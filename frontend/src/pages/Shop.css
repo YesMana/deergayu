@@ -164,3 +164,24 @@
 .add-to-cart-btn {
   padding: 0.5rem 1rem;
 }
+
+/* --- Mobile Responsiveness --- */
+@media (max-width: 768px) {
+  .shop-controls {
+    flex-direction: column;
+    width: 100%;
+  }
+  
+  .search-bar {
+    width: 100%;
+  }
+
+  .filter-btn {
+    width: 100%;
+    margin-top: 1rem;
+  }
+
+  .product-grid {
+    grid-template-columns: 1fr;
+  }
+}

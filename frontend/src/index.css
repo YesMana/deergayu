@@ -172,3 +172,21 @@ button {
   margin-bottom: 3rem;
   color: var(--primary-color);
 }
+
+/* --- Mobile Responsiveness (Global) --- */
+@media (max-width: 768px) {
+  .container {
+    padding: 0 1rem;
+  }
+  .section {
+    padding: 3rem 0;
+  }
+  .section-title {
+    font-size: 2rem;
+    margin-bottom: 2rem;
+  }
+  .btn {
+    padding: 0.6rem 1.2rem;
+    font-size: 0.95rem;
+  }
+}
