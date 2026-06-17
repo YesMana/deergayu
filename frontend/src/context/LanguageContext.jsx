@@ -1,0 +1,99 @@
+import React, { createContext, useState, useContext } from 'react';
+
+const translations = {
+  en: {
+    nav_home: "Home",
+    nav_shop: "Ayurvedic Shop",
+    nav_channeling: "Channeling",
+    nav_symptoms: "Symptom Checker",
+    nav_admin: "Admin Dashboard",
+    nav_login: "Login",
+    hero_title: "Discover Ancient Healing with",
+    hero_subtitle: "Your trusted platform for authentic Ayurvedic medicines, expert doctor channeling, and profound astrological guidance.",
+    btn_shop: "Shop Medicines",
+    btn_book: "Book Appointment",
+    services_title: "Our Services",
+    srv_shop_title: "Ayurvedic Shop",
+    srv_shop_desc: "Authentic and verified Ayurvedic medicines delivered to your doorstep.",
+    srv_shop_link: "Browse Products",
+    srv_doc_title: "Doctor Channeling",
+    srv_doc_desc: "Consult with Sri Lanka's top Ayurvedic physicians online or in-person.",
+    srv_doc_link: "Find Doctors",
+    srv_astro_title: "Astrology & Yantra",
+    srv_astro_desc: "Connect with expert astrologers for guidance, yantra, and mantra services.",
+    srv_astro_link: "Consult Astrologers",
+  },
+  si: {
+    nav_home: "මුල් පිටුව",
+    nav_shop: "ආයුර්වේද ඔසුසල",
+    nav_channeling: "චැනලින් සේවා",
+    nav_symptoms: "රෝග ලක්ෂණ පරීක්ෂාව",
+    nav_admin: "පරිපාලන පැනලය",
+    nav_login: "ඇතුල් වන්න",
+    hero_title: "පෞරාණික ආයුර්වේද සුවය අත්විඳින්න",
+    hero_subtitle: "විශ්වාසවන්ත ආයුර්වේද ඖෂධ, ප්‍රවීණ වෛද්‍යවරුන් චැනල් කිරීම සහ ජ්‍යොතිෂ්‍ය සේවා සඳහා ඔබේ විශ්වාසවන්ත වේදිකාව.",
+    btn_shop: "ඖෂධ මිලදී ගන්න",
+    btn_book: "වෙලාවක් වෙන්කරගන්න",
+    services_title: "අපගේ සේවාවන්",
+    srv_shop_title: "ආයුර්වේද ඔසුසල",
+    srv_shop_desc: "උසස්ම තත්ත්වයේ, පිරිසිදු ආයුර්වේද ඖෂධ නිවසටම ගෙන්වා ගන්න.",
+    srv_shop_link: "ඖෂධ බලන්න",
+    srv_doc_title: "වෛද්‍ය චැනලින්",
+    srv_doc_desc: "ශ්‍රී ලංකාවේ ප්‍රවීණතම ආයුර්වේද වෛද්‍යවරුන් මාර්ගගතව හෝ ඍජුවම හමුවන්න.",
+    srv_doc_link: "වෛද්‍යවරුන් සොයන්න",
+    srv_astro_title: "ජ්‍යොතිෂ්‍ය හා යන්ත්‍ර මන්ත්‍ර",
+    srv_astro_desc: "ඔබේ ජීවිතයේ ගැටළු වලට ප්‍රවීණ ජ්‍යොතිෂ්‍යවේදීන්ගෙන් නිවැරදි විසඳුම් ලබාගන්න.",
+    srv_astro_link: "සේවාවන් ලබාගන්න",
+  },
+  ta: {
+    nav_home: "முகப்பு",
+    nav_shop: "ஆயுர்வேத கடை",
+    nav_channeling: "மருத்துவர் ஆலோசனை",
+    nav_symptoms: "அறிகுறி சோதனையாளர்",
+    nav_admin: "நிர்வாக குழு",
+    nav_login: "உள்நுழைக",
+    hero_title: "பண்டைய குணப்படுத்தும் முறையை கண்டறியுங்கள்",
+    hero_subtitle: "உண்மையான ஆயுர்வேத மருந்துகள், சிறந்த மருத்துவர் ஆலோசனை மற்றும் ஜோதிட வழிகாட்டுதலுக்கான உங்கள் நம்பகமான தளம்.",
+    btn_shop: "மருந்துகள் வாங்குங்கள்",
+    btn_book: "நேரத்தை பதிவு செய்யுங்கள்",
+    services_title: "எங்கள் சேவைகள்",
+    srv_shop_title: "ஆயுர்வேத கடை",
+    srv_shop_desc: "உயர்தர மற்றும் உண்மையான ஆயுர்வேத மருந்துகள் உங்கள் வீட்டு வாசலில்.",
+    srv_shop_link: "தயாரிப்புகளைக் காண்க",
+    srv_doc_title: "மருத்துவர் ஆலோசனை",
+    srv_doc_desc: "இலங்கையின் சிறந்த ஆயுர்வேத மருத்துவர்களுடன் ஆன்லைனில் அல்லது நேரில் ஆலோசனை பெறுங்கள்.",
+    srv_doc_link: "மருத்துவர்களை தேடுங்கள்",
+    srv_astro_title: "ஜோதிடம் & யந்திரம்",
+    srv_astro_desc: "ஜோதிடர்களுடன் தொடர்புகொண்டு வழிகாட்டுதல் மற்றும் யந்திர சேவைகளை பெறுங்கள்.",
+    srv_astro_link: "சேவைகளை பெறுங்கள்",
+  }
+};
+
+const LanguageContext = createContext();
+
+export const useLanguage = () => useContext(LanguageContext);
+
+export const LanguageProvider = ({ children }) => {
+  const [lang, setLangState] = useState(localStorage.getItem('appLang') || 'en');
+  const [hasChosen, setHasChosen] = useState(!!localStorage.getItem('appLang'));
+
+  const setLanguage = (selectedLang) => {
+    setLangState(selectedLang);
+    setHasChosen(true);
+    localStorage.setItem('appLang', selectedLang);
+  };
+
+  const toggleLanguage = () => {
+    const sequence = ['en', 'si', 'ta'];
+    const nextIndex = (sequence.indexOf(lang) + 1) % sequence.length;
+    setLanguage(sequence[nextIndex]);
+  };
+
+  const t = (key) => translations[lang]?.[key] || translations['en'][key] || key;
+
+  return (
+    <LanguageContext.Provider value={{ lang, toggleLanguage, setLanguage, hasChosen, t }}>
+      {children}
+    </LanguageContext.Provider>
+  );
+};
