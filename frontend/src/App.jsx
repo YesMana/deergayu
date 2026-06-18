@@ -39,7 +39,7 @@ function App() {
                 </Route>
 
                 {/* Protected Vendor Routes */}
-                <Route element={<ProtectedRoute requiredRole="vendor" />}>
+                <Route element={<ProtectedRoute requiredRole={['vendor', 'doctor', 'clinic', 'organization']} />}>
                   <Route path="/vendor/*" element={<VendorDashboard />} />
                 </Route>
               </Routes>

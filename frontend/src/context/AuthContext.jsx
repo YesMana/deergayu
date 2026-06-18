@@ -29,7 +29,9 @@ export const AuthProvider = ({ children }) => {
             if (userDoc.exists()) {
               const data = userDoc.data();
               currentUser.role = data.role || 'user';
+              currentUser.status = data.status || 'approved';
               currentUser.displayName = data.name || currentUser.displayName;
+              currentUser.profileDetails = data.profileDetails || null;
             } else {
               currentUser.role = 'user';
             }
@@ -56,25 +58,14 @@ export const AuthProvider = ({ children }) => {
       name,
       email,
       role,
+      status: role === 'user' ? 'approved' : 'pending',
       createdAt: new Date().toISOString()
     });
     return userCredential;
   };
 
   const loginWithGoogle = async () => {
-    const userCredential = await signInWithPopup(auth, googleProvider);
-    // Check if user doc exists, if not create as normal user
-    const userDocRef = doc(db, 'users', userCredential.user.uid);
-    const userDoc = await getDoc(userDocRef);
-    if (!userDoc.exists()) {
-      await setDoc(userDocRef, {
-        name: userCredential.user.displayName || 'Google User',
-        email: userCredential.user.email,
-        role: 'user',
-        createdAt: new Date().toISOString()
-      });
-    }
-    return userCredential;
+    return signInWithPopup(auth, googleProvider);
   };
 
   const resetPassword = (email) => {

@@ -21,13 +21,28 @@ const Login = () => {
   const { t } = useLanguage();
   const navigate = useNavigate();
 
-  const handleAdminRouting = (user) => {
+  const handleAdminRouting = async (user) => {
     const superAdmins = ['yes.manujaya@gmail.com'];
     if (user && superAdmins.includes(user.email)) {
       navigate('/admin');
-    } else {
-      navigate('/');
+      return;
     }
+    
+    // Fetch user document to check role
+    try {
+      const userDoc = await getDoc(doc(db, 'users', user.uid));
+      if (userDoc.exists()) {
+        const data = userDoc.data();
+        if (['vendor', 'doctor', 'clinic', 'organization'].includes(data.role)) {
+          navigate('/vendor');
+          return;
+        }
+      }
+    } catch (e) {
+      console.error("Error fetching role for routing:", e);
+    }
+    
+    navigate('/');
   };
 
   const handleSubmit = async (e) => {
@@ -38,14 +53,14 @@ const Login = () => {
     try {
       if (mode === 'login') {
         const userCredential = await loginWithEmail(email, password);
-        handleAdminRouting(userCredential.user);
+        await handleAdminRouting(userCredential.user);
       } else if (mode === 'signup') {
         if (!name) {
           setError('Please enter your name');
           return;
         }
         const userCredential = await signupWithEmail(email, password, name, role);
-        handleAdminRouting(userCredential.user);
+        await handleAdminRouting(userCredential.user);
       } else if (mode === 'forgot') {
         await resetPassword(email);
         setMessage('Password reset email sent! Check your inbox.');
@@ -66,7 +81,7 @@ const Login = () => {
         setName(userCredential.user.displayName || '');
         setShowRoleModal(true);
       } else {
-        handleAdminRouting(userCredential.user);
+        await handleAdminRouting(userCredential.user);
       }
     } catch (err) {
       setError('Google Sign-In failed.');
@@ -82,10 +97,11 @@ const Login = () => {
         name: name || tempUser.displayName,
         email: tempUser.email,
         role: role,
+        status: role === 'user' ? 'approved' : 'pending',
         createdAt: new Date().toISOString()
       });
       setShowRoleModal(false);
-      handleAdminRouting(tempUser);
+      await handleAdminRouting(tempUser);
     } catch (err) {
       setError('Failed to save profile. Please try again.');
     }

@@ -41,7 +41,7 @@ const specialtiesList = ["Sarwanga Roga (General)", "Kadum Bindum (Orthopedic)",
 
 const AdminDashboard = () => {
   const [providers, setProviders] = useState(initialProviders);
-  const [products, setProducts] = useState(initialProducts);
+  const [products, setProducts] = useState([]);
   const [orders, setOrders] = useState(initialAdminOrders);
   const [filterVendor, setFilterVendor] = useState('All');
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -53,7 +53,21 @@ const AdminDashboard = () => {
     if (activeTab === 'users') {
       fetchUsers();
     }
+    if (activeTab === 'products') {
+      fetchProducts();
+    }
   }, [activeTab]);
+
+  const fetchProducts = async () => {
+    try {
+      const productsCol = collection(db, 'products');
+      const productSnapshot = await getDocs(productsCol);
+      const productList = productSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setProducts(productList);
+    } catch (err) {
+      console.error("Error fetching products:", err);
+    }
+  };
 
   const fetchUsers = async () => {
     setLoadingUsers(true);
@@ -92,6 +106,30 @@ const AdminDashboard = () => {
     }
   };
 
+  const handleApproveUser = async (uid) => {
+    if (!window.confirm("Approve this expert?")) return;
+    try {
+      const token = await auth.currentUser.getIdToken();
+      const res = await fetch(`https://deergayu.com/api/users/${uid}/status`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ status: 'approved' })
+      });
+      if (res.ok) {
+        alert("Expert approved successfully!");
+        fetchUsers();
+      } else {
+        const data = await res.json();
+        alert(`Failed: ${data.error}`);
+      }
+    } catch (err) {
+      alert("Error approving expert");
+    }
+  };
+
   const handleDeleteUser = async (uid) => {
     if (!window.confirm("Are you sure you want to completely delete this user? This cannot be undone.")) return;
     
@@ -122,15 +160,37 @@ const AdminDashboard = () => {
 
   const pendingCount = products.filter(p => p.status === 'pending').length;
 
-  const handleProductAction = (id, action) => {
-    setProducts(products.map(p => {
-      if (p.id === id) {
-        if (action === 'approve') return { ...p, status: 'approved' };
-        if (action === 'hide') return { ...p, status: 'hidden' };
-        if (action === 'delete') return null; // We'll filter nulls out below
+  const handleProductAction = async (id, action) => {
+    try {
+      const newStatus = action === 'approve' ? 'approved' : action === 'hide' ? 'hidden' : 'rejected';
+      
+      const token = await auth.currentUser.getIdToken();
+      const res = await fetch(`https://deergayu.com/api/products/${id}/status`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ status: newStatus })
+      });
+      
+      if (res.ok) {
+        alert(`Product ${action}d successfully!`);
+        fetchProducts();
+      } else {
+        // Fallback to local state if API isn't ready
+        setProducts(products.map(p => {
+          if (p.id === id) {
+            if (action === 'approve') return { ...p, status: 'approved' };
+            if (action === 'hide') return { ...p, status: 'hidden' };
+            if (action === 'delete') return null;
+          }
+          return p;
+        }).filter(Boolean));
       }
-      return p;
-    }).filter(Boolean));
+    } catch (err) {
+      alert(`Error updating product status`);
+    }
   };
 
   const handleDistrictToggle = (district) => {
@@ -434,6 +494,7 @@ const AdminDashboard = () => {
                       <th>Name</th>
                       <th>Email</th>
                       <th>Role</th>
+                      <th>Status & Details</th>
                       <th>Joined</th>
                       <th>Actions</th>
                     </tr>
@@ -457,16 +518,33 @@ const AdminDashboard = () => {
                             {u.email === 'yes.manujaya@gmail.com' && <option value="admin">Admin</option>}
                           </select>
                         </td>
+                        <td>
+                          {u.status === 'pending' ? (
+                            <span style={{ color: 'var(--error-color)', fontWeight: 'bold' }}>Pending</span>
+                          ) : (
+                            <span style={{ color: 'var(--success-color)' }}>Approved</span>
+                          )}
+                          {u.profileDetails && (
+                            <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: '0.25rem' }}>
+                              {u.profileDetails.phone} <br/> {u.profileDetails.address}
+                            </div>
+                          )}
+                        </td>
                         <td>{u.createdAt ? new Date(u.createdAt).toLocaleDateString() : 'N/A'}</td>
                         <td>
-                          <button 
-                            className="btn btn-outline" 
-                            style={{color: 'white', background: 'var(--error-color)', borderColor: 'var(--error-color)', padding: '0.25rem 0.75rem', fontSize: '0.85rem'}}
-                            onClick={() => handleDeleteUser(u.id)}
-                            disabled={u.email === 'yes.manujaya@gmail.com'}
-                          >
-                            Delete
-                          </button>
+                          <div style={{ display: 'flex', gap: '0.5rem' }}>
+                            {u.status === 'pending' && (
+                              <button onClick={() => handleApproveUser(u.id)} className="btn btn-primary" style={{ padding: '0.3rem 0.5rem', fontSize: '0.8rem' }}>Approve</button>
+                            )}
+                            <button 
+                              className="btn btn-outline" 
+                              style={{color: 'white', background: 'var(--error-color)', borderColor: 'var(--error-color)', padding: '0.25rem 0.75rem', fontSize: '0.85rem'}}
+                              onClick={() => handleDeleteUser(u.id)}
+                              disabled={u.email === 'yes.manujaya@gmail.com'}
+                            >
+                              Delete
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     ))}
