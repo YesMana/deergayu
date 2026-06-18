@@ -3,26 +3,49 @@ import { Search, Calendar as CalendarIcon, Star, Video, MapPin, CheckCircle2 } f
 import './Channeling.css';
 
 const dummyProviders = [
-  { id: 1, name: "Dr. Anura Dissanayake", role: "Ayurvedic Physician", specialty: "Sarwanga Roga (General)", rating: 4.9, location: "Colombo", experience: "15 Years", type: "doctor", image: "https://images.unsplash.com/photo-1612349317150-e413f6a5b16d?w=500&q=80" },
-  { id: 2, name: "Vedamahaththaya Somarathna", role: "Traditional Healer", specialty: "Kadum Bindum (Orthopedic)", rating: 4.8, location: "Kandy", experience: "25 Years", type: "doctor", image: "https://images.unsplash.com/photo-1537368910025-700350fe46c7?w=500&q=80" },
-  { id: 3, name: "Astrologer Wickramasinghe", role: "Vedic Astrologer", specialty: "Yantra & Mantra", rating: 5.0, location: "Online", experience: "30 Years", type: "astrologer", image: "https://images.unsplash.com/photo-1544717685-618763071c89?w=500&q=80" },
-  { id: 4, name: "Dr. Samanthi Perera", role: "Ayurvedic Physician", specialty: "Sarpa Visha (Toxicology)", rating: 4.7, location: "Galle", experience: "10 Years", type: "doctor", image: "https://images.unsplash.com/photo-1594824436951-7f12bc4147f5?w=500&q=80" },
-  { id: 5, name: "Dr. Wasantha Kumara", role: "Traditional Healer", specialty: "Sarwanga Roga (General)", rating: 4.6, location: "Gampaha", experience: "20 Years", type: "doctor", image: "https://images.unsplash.com/photo-1559839734-2b71ea197ec2?w=500&q=80" },
+  { id: 1, name: "Dr. Anura Dissanayake", role: "Ayurvedic Physician", specialty: "Sarwanga Roga (General)", rating: 4.9, province: "Western", location: "Colombo", experience: "15 Years", type: "doctor", image: "https://images.unsplash.com/photo-1612349317150-e413f6a5b16d?w=500&q=80" },
+  { id: 2, name: "Vedamahaththaya Somarathna", role: "Traditional Healer", specialty: "Kadum Bindum (Orthopedic)", rating: 4.8, province: "Central", location: "Kandy", experience: "25 Years", type: "doctor", image: "https://images.unsplash.com/photo-1537368910025-700350fe46c7?w=500&q=80" },
+  { id: 3, name: "Astrologer Wickramasinghe", role: "Vedic Astrologer", specialty: "Yantra & Mantra", rating: 5.0, province: "Online", location: "Online", experience: "30 Years", type: "astrologer", image: "https://images.unsplash.com/photo-1544717685-618763071c89?w=500&q=80" },
+  { id: 4, name: "Dr. Samanthi Perera", role: "Ayurvedic Physician", specialty: "Sarpa Visha (Toxicology)", rating: 4.7, province: "Southern", location: "Galle", experience: "10 Years", type: "doctor", image: "https://images.unsplash.com/photo-1594824436951-7f12bc4147f5?w=500&q=80" },
+  { id: 5, name: "Dr. Wasantha Kumara", role: "Traditional Healer", specialty: "Sarwanga Roga (General)", rating: 4.6, province: "Western", location: "Gampaha", experience: "20 Years", type: "doctor", image: "https://images.unsplash.com/photo-1559839734-2b71ea197ec2?w=500&q=80" },
 ];
 
-const districts = ["Colombo", "Gampaha", "Kandy", "Galle", "Matara", "Online"];
+const sriLankaData = {
+  "Western": ["Colombo", "Gampaha", "Kalutara"],
+  "Central": ["Kandy", "Matale", "Nuwara Eliya"],
+  "Southern": ["Galle", "Matara", "Hambantota"],
+  "Northern": ["Jaffna", "Kilinochchi", "Mannar", "Mullaitivu", "Vavuniya"],
+  "Eastern": ["Trincomalee", "Batticaloa", "Ampara"],
+  "North Western": ["Kurunegala", "Puttalam"],
+  "North Central": ["Anuradhapura", "Polonnaruwa"],
+  "Uva": ["Badulla", "Monaragala"],
+  "Sabaragamuwa": ["Ratnapura", "Kegalle"],
+  "Online": ["Online"]
+};
+
 const specialties = ["Sarwanga Roga (General)", "Kadum Bindum (Orthopedic)", "Sarpa Visha (Toxicology)", "Yantra & Mantra", "Vastu Shastra"];
 
 const Channeling = () => {
   const [filterType, setFilterType] = useState('all');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [provinceFilter, setProvinceFilter] = useState('all');
   const [districtFilter, setDistrictFilter] = useState('all');
   const [specialtyFilter, setSpecialtyFilter] = useState('all');
 
+  const handleProvinceChange = (e) => {
+    setProvinceFilter(e.target.value);
+    setDistrictFilter('all'); // Reset district when province changes
+  };
+
   const filteredProviders = dummyProviders.filter(p => {
     const matchType = filterType === 'all' || p.type === filterType;
+    const matchProvince = provinceFilter === 'all' || p.province === provinceFilter;
     const matchDistrict = districtFilter === 'all' || p.location === districtFilter;
     const matchSpecialty = specialtyFilter === 'all' || p.specialty === specialtyFilter;
-    return matchType && matchDistrict && matchSpecialty;
+    const matchSearch = p.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                        p.specialty.toLowerCase().includes(searchQuery.toLowerCase());
+                        
+    return matchType && matchProvince && matchDistrict && matchSpecialty && matchSearch;
   });
 
   return (
@@ -53,28 +76,53 @@ const Channeling = () => {
             </button>
           </div>
 
-          <div className="filter-dropdowns">
-            <select 
-              value={districtFilter} 
-              onChange={(e) => setDistrictFilter(e.target.value)}
-              className="filter-select"
-            >
-              <option value="all">All Districts</option>
-              {districts.map(d => (
-                <option key={d} value={d}>{d}</option>
-              ))}
-            </select>
+          <div className="filter-controls-container">
+            <div className="search-wrapper">
+              <Search className="search-icon" size={20} />
+              <input 
+                type="text" 
+                placeholder="Search by name or specialty..." 
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="channeling-search-input"
+              />
+            </div>
 
-            <select 
-              value={specialtyFilter} 
-              onChange={(e) => setSpecialtyFilter(e.target.value)}
-              className="filter-select"
-            >
-              <option value="all">All Specialties</option>
-              {specialties.map(s => (
-                <option key={s} value={s}>{s}</option>
-              ))}
-            </select>
+            <div className="filter-dropdowns">
+              <select 
+                value={provinceFilter} 
+                onChange={handleProvinceChange}
+                className="filter-select"
+              >
+                <option value="all">All Provinces</option>
+                {Object.keys(sriLankaData).map(prov => (
+                  <option key={prov} value={prov}>{prov}</option>
+                ))}
+              </select>
+
+              <select 
+                value={districtFilter} 
+                onChange={(e) => setDistrictFilter(e.target.value)}
+                className="filter-select"
+                disabled={provinceFilter === 'all'}
+              >
+                <option value="all">All Districts</option>
+                {provinceFilter !== 'all' && sriLankaData[provinceFilter].map(dist => (
+                  <option key={dist} value={dist}>{dist}</option>
+                ))}
+              </select>
+
+              <select 
+                value={specialtyFilter} 
+                onChange={(e) => setSpecialtyFilter(e.target.value)}
+                className="filter-select"
+              >
+                <option value="all">All Specialties</option>
+                {specialties.map(s => (
+                  <option key={s} value={s}>{s}</option>
+                ))}
+              </select>
+            </div>
           </div>
         </div>
       </div>
@@ -100,7 +148,7 @@ const Channeling = () => {
                   <div className="provider-details">
                     <span className="detail-tag">{provider.specialty}</span>
                     <span className="detail-tag">{provider.experience} Exp</span>
-                    <span className="detail-tag flex-center"><MapPin size={14}/> {provider.location}</span>
+                    <span className="detail-tag flex-center"><MapPin size={14}/> {provider.location}, {provider.province}</span>
                   </div>
                 </div>
                 
