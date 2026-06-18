@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
+import { db } from '../firebase';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
 import './Login.css';
 
 const Login = () => {
@@ -12,6 +14,8 @@ const Login = () => {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
+  const [showRoleModal, setShowRoleModal] = useState(false);
+  const [tempUser, setTempUser] = useState(null);
   
   const { loginWithEmail, signupWithEmail, loginWithGoogle, resetPassword } = useAuth();
   const { t } = useLanguage();
@@ -54,9 +58,36 @@ const Login = () => {
   const handleGoogleAuth = async () => {
     try {
       const userCredential = await loginWithGoogle();
-      handleAdminRouting(userCredential.user);
+      const userDocRef = doc(db, 'users', userCredential.user.uid);
+      const userDoc = await getDoc(userDocRef);
+      
+      if (!userDoc.exists()) {
+        setTempUser(userCredential.user);
+        setName(userCredential.user.displayName || '');
+        setShowRoleModal(true);
+      } else {
+        handleAdminRouting(userCredential.user);
+      }
     } catch (err) {
       setError('Google Sign-In failed.');
+    }
+  };
+
+  const handleRoleSelectionSubmit = async (e) => {
+    e.preventDefault();
+    if (!tempUser) return;
+    
+    try {
+      await setDoc(doc(db, 'users', tempUser.uid), {
+        name: name || tempUser.displayName,
+        email: tempUser.email,
+        role: role,
+        createdAt: new Date().toISOString()
+      });
+      setShowRoleModal(false);
+      handleAdminRouting(tempUser);
+    } catch (err) {
+      setError('Failed to save profile. Please try again.');
     }
   };
 
@@ -142,17 +173,52 @@ const Login = () => {
           </>
         )}
 
-        <div className="auth-links" style={{textAlign: 'center', marginTop: '1rem', fontSize: '0.9rem'}}>
+        <div className="login-footer">
           {mode === 'login' ? (
-            <>
-              <p>Don't have an account? <span onClick={() => setMode('signup')} style={{color: 'var(--primary-color)', cursor: 'pointer', fontWeight: 'bold'}}>Sign up</span></p>
-              <p style={{marginTop: '0.5rem'}}><span onClick={() => setMode('forgot')} style={{color: 'var(--text-secondary)', cursor: 'pointer', textDecoration: 'underline'}}>Forgot your password?</span></p>
-            </>
+            <p>Don't have an account? <span onClick={() => setMode('signup')} className="login-link">Sign up</span></p>
+          ) : mode === 'signup' ? (
+            <p>Already have an account? <span onClick={() => setMode('login')} className="login-link">Login</span></p>
           ) : (
-            <p>Already have an account? <span onClick={() => setMode('login')} style={{color: 'var(--primary-color)', cursor: 'pointer', fontWeight: 'bold'}}>Sign in</span></p>
+            <p>Remember your password? <span onClick={() => setMode('login')} className="login-link">Login</span></p>
           )}
         </div>
       </div>
+
+      {showRoleModal && (
+        <div className="modal-overlay" style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', background: 'rgba(0,0,0,0.8)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000 }}>
+          <div className="modal-content glass-panel" style={{ padding: '2rem', maxWidth: '400px', width: '90%' }}>
+            <h3 style={{ marginBottom: '1rem', color: 'var(--secondary-color)' }}>Complete Your Profile</h3>
+            <p style={{ marginBottom: '1.5rem', color: 'var(--text-secondary)' }}>Please verify your name and select your account type to continue.</p>
+            <form onSubmit={handleRoleSelectionSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <div className="form-group">
+                <label>Full Name</label>
+                <input 
+                  type="text" 
+                  value={name} 
+                  onChange={(e) => setName(e.target.value)} 
+                  required 
+                  style={{ width: '100%', padding: '0.8rem', borderRadius: '4px' }}
+                />
+              </div>
+              <div className="form-group">
+                <label>Account Type</label>
+                <select 
+                  value={role} 
+                  onChange={(e) => setRole(e.target.value)} 
+                  required
+                  style={{ width: '100%', padding: '0.8rem', borderRadius: '4px', background: 'var(--surface-color)', color: 'var(--text-primary)' }}
+                >
+                  <option value="user">Normal User</option>
+                  <option value="doctor">Doctor</option>
+                  <option value="clinic">Medical Clinic</option>
+                  <option value="organization">Organization</option>
+                </select>
+              </div>
+              <button type="submit" className="btn btn-primary" style={{ marginTop: '1rem' }}>Complete Setup</button>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
