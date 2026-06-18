@@ -72,8 +72,14 @@ const Navbar = () => {
             {user ? (
               <div className="user-profile-nav" style={{display: 'flex', alignItems: 'center', gap: '0.8rem', background: 'rgba(var(--primary-color-rgb), 0.1)', padding: '0.4rem 1rem', borderRadius: '20px'}}>
                 <div style={{display: 'flex', flexDirection: 'column', alignItems: 'flex-end', lineHeight: '1.2'}}>
-                  <span style={{fontWeight: 'bold', fontSize: '0.9rem'}}>{user.displayName || user.email.split('@')[0]}</span>
-                  <span style={{fontSize: '0.7rem', color: 'var(--primary-color)', textTransform: 'capitalize'}}>{user.role}</span>
+                  <span style={{fontWeight: 'bold', fontSize: '0.9rem', color: 'var(--text-primary)'}}>{user.displayName || user.email.split('@')[0]}</span>
+                  {user.role === 'admin' ? (
+                    <Link to="/admin" style={{fontSize: '0.75rem', color: 'var(--primary-color)', textTransform: 'capitalize', fontWeight: 'bold', textDecoration: 'none'}}>➜ Admin Panel</Link>
+                  ) : user.role === 'vendor' || user.role === 'clinic' ? (
+                    <Link to="/vendor" style={{fontSize: '0.75rem', color: 'var(--primary-color)', textTransform: 'capitalize', fontWeight: 'bold', textDecoration: 'none'}}>➜ Vendor Panel</Link>
+                  ) : (
+                    <span style={{fontSize: '0.7rem', color: 'var(--primary-color)', textTransform: 'capitalize'}}>{user.role}</span>
+                  )}
                 </div>
                 <button onClick={logout} className="icon-btn" title="Logout" style={{color: 'var(--error-color)', padding: '0.2rem'}}>
                   <X size={18} />
