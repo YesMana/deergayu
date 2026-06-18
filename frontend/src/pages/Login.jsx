@@ -14,8 +14,6 @@ const Login = () => {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
-  const [showRoleModal, setShowRoleModal] = useState(false);
-  const [tempUser, setTempUser] = useState(null);
   
   const { loginWithEmail, signupWithEmail, loginWithGoogle, resetPassword } = useAuth();
   const { t } = useLanguage();
@@ -73,39 +71,27 @@ const Login = () => {
   const handleGoogleAuth = async () => {
     try {
       const userCredential = await loginWithGoogle();
-      const userDocRef = doc(db, 'users', userCredential.user.uid);
+      const user = userCredential.user;
+      const userDocRef = doc(db, 'users', user.uid);
       const userDoc = await getDoc(userDocRef);
       
       if (!userDoc.exists()) {
-        setTempUser(userCredential.user);
-        setName(userCredential.user.displayName || '');
-        setShowRoleModal(true);
-      } else {
-        await handleAdminRouting(userCredential.user);
+        const isSuperAdmin = user.email && user.email.toLowerCase() === 'yes.manujaya@gmail.com';
+        await setDoc(userDocRef, {
+          name: user.displayName || 'New User',
+          email: user.email,
+          role: isSuperAdmin ? 'admin' : 'user',
+          status: 'approved',
+          createdAt: new Date().toISOString()
+        });
       }
+      await handleAdminRouting(user);
     } catch (err) {
       setError('Google Sign-In failed.');
     }
   };
 
-  const handleRoleSelectionSubmit = async (e) => {
-    e.preventDefault();
-    if (!tempUser) return;
-    
-    try {
-      await setDoc(doc(db, 'users', tempUser.uid), {
-        name: name || tempUser.displayName,
-        email: tempUser.email,
-        role: role,
-        status: role === 'user' ? 'approved' : 'pending',
-        createdAt: new Date().toISOString()
-      });
-      setShowRoleModal(false);
-      await handleAdminRouting(tempUser);
-    } catch (err) {
-      setError('Failed to save profile. Please try again.');
-    }
-  };
+
 
   return (
     <div className="login-container animate-fade-in">
