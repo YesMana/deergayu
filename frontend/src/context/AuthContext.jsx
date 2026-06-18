@@ -7,8 +7,8 @@ import {
   signInWithPopup,
   sendPasswordResetEmail
 } from 'firebase/auth';
-import { auth, googleProvider } from '../firebase';
-
+import { auth, googleProvider, db } from '../firebase';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
 const AuthContext = createContext();
 
 export const useAuth = () => useContext(AuthContext);
@@ -18,13 +18,25 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       if (currentUser) {
         const superAdmins = ['yes.manujaya@gmail.com'];
         if (superAdmins.includes(currentUser.email)) {
           currentUser.role = 'admin';
         } else {
-          currentUser.role = 'user';
+          try {
+            const userDoc = await getDoc(doc(db, 'users', currentUser.uid));
+            if (userDoc.exists()) {
+              const data = userDoc.data();
+              currentUser.role = data.role || 'user';
+              currentUser.displayName = data.name || currentUser.displayName;
+            } else {
+              currentUser.role = 'user';
+            }
+          } catch (e) {
+            console.error("Error fetching user role:", e);
+            currentUser.role = 'user';
+          }
         }
       }
       setUser(currentUser);
@@ -37,12 +49,32 @@ export const AuthProvider = ({ children }) => {
     return signInWithEmailAndPassword(auth, email, password);
   };
 
-  const signupWithEmail = (email, password) => {
-    return createUserWithEmailAndPassword(auth, email, password);
+  const signupWithEmail = async (email, password, name, role) => {
+    const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+    // Create user doc in Firestore
+    await setDoc(doc(db, 'users', userCredential.user.uid), {
+      name,
+      email,
+      role,
+      createdAt: new Date().toISOString()
+    });
+    return userCredential;
   };
 
-  const loginWithGoogle = () => {
-    return signInWithPopup(auth, googleProvider);
+  const loginWithGoogle = async () => {
+    const userCredential = await signInWithPopup(auth, googleProvider);
+    // Check if user doc exists, if not create as normal user
+    const userDocRef = doc(db, 'users', userCredential.user.uid);
+    const userDoc = await getDoc(userDocRef);
+    if (!userDoc.exists()) {
+      await setDoc(userDocRef, {
+        name: userCredential.user.displayName || 'Google User',
+        email: userCredential.user.email,
+        role: 'user',
+        createdAt: new Date().toISOString()
+      });
+    }
+    return userCredential;
   };
 
   const resetPassword = (email) => {

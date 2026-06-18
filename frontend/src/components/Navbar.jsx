@@ -2,12 +2,14 @@ import { Link, useLocation } from 'react-router-dom';
 import { Leaf, UserCircle, ShoppingBag, Globe, Mic, Sun, Moon, Menu, X } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import { useTheme } from '../context/ThemeContext';
+import { useAuth } from '../context/AuthContext';
 import React, { useState, useEffect } from 'react';
 import './Navbar.css';
 
 const Navbar = () => {
   const { lang, toggleLanguage, t } = useLanguage();
   const { theme, toggleTheme } = useTheme();
+  const { user, logout } = useAuth();
   const [isListening, setIsListening] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const location = useLocation();
@@ -67,10 +69,22 @@ const Navbar = () => {
             <Link to="/shop/cart" className="icon-btn">
               <ShoppingBag size={20} />
             </Link>
-            <Link to="/login" className="btn btn-primary">
-              <UserCircle size={20} />
-              {t('nav_login')}
-            </Link>
+            {user ? (
+              <div className="user-profile-nav" style={{display: 'flex', alignItems: 'center', gap: '0.8rem', background: 'rgba(var(--primary-color-rgb), 0.1)', padding: '0.4rem 1rem', borderRadius: '20px'}}>
+                <div style={{display: 'flex', flexDirection: 'column', alignItems: 'flex-end', lineHeight: '1.2'}}>
+                  <span style={{fontWeight: 'bold', fontSize: '0.9rem'}}>{user.displayName || user.email.split('@')[0]}</span>
+                  <span style={{fontSize: '0.7rem', color: 'var(--primary-color)', textTransform: 'capitalize'}}>{user.role}</span>
+                </div>
+                <button onClick={logout} className="icon-btn" title="Logout" style={{color: 'var(--error-color)', padding: '0.2rem'}}>
+                  <X size={18} />
+                </button>
+              </div>
+            ) : (
+              <Link to="/login" className="btn btn-primary">
+                <UserCircle size={20} />
+                {t('nav_login')}
+              </Link>
+            )}
           </div>
         </div>
       </div>

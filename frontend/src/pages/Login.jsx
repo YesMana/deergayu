@@ -6,6 +6,8 @@ import './Login.css';
 
 const Login = () => {
   const [mode, setMode] = useState('login'); // 'login', 'signup', 'forgot'
+  const [name, setName] = useState('');
+  const [role, setRole] = useState('user');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -34,7 +36,11 @@ const Login = () => {
         const userCredential = await loginWithEmail(email, password);
         handleAdminRouting(userCredential.user);
       } else if (mode === 'signup') {
-        const userCredential = await signupWithEmail(email, password);
+        if (!name) {
+          setError('Please enter your name');
+          return;
+        }
+        const userCredential = await signupWithEmail(email, password, name, role);
         handleAdminRouting(userCredential.user);
       } else if (mode === 'forgot') {
         await resetPassword(email);
@@ -73,6 +79,29 @@ const Login = () => {
         {message && <div className="login-success" style={{color: 'var(--success-color)', marginBottom: '1rem', textAlign: 'center', background: '#e8f5e9', padding: '0.5rem', borderRadius: '4px'}}>{message}</div>}
 
         <form onSubmit={handleSubmit} className="login-form">
+          {mode === 'signup' && (
+            <>
+              <div className="form-group">
+                <label>Full Name / Organization Name</label>
+                <input 
+                  type="text" 
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="John Doe"
+                  required 
+                />
+              </div>
+              <div className="form-group">
+                <label>Account Type</label>
+                <select value={role} onChange={(e) => setRole(e.target.value)} required>
+                  <option value="user">Normal User</option>
+                  <option value="doctor">Doctor</option>
+                  <option value="clinic">Medical Clinic</option>
+                  <option value="organization">Organization</option>
+                </select>
+              </div>
+            </>
+          )}
           <div className="form-group">
             <label>Email Address</label>
             <input 

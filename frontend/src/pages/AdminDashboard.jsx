@@ -42,7 +42,7 @@ const AdminDashboard = () => {
   const [products, setProducts] = useState(initialProducts);
   const [orders, setOrders] = useState(initialAdminOrders);
   const [filterVendor, setFilterVendor] = useState('All');
-  const [activeTab, setActiveTab] = useState('providers');
+  const [activeTab, setActiveTab] = useState('dashboard');
   
   const [showAddModal, setShowAddModal] = useState(false);
   const [newExpert, setNewExpert] = useState({
@@ -127,6 +127,11 @@ const AdminDashboard = () => {
           </li>
           <li className={activeTab === 'providers' ? 'active' : ''} onClick={() => setActiveTab('providers')}>
             <Users size={20} /> Manage Experts
+            {activeTab === 'providers' && (
+              <span className="badge" style={{background: 'var(--primary-color)', color: 'white', padding: '0.1rem 0.4rem', borderRadius: '10px', fontSize: '0.7rem', marginLeft: 'auto'}}>
+                2
+              </span>
+            )}
           </li>
           <li className={activeTab === 'products' ? 'active' : ''} onClick={() => setActiveTab('products')} style={{position: 'relative'}}>
             <LayoutDashboard size={20} /> Product Approvals
@@ -156,6 +161,23 @@ const AdminDashboard = () => {
         </header>
 
         <div className="admin-content">
+          {activeTab === 'dashboard' && (
+            <div className="dashboard-overview" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
+              <div className="glass-panel" style={{ padding: '1.5rem', textAlign: 'center' }}>
+                <h3 style={{ color: 'var(--text-secondary)' }}>Total Experts</h3>
+                <p style={{ fontSize: '2rem', fontWeight: 'bold', color: 'var(--primary-color)', margin: '0.5rem 0' }}>{providers.length}</p>
+              </div>
+              <div className="glass-panel" style={{ padding: '1.5rem', textAlign: 'center' }}>
+                <h3 style={{ color: 'var(--text-secondary)' }}>Pending Products</h3>
+                <p style={{ fontSize: '2rem', fontWeight: 'bold', color: '#856404', margin: '0.5rem 0' }}>{products.filter(p => p.status === 'pending').length}</p>
+              </div>
+              <div className="glass-panel" style={{ padding: '1.5rem', textAlign: 'center' }}>
+                <h3 style={{ color: 'var(--text-secondary)' }}>Total Orders</h3>
+                <p style={{ fontSize: '2rem', fontWeight: 'bold', color: 'var(--text-primary)', margin: '0.5rem 0' }}>{orders.length}</p>
+              </div>
+            </div>
+          )}
+
           {activeTab === 'providers' && (
             <div className="glass-panel table-container">
               <p className="admin-hint">Use the arrows to rank experts. Top ranked experts appear first on the Channeling page.</p>
@@ -303,6 +325,28 @@ const AdminDashboard = () => {
                   ))}
                 </tbody>
               </table>
+            </div>
+          )}
+
+          {activeTab === 'settings' && (
+            <div className="glass-panel" style={{ padding: '2rem' }}>
+              <h2>Admin Settings</h2>
+              <p className="admin-hint">Configure platform settings here.</p>
+              
+              <div className="form-group" style={{ maxWidth: '400px', marginTop: '2rem' }}>
+                <label>Platform Commission (%)</label>
+                <input type="number" defaultValue={10} className="form-control" />
+              </div>
+              
+              <div className="form-group" style={{ maxWidth: '400px', marginTop: '1rem' }}>
+                <label>Auto-approve Verified Clinics</label>
+                <div style={{ display: 'flex', gap: '1rem', marginTop: '0.5rem' }}>
+                  <label><input type="radio" name="auto_approve" defaultChecked /> Yes</label>
+                  <label><input type="radio" name="auto_approve" /> No</label>
+                </div>
+              </div>
+
+              <button className="btn btn-primary" style={{ marginTop: '2rem' }}>Save Settings</button>
             </div>
           )}
         </div>
