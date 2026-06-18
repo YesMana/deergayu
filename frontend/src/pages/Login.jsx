@@ -12,6 +12,12 @@ const Login = () => {
   const [role, setRole] = useState('user');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  
+  // Expert specific fields
+  const [address, setAddress] = useState('');
+  const [telephone, setTelephone] = useState('');
+  const [doctorType, setDoctorType] = useState('ayurvedic');
+  const [specialty, setSpecialty] = useState('');
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
   
@@ -57,7 +63,21 @@ const Login = () => {
           setError('Please enter your name');
           return;
         }
-        const userCredential = await signupWithEmail(email, password, name, role);
+        if (role !== 'user') {
+          if (!address || !telephone) {
+            setError('Please fill in all expert details (Address, Telephone)');
+            return;
+          }
+        }
+        
+        const profileDetails = role !== 'user' ? {
+          address,
+          telephone,
+          doctorType,
+          specialty
+        } : null;
+        
+        const userCredential = await signupWithEmail(email, password, name, role, profileDetails);
         await handleAdminRouting(userCredential.user);
       } else if (mode === 'forgot') {
         await resetPassword(email);
@@ -133,6 +153,55 @@ const Login = () => {
                   <option value="organization">Organization</option>
                 </select>
               </div>
+              
+              {role !== 'user' && (
+                <div className="expert-fields" style={{background: 'rgba(0,0,0,0.02)', padding: '1rem', borderRadius: '8px', marginBottom: '1rem', border: '1px solid rgba(0,0,0,0.05)'}}>
+                  <h4 style={{marginBottom: '1rem', fontSize: '0.9rem', color: 'var(--primary-color)'}}>Professional Details</h4>
+                  
+                  {role === 'doctor' && (
+                    <div className="form-group">
+                      <label>Doctor Type</label>
+                      <select value={doctorType} onChange={(e) => setDoctorType(e.target.value)} required>
+                        <option value="ayurvedic">Ayurvedic Doctor</option>
+                        <option value="traditional">Paramparika Doctor (Traditional)</option>
+                      </select>
+                    </div>
+                  )}
+                  
+                  <div className="form-group">
+                    <label>Specialty / Category</label>
+                    <input 
+                      type="text" 
+                      value={specialty}
+                      onChange={(e) => setSpecialty(e.target.value)}
+                      placeholder="e.g. Sarwanga Roga, Skin Diseases..."
+                      required 
+                    />
+                  </div>
+                  
+                  <div className="form-group">
+                    <label>Clinic/Practice Address</label>
+                    <input 
+                      type="text" 
+                      value={address}
+                      onChange={(e) => setAddress(e.target.value)}
+                      placeholder="123 Main St, City"
+                      required 
+                    />
+                  </div>
+                  
+                  <div className="form-group">
+                    <label>Telephone Number</label>
+                    <input 
+                      type="tel" 
+                      value={telephone}
+                      onChange={(e) => setTelephone(e.target.value)}
+                      placeholder="077 123 4567"
+                      required 
+                    />
+                  </div>
+                </div>
+              )}
             </>
           )}
           <div className="form-group">

@@ -51,16 +51,22 @@ export const AuthProvider = ({ children }) => {
     return signInWithEmailAndPassword(auth, email, password);
   };
 
-  const signupWithEmail = async (email, password, name, role) => {
+  const signupWithEmail = async (email, password, name, role, profileDetails = null) => {
     const userCredential = await createUserWithEmailAndPassword(auth, email, password);
     // Create user doc in Firestore
-    await setDoc(doc(db, 'users', userCredential.user.uid), {
+    const userData = {
       name,
       email,
       role,
       status: role === 'user' ? 'approved' : 'pending',
       createdAt: new Date().toISOString()
-    });
+    };
+    
+    if (profileDetails && role !== 'user') {
+      userData.profileDetails = profileDetails;
+    }
+    
+    await setDoc(doc(db, 'users', userCredential.user.uid), userData);
     return userCredential;
   };
 
