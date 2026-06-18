@@ -1,5 +1,6 @@
 ---
 deployment:
   tasks:
-    - export DEPLOYPATH=/home/dilspxws/public_html/
+    - export DEPLOYPATH=/home/dilspxws/deergayu.com/
     - /bin/cp -R frontend/dist/* $DEPLOYPATH
+    - /bin/cp frontend/dist/.htaccess $DEPLOYPATH
