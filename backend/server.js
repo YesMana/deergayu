@@ -61,7 +61,15 @@ app.get('/api/users', verifyAdmin, async (req, res) => {
 app.delete('/api/users/:uid', verifyAdmin, async (req, res) => {
   const { uid } = req.params;
   try {
-    await admin.auth().deleteUser(uid);
+    try {
+      await admin.auth().deleteUser(uid);
+    } catch (authError) {
+      if (authError.code !== 'auth/user-not-found') {
+        throw authError;
+      }
+      console.log(`User ${uid} not found in Auth, proceeding to delete from Firestore.`);
+    }
+    
     await db.collection('users').doc(uid).delete();
     res.json({ message: 'User successfully deleted' });
   } catch (error) {
@@ -83,6 +91,40 @@ app.put('/api/users/:uid/role', verifyAdmin, async (req, res) => {
     await db.collection('users').doc(uid).set({ role }, { merge: true });
     // Note: We don't change Firebase Auth custom claims here since we rely on Firestore for roles.
     res.json({ message: 'User role updated successfully' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Route: Update user status
+app.put('/api/users/:uid/status', verifyAdmin, async (req, res) => {
+  const { uid } = req.params;
+  const { status } = req.body;
+  
+  if (!['pending', 'approved', 'rejected'].includes(status)) {
+    return res.status(400).json({ error: 'Invalid status' });
+  }
+
+  try {
+    await db.collection('users').doc(uid).set({ status }, { merge: true });
+    res.json({ message: 'User status updated successfully' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Route: Update product status
+app.put('/api/products/:id/status', verifyAdmin, async (req, res) => {
+  const { id } = req.params;
+  const { status } = req.body;
+  
+  if (!['pending', 'approved', 'hidden', 'rejected'].includes(status)) {
+    return res.status(400).json({ error: 'Invalid status' });
+  }
+
+  try {
+    await db.collection('products').doc(id).set({ status }, { merge: true });
+    res.json({ message: 'Product status updated successfully' });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
