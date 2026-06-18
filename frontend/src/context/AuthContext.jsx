@@ -19,6 +19,14 @@ export const AuthProvider = ({ children }) => {
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+      if (currentUser) {
+        const superAdmins = ['yes.manujaya@gmail.com'];
+        if (superAdmins.includes(currentUser.email)) {
+          currentUser.role = 'admin';
+        } else {
+          currentUser.role = 'user';
+        }
+      }
       setUser(currentUser);
       setLoading(false);
     });

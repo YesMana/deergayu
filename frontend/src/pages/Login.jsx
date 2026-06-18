@@ -15,6 +15,15 @@ const Login = () => {
   const { t } = useLanguage();
   const navigate = useNavigate();
 
+  const handleAdminRouting = (user) => {
+    const superAdmins = ['yes.manujaya@gmail.com'];
+    if (user && superAdmins.includes(user.email)) {
+      navigate('/admin');
+    } else {
+      navigate('/');
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
@@ -22,11 +31,11 @@ const Login = () => {
     
     try {
       if (mode === 'login') {
-        await loginWithEmail(email, password);
-        navigate('/'); // Usually we redirect to home, auth state handles admin routing elsewhere
+        const userCredential = await loginWithEmail(email, password);
+        handleAdminRouting(userCredential.user);
       } else if (mode === 'signup') {
-        await signupWithEmail(email, password);
-        navigate('/');
+        const userCredential = await signupWithEmail(email, password);
+        handleAdminRouting(userCredential.user);
       } else if (mode === 'forgot') {
         await resetPassword(email);
         setMessage('Password reset email sent! Check your inbox.');
@@ -38,8 +47,8 @@ const Login = () => {
 
   const handleGoogleAuth = async () => {
     try {
-      await loginWithGoogle();
-      navigate('/');
+      const userCredential = await loginWithGoogle();
+      handleAdminRouting(userCredential.user);
     } catch (err) {
       setError('Google Sign-In failed.');
     }
