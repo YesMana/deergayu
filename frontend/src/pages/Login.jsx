@@ -270,41 +270,6 @@ const Login = () => {
         </div>
       </div>
 
-      {showRoleModal && (
-        <div className="modal-overlay" style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', background: 'rgba(0,0,0,0.8)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000 }}>
-          <div className="modal-content glass-panel" style={{ padding: '2rem', maxWidth: '400px', width: '90%' }}>
-            <h3 style={{ marginBottom: '1rem', color: 'var(--secondary-color)' }}>Complete Your Profile</h3>
-            <p style={{ marginBottom: '1.5rem', color: 'var(--text-secondary)' }}>Please verify your name and select your account type to continue.</p>
-            <form onSubmit={handleRoleSelectionSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              <div className="form-group">
-                <label>Full Name</label>
-                <input 
-                  type="text" 
-                  value={name} 
-                  onChange={(e) => setName(e.target.value)} 
-                  required 
-                  style={{ width: '100%', padding: '0.8rem', borderRadius: '4px' }}
-                />
-              </div>
-              <div className="form-group">
-                <label>Account Type</label>
-                <select 
-                  value={role} 
-                  onChange={(e) => setRole(e.target.value)} 
-                  required
-                  style={{ width: '100%', padding: '0.8rem', borderRadius: '4px', background: 'var(--surface-color)', color: 'var(--text-primary)' }}
-                >
-                  <option value="user">Normal User</option>
-                  <option value="doctor">Doctor</option>
-                  <option value="clinic">Medical Clinic</option>
-                  <option value="organization">Organization</option>
-                </select>
-              </div>
-              <button type="submit" className="btn btn-primary" style={{ marginTop: '1rem' }}>Complete Setup</button>
-            </form>
-          </div>
-        </div>
-      )}
     </div>
   );
 };
