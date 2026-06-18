@@ -98,11 +98,16 @@ const AdminDashboard = () => {
         alert("Role updated successfully!");
         fetchUsers();
       } else {
-        const data = await res.json();
-        alert(`Failed: ${data.error}`);
+        const text = await res.text();
+        try {
+          const data = JSON.parse(text);
+          alert(`Failed: ${data.error}`);
+        } catch (e) {
+          alert(`Server Error: ${res.status} - ${text.substring(0, 50)}`);
+        }
       }
     } catch (err) {
-      alert("Error updating role");
+      alert(`Network Error: ${err.message}`);
     }
   };
 
@@ -122,11 +127,16 @@ const AdminDashboard = () => {
         alert("Expert approved successfully!");
         fetchUsers();
       } else {
-        const data = await res.json();
-        alert(`Failed: ${data.error}`);
+        const text = await res.text();
+        try {
+          const data = JSON.parse(text);
+          alert(`Failed: ${data.error}`);
+        } catch (e) {
+          alert(`Server Error: ${res.status} - ${text.substring(0, 50)}`);
+        }
       }
     } catch (err) {
-      alert("Error approving expert");
+      alert(`Network Error: ${err.message}`);
     }
   };
 
@@ -145,11 +155,16 @@ const AdminDashboard = () => {
         alert("User deleted successfully!");
         fetchUsers();
       } else {
-        const data = await res.json();
-        alert(`Failed: ${data.error}`);
+        const text = await res.text();
+        try {
+          const data = JSON.parse(text);
+          alert(`Failed: ${data.error}`);
+        } catch (e) {
+          alert(`Server Error: ${res.status} - ${text.substring(0, 50)}`);
+        }
       }
     } catch (err) {
-      alert("Error deleting user");
+      alert(`Network Error: ${err.message}`);
     }
   };
   
