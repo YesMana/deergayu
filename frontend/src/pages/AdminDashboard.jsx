@@ -153,7 +153,7 @@ const AdminDashboard = () => {
       });
       if (res.ok) {
         alert("User deleted successfully!");
-        setUsers(users.filter(u => u.id !== uid));
+        setPlatformUsers(platformUsers.filter(u => u.id !== uid));
       } else {
         const text = await res.text();
         try {
