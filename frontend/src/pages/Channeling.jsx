@@ -98,7 +98,7 @@ const Channeling = () => {
               >
                 <option value="all">{t('ch_all_prov')}</option>
                 {Object.keys(sriLankaData).map(prov => (
-                  <option key={prov} value={prov}>{prov}</option>
+                  <option key={prov} value={prov}>{t(prov)}</option>
                 ))}
               </select>
 
@@ -110,7 +110,7 @@ const Channeling = () => {
               >
                 <option value="all">{t('ch_all_dist')}</option>
                 {provinceFilter !== 'all' && sriLankaData[provinceFilter].map(dist => (
-                  <option key={dist} value={dist}>{dist}</option>
+                  <option key={dist} value={dist}>{t(dist)}</option>
                 ))}
               </select>
 
@@ -121,7 +121,7 @@ const Channeling = () => {
               >
                 <option value="all">{t('ch_all_spec')}</option>
                 {specialties.map(s => (
-                  <option key={s} value={s}>{s}</option>
+                  <option key={s} value={s}>{t(s)}</option>
                 ))}
               </select>
             </div>
@@ -148,9 +148,9 @@ const Channeling = () => {
                   </div>
                   
                   <div className="provider-details">
-                    <span className="detail-tag">{provider.specialty}</span>
+                    <span className="detail-tag">{t(provider.specialty)}</span>
                     <span className="detail-tag">{provider.experience}</span>
-                    <span className="detail-tag flex-center"><MapPin size={14}/> {provider.location}, {provider.province}</span>
+                    <span className="detail-tag flex-center"><MapPin size={14}/> {t(provider.location)}, {t(provider.province)}</span>
                   </div>
                 </div>
                 
