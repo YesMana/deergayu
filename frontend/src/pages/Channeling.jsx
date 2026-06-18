@@ -3,16 +3,27 @@ import { Search, Calendar as CalendarIcon, Star, Video, MapPin, CheckCircle2 } f
 import './Channeling.css';
 
 const dummyProviders = [
-  { id: 1, name: "Dr. Anura Dissanayake", role: "Ayurvedic Physician", specialty: "Neurology", rating: 4.9, location: "Colombo", experience: "15 Years", type: "doctor", image: "https://images.unsplash.com/photo-1612349317150-e413f6a5b16d?w=500&q=80" },
-  { id: 2, name: "Vedamahaththaya Somarathna", role: "Traditional Healer", specialty: "Orthopedic", rating: 4.8, location: "Kandy", experience: "25 Years", type: "doctor", image: "https://images.unsplash.com/photo-1537368910025-700350fe46c7?w=500&q=80" },
+  { id: 1, name: "Dr. Anura Dissanayake", role: "Ayurvedic Physician", specialty: "Sarwanga Roga (General)", rating: 4.9, location: "Colombo", experience: "15 Years", type: "doctor", image: "https://images.unsplash.com/photo-1612349317150-e413f6a5b16d?w=500&q=80" },
+  { id: 2, name: "Vedamahaththaya Somarathna", role: "Traditional Healer", specialty: "Kadum Bindum (Orthopedic)", rating: 4.8, location: "Kandy", experience: "25 Years", type: "doctor", image: "https://images.unsplash.com/photo-1537368910025-700350fe46c7?w=500&q=80" },
   { id: 3, name: "Astrologer Wickramasinghe", role: "Vedic Astrologer", specialty: "Yantra & Mantra", rating: 5.0, location: "Online", experience: "30 Years", type: "astrologer", image: "https://images.unsplash.com/photo-1544717685-618763071c89?w=500&q=80" },
-  { id: 4, name: "Dr. Samanthi Perera", role: "Ayurvedic Physician", specialty: "Dermatology", rating: 4.7, location: "Galle", experience: "10 Years", type: "doctor", image: "https://images.unsplash.com/photo-1594824436951-7f12bc4147f5?w=500&q=80" },
+  { id: 4, name: "Dr. Samanthi Perera", role: "Ayurvedic Physician", specialty: "Sarpa Visha (Toxicology)", rating: 4.7, location: "Galle", experience: "10 Years", type: "doctor", image: "https://images.unsplash.com/photo-1594824436951-7f12bc4147f5?w=500&q=80" },
+  { id: 5, name: "Dr. Wasantha Kumara", role: "Traditional Healer", specialty: "Sarwanga Roga (General)", rating: 4.6, location: "Gampaha", experience: "20 Years", type: "doctor", image: "https://images.unsplash.com/photo-1559839734-2b71ea197ec2?w=500&q=80" },
 ];
+
+const districts = ["Colombo", "Gampaha", "Kandy", "Galle", "Matara", "Online"];
+const specialties = ["Sarwanga Roga (General)", "Kadum Bindum (Orthopedic)", "Sarpa Visha (Toxicology)", "Yantra & Mantra", "Vastu Shastra"];
 
 const Channeling = () => {
   const [filterType, setFilterType] = useState('all');
+  const [districtFilter, setDistrictFilter] = useState('all');
+  const [specialtyFilter, setSpecialtyFilter] = useState('all');
 
-  const filteredProviders = dummyProviders.filter(p => filterType === 'all' || p.type === filterType);
+  const filteredProviders = dummyProviders.filter(p => {
+    const matchType = filterType === 'all' || p.type === filterType;
+    const matchDistrict = districtFilter === 'all' || p.location === districtFilter;
+    const matchSpecialty = specialtyFilter === 'all' || p.specialty === specialtyFilter;
+    return matchType && matchDistrict && matchSpecialty;
+  });
 
   return (
     <div className="channeling-page animate-fade-in">
@@ -41,45 +52,75 @@ const Channeling = () => {
               Astrologers
             </button>
           </div>
+
+          <div className="filter-dropdowns">
+            <select 
+              value={districtFilter} 
+              onChange={(e) => setDistrictFilter(e.target.value)}
+              className="filter-select"
+            >
+              <option value="all">All Districts</option>
+              {districts.map(d => (
+                <option key={d} value={d}>{d}</option>
+              ))}
+            </select>
+
+            <select 
+              value={specialtyFilter} 
+              onChange={(e) => setSpecialtyFilter(e.target.value)}
+              className="filter-select"
+            >
+              <option value="all">All Specialties</option>
+              {specialties.map(s => (
+                <option key={s} value={s}>{s}</option>
+              ))}
+            </select>
+          </div>
         </div>
       </div>
 
       <div className="container channeling-content">
         <div className="providers-list">
-          {filteredProviders.map(provider => (
-            <div key={provider.id} className="provider-card glass-panel">
-              <div className="provider-image-wrapper">
-                <img src={provider.image} alt={provider.name} className="provider-image" />
-                <div className="provider-rating">
-                  <Star size={14} className="star-icon" fill="currentColor" /> {provider.rating}
-                </div>
-              </div>
-              
-              <div className="provider-info">
-                <div className="provider-header-info">
-                  <h3 className="provider-name">{provider.name} <CheckCircle2 size={18} className="verified-icon" /></h3>
-                  <p className="provider-role">{provider.role}</p>
+          {filteredProviders.length > 0 ? (
+            filteredProviders.map(provider => (
+              <div key={provider.id} className="provider-card glass-panel">
+                <div className="provider-image-wrapper">
+                  <img src={provider.image} alt={provider.name} className="provider-image" />
+                  <div className="provider-rating">
+                    <Star size={14} className="star-icon" fill="currentColor" /> {provider.rating}
+                  </div>
                 </div>
                 
-                <div className="provider-details">
-                  <span className="detail-tag">{provider.specialty}</span>
-                  <span className="detail-tag">{provider.experience} Exp</span>
-                  <span className="detail-tag flex-center"><MapPin size={14}/> {provider.location}</span>
+                <div className="provider-info">
+                  <div className="provider-header-info">
+                    <h3 className="provider-name">{provider.name} <CheckCircle2 size={18} className="verified-icon" /></h3>
+                    <p className="provider-role">{provider.role}</p>
+                  </div>
+                  
+                  <div className="provider-details">
+                    <span className="detail-tag">{provider.specialty}</span>
+                    <span className="detail-tag">{provider.experience} Exp</span>
+                    <span className="detail-tag flex-center"><MapPin size={14}/> {provider.location}</span>
+                  </div>
+                </div>
+                
+                <div className="provider-actions">
+                  <div className="action-buttons">
+                    <button className="btn btn-outline btn-full">
+                      <Video size={18} /> Video Consult
+                    </button>
+                    <button className="btn btn-primary btn-full">
+                      <CalendarIcon size={18} /> Book Visit
+                    </button>
+                  </div>
                 </div>
               </div>
-              
-              <div className="provider-actions">
-                <div className="action-buttons">
-                  <button className="btn btn-outline btn-full">
-                    <Video size={18} /> Video Consult
-                  </button>
-                  <button className="btn btn-primary btn-full">
-                    <CalendarIcon size={18} /> Book Visit
-                  </button>
-                </div>
-              </div>
+            ))
+          ) : (
+            <div className="no-results">
+              <p>No providers found matching your criteria. Try adjusting your filters.</p>
             </div>
-          ))}
+          )}
         </div>
       </div>
     </div>
