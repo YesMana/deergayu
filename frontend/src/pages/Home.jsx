@@ -76,6 +76,24 @@ const Home = () => {
           </div>
         </div>
       </section>
+
+      {/* Expert CTA Section */}
+      <section className="expert-cta-section section" style={{background: 'var(--surface-color)', marginTop: '2rem'}}>
+        <div className="container" style={{textAlign: 'center', maxWidth: '800px', margin: '0 auto', padding: '3rem 1rem'}}>
+          <h2 className="section-title" style={{marginBottom: '1rem', color: 'var(--primary-color)'}}>Are you a Doctor or Medical Clinic?</h2>
+          <p style={{marginBottom: '2rem', fontSize: '1.1rem', color: 'var(--text-secondary)'}}>
+            Join the Deergayu platform to offer your services, manage channelings, and sell your traditional medical products directly to our community.
+          </p>
+          <Link 
+            to="/login" 
+            state={{ mode: 'signup', role: 'doctor' }} 
+            className="btn btn-primary"
+            style={{padding: '0.8rem 2rem', fontSize: '1.1rem'}}
+          >
+            Register as an Expert
+          </Link>
+        </div>
+      </section>
     </div>
   );
 };
