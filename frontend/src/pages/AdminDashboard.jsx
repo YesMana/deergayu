@@ -86,7 +86,7 @@ const AdminDashboard = () => {
   const handleUpdateRole = async (uid, newRole) => {
     try {
       const token = await auth.currentUser.getIdToken();
-      const res = await fetch(`https://deergayu.com/api/users/${uid}/role`, {
+      const res = await fetch(`/api/users/${uid}/role`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -115,7 +115,7 @@ const AdminDashboard = () => {
     if (!window.confirm("Approve this expert?")) return;
     try {
       const token = await auth.currentUser.getIdToken();
-      const res = await fetch(`https://deergayu.com/api/users/${uid}/status`, {
+      const res = await fetch(`/api/users/${uid}/status`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -145,7 +145,7 @@ const AdminDashboard = () => {
     
     try {
       const token = await auth.currentUser.getIdToken();
-      const res = await fetch(`https://deergayu.com/api/users/${uid}`, {
+      const res = await fetch(`/api/users/${uid}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`
@@ -180,7 +180,7 @@ const AdminDashboard = () => {
       const newStatus = action === 'approve' ? 'approved' : action === 'hide' ? 'hidden' : 'rejected';
       
       const token = await auth.currentUser.getIdToken();
-      const res = await fetch(`https://deergayu.com/api/products/${id}/status`, {
+      const res = await fetch(`/api/products/${id}/status`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
