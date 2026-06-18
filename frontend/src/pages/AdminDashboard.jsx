@@ -163,15 +163,15 @@ const AdminDashboard = () => {
         <div className="admin-content">
           {activeTab === 'dashboard' && (
             <div className="dashboard-overview" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
-              <div className="glass-panel" style={{ padding: '1.5rem', textAlign: 'center' }}>
+              <div className="glass-panel stat-card" onClick={() => setActiveTab('providers')} style={{ padding: '1.5rem', textAlign: 'center', cursor: 'pointer', transition: 'transform 0.2s' }}>
                 <h3 style={{ color: 'var(--text-secondary)' }}>Total Experts</h3>
                 <p style={{ fontSize: '2rem', fontWeight: 'bold', color: 'var(--primary-color)', margin: '0.5rem 0' }}>{providers.length}</p>
               </div>
-              <div className="glass-panel" style={{ padding: '1.5rem', textAlign: 'center' }}>
+              <div className="glass-panel stat-card" onClick={() => setActiveTab('products')} style={{ padding: '1.5rem', textAlign: 'center', cursor: 'pointer', transition: 'transform 0.2s' }}>
                 <h3 style={{ color: 'var(--text-secondary)' }}>Pending Products</h3>
                 <p style={{ fontSize: '2rem', fontWeight: 'bold', color: '#856404', margin: '0.5rem 0' }}>{products.filter(p => p.status === 'pending').length}</p>
               </div>
-              <div className="glass-panel" style={{ padding: '1.5rem', textAlign: 'center' }}>
+              <div className="glass-panel stat-card" onClick={() => setActiveTab('orders')} style={{ padding: '1.5rem', textAlign: 'center', cursor: 'pointer', transition: 'transform 0.2s' }}>
                 <h3 style={{ color: 'var(--text-secondary)' }}>Total Orders</h3>
                 <p style={{ fontSize: '2rem', fontWeight: 'bold', color: 'var(--text-primary)', margin: '0.5rem 0' }}>{orders.length}</p>
               </div>
