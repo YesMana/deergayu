@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Search, Calendar as CalendarIcon, Star, Video, MapPin, CheckCircle2 } from 'lucide-react';
+import { useLanguage } from '../context/LanguageContext';
 import './Channeling.css';
 
 const dummyProviders = [
@@ -26,6 +27,7 @@ const sriLankaData = {
 const specialties = ["Sarwanga Roga (General)", "Kadum Bindum (Orthopedic)", "Sarpa Visha (Toxicology)", "Yantra & Mantra", "Vastu Shastra"];
 
 const Channeling = () => {
+  const { t } = useLanguage();
   const [filterType, setFilterType] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [provinceFilter, setProvinceFilter] = useState('all');
@@ -52,27 +54,27 @@ const Channeling = () => {
     <div className="channeling-page animate-fade-in">
       <div className="channeling-header">
         <div className="container">
-          <h1 className="channeling-title">Find Your Healer</h1>
-          <p className="channeling-subtitle">Book appointments with Sri Lanka's finest Ayurvedic Doctors and Astrologers.</p>
+          <h1 className="channeling-title">{t('ch_title')}</h1>
+          <p className="channeling-subtitle">{t('ch_subtitle')}</p>
           
           <div className="filter-tabs">
             <button 
               className={`tab-btn ${filterType === 'all' ? 'active' : ''}`}
               onClick={() => setFilterType('all')}
             >
-              All Experts
+              {t('ch_tab_all')}
             </button>
             <button 
               className={`tab-btn ${filterType === 'doctor' ? 'active' : ''}`}
               onClick={() => setFilterType('doctor')}
             >
-              Ayurvedic Doctors
+              {t('ch_tab_doc')}
             </button>
             <button 
               className={`tab-btn ${filterType === 'astrologer' ? 'active' : ''}`}
               onClick={() => setFilterType('astrologer')}
             >
-              Astrologers
+              {t('ch_tab_astro')}
             </button>
           </div>
 
@@ -81,7 +83,7 @@ const Channeling = () => {
               <Search className="search-icon" size={20} />
               <input 
                 type="text" 
-                placeholder="Search by name or specialty..." 
+                placeholder={t('ch_search')} 
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="channeling-search-input"
@@ -94,7 +96,7 @@ const Channeling = () => {
                 onChange={handleProvinceChange}
                 className="filter-select"
               >
-                <option value="all">All Provinces</option>
+                <option value="all">{t('ch_all_prov')}</option>
                 {Object.keys(sriLankaData).map(prov => (
                   <option key={prov} value={prov}>{prov}</option>
                 ))}
@@ -106,7 +108,7 @@ const Channeling = () => {
                 className="filter-select"
                 disabled={provinceFilter === 'all'}
               >
-                <option value="all">All Districts</option>
+                <option value="all">{t('ch_all_dist')}</option>
                 {provinceFilter !== 'all' && sriLankaData[provinceFilter].map(dist => (
                   <option key={dist} value={dist}>{dist}</option>
                 ))}
@@ -117,7 +119,7 @@ const Channeling = () => {
                 onChange={(e) => setSpecialtyFilter(e.target.value)}
                 className="filter-select"
               >
-                <option value="all">All Specialties</option>
+                <option value="all">{t('ch_all_spec')}</option>
                 {specialties.map(s => (
                   <option key={s} value={s}>{s}</option>
                 ))}
@@ -147,7 +149,7 @@ const Channeling = () => {
                   
                   <div className="provider-details">
                     <span className="detail-tag">{provider.specialty}</span>
-                    <span className="detail-tag">{provider.experience} Exp</span>
+                    <span className="detail-tag">{provider.experience}</span>
                     <span className="detail-tag flex-center"><MapPin size={14}/> {provider.location}, {provider.province}</span>
                   </div>
                 </div>
@@ -155,10 +157,10 @@ const Channeling = () => {
                 <div className="provider-actions">
                   <div className="action-buttons">
                     <button className="btn btn-outline btn-full">
-                      <Video size={18} /> Video Consult
+                      <Video size={18} /> {t('ch_btn_video')}
                     </button>
                     <button className="btn btn-primary btn-full">
-                      <CalendarIcon size={18} /> Book Visit
+                      <CalendarIcon size={18} /> {t('ch_btn_book')}
                     </button>
                   </div>
                 </div>
@@ -166,7 +168,7 @@ const Channeling = () => {
             ))
           ) : (
             <div className="no-results">
-              <p>No providers found matching your criteria. Try adjusting your filters.</p>
+              <p>{t('ch_no_results')}</p>
             </div>
           )}
         </div>

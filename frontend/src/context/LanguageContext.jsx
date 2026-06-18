@@ -22,6 +22,18 @@ const translations = {
     srv_astro_title: "Astrology & Yantra",
     srv_astro_desc: "Connect with expert astrologers for guidance, yantra, and mantra services.",
     srv_astro_link: "Consult Astrologers",
+    ch_title: "Find Your Healer",
+    ch_subtitle: "Book appointments with Sri Lanka's finest Ayurvedic Doctors and Astrologers.",
+    ch_tab_all: "All Experts",
+    ch_tab_doc: "Ayurvedic Doctors",
+    ch_tab_astro: "Astrologers",
+    ch_search: "Search by name or specialty...",
+    ch_all_prov: "All Provinces",
+    ch_all_dist: "All Districts",
+    ch_all_spec: "All Specialties",
+    ch_no_results: "No providers found matching your criteria. Try adjusting your filters.",
+    ch_btn_video: "Video Consult",
+    ch_btn_book: "Book Visit"
   },
   si: {
     nav_home: "මුල් පිටුව",
@@ -44,6 +56,18 @@ const translations = {
     srv_astro_title: "ජ්‍යොතිෂ්‍ය හා යන්ත්‍ර මන්ත්‍ර",
     srv_astro_desc: "ඔබේ ජීවිතයේ ගැටළු වලට ප්‍රවීණ ජ්‍යොතිෂ්‍යවේදීන්ගෙන් නිවැරදි විසඳුම් ලබාගන්න.",
     srv_astro_link: "සේවාවන් ලබාගන්න",
+    ch_title: "ඔබේ වෛද්‍යවරයා සොයාගන්න",
+    ch_subtitle: "ශ්‍රී ලංකාවේ ප්‍රවීණතම ආයුර්වේද වෛද්‍යවරුන් සහ ජ්‍යොතිෂ්‍යවේදීන් හමුවීමට වෙලාවක් වෙන්කරගන්න.",
+    ch_tab_all: "සියලුම ප්‍රවීණයන්",
+    ch_tab_doc: "ආයුර්වේද වෛද්‍යවරුන්",
+    ch_tab_astro: "ජ්‍යොතිෂ්‍යවේදීන්",
+    ch_search: "නමින් හෝ රෝග අංශයෙන් සොයන්න...",
+    ch_all_prov: "සියලුම පළාත්",
+    ch_all_dist: "සියලුම දිස්ත්‍රික්ක",
+    ch_all_spec: "සියලුම රෝග අංශ",
+    ch_no_results: "ඔබ සෙවූ තොරතුරු වලට ගැලපෙන අය නොමැත. වෙනත් විස්තරයක් ඇතුළත් කර බලන්න.",
+    ch_btn_video: "වීඩියෝ ඇමතුම්",
+    ch_btn_book: "හමුවන්න"
   },
   ta: {
     nav_home: "முகப்பு",
@@ -66,6 +90,18 @@ const translations = {
     srv_astro_title: "ஜோதிடம் & யந்திரம்",
     srv_astro_desc: "ஜோதிடர்களுடன் தொடர்புகொண்டு வழிகாட்டுதல் மற்றும் யந்திர சேவைகளை பெறுங்கள்.",
     srv_astro_link: "சேவைகளை பெறுங்கள்",
+    ch_title: "உங்கள் மருத்துவரை கண்டறியுங்கள்",
+    ch_subtitle: "இலங்கையின் சிறந்த ஆயுர்வேத மருத்துவர்கள் மற்றும் ஜோதிடர்களுடன் சந்திப்புகளை பதிவு செய்யவும்.",
+    ch_tab_all: "அனைத்து வல்லுநர்கள்",
+    ch_tab_doc: "ஆயுர்வேத மருத்துவர்கள்",
+    ch_tab_astro: "ஜோதிடர்கள்",
+    ch_search: "பெயர் அல்லது சிறப்பு மூலம் தேடவும்...",
+    ch_all_prov: "அனைத்து மாகாணங்கள்",
+    ch_all_dist: "அனைத்து மாவட்டங்கள்",
+    ch_all_spec: "அனைத்து சிறப்புகள்",
+    ch_no_results: "உங்கள் தேடலுக்கு எந்த தகவலும் கிடைக்கவில்லை.",
+    ch_btn_video: "வீடியோ ஆலோசனை",
+    ch_btn_book: "பார்வை பதிவு"
   }
 };
 
