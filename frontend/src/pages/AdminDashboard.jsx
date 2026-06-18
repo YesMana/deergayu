@@ -1,5 +1,7 @@
-import React, { useState } from 'react';
-import { Users, LayoutDashboard, Settings, ArrowUp, ArrowDown, Bell, Search, Filter } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Users, LayoutDashboard, Settings, ArrowUp, ArrowDown, Bell, Search, Filter, ShieldAlert } from 'lucide-react';
+import { collection, getDocs } from 'firebase/firestore';
+import { db, auth } from '../firebase';
 import './AdminDashboard.css';
 
 const initialProviders = [
@@ -43,6 +45,75 @@ const AdminDashboard = () => {
   const [orders, setOrders] = useState(initialAdminOrders);
   const [filterVendor, setFilterVendor] = useState('All');
   const [activeTab, setActiveTab] = useState('dashboard');
+  
+  const [platformUsers, setPlatformUsers] = useState([]);
+  const [loadingUsers, setLoadingUsers] = useState(false);
+
+  useEffect(() => {
+    if (activeTab === 'users') {
+      fetchUsers();
+    }
+  }, [activeTab]);
+
+  const fetchUsers = async () => {
+    setLoadingUsers(true);
+    try {
+      const usersCol = collection(db, 'users');
+      const userSnapshot = await getDocs(usersCol);
+      const userList = userSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setPlatformUsers(userList);
+    } catch (err) {
+      console.error("Error fetching users:", err);
+    } finally {
+      setLoadingUsers(false);
+    }
+  };
+
+  const handleUpdateRole = async (uid, newRole) => {
+    try {
+      const token = await auth.currentUser.getIdToken();
+      const res = await fetch(`https://deergayu.com/api/users/${uid}/role`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ role: newRole })
+      });
+      if (res.ok) {
+        alert("Role updated successfully!");
+        fetchUsers();
+      } else {
+        const data = await res.json();
+        alert(`Failed: ${data.error}`);
+      }
+    } catch (err) {
+      alert("Error updating role");
+    }
+  };
+
+  const handleDeleteUser = async (uid) => {
+    if (!window.confirm("Are you sure you want to completely delete this user? This cannot be undone.")) return;
+    
+    try {
+      const token = await auth.currentUser.getIdToken();
+      const res = await fetch(`https://deergayu.com/api/users/${uid}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      if (res.ok) {
+        alert("User deleted successfully!");
+        fetchUsers();
+      } else {
+        const data = await res.json();
+        alert(`Failed: ${data.error}`);
+      }
+    } catch (err) {
+      alert("Error deleting user");
+    }
+  };
   
   const [showAddModal, setShowAddModal] = useState(false);
   const [newExpert, setNewExpert] = useState({
@@ -133,6 +204,9 @@ const AdminDashboard = () => {
               </span>
             )}
           </li>
+          <li className={activeTab === 'users' ? 'active' : ''} onClick={() => setActiveTab('users')}>
+            <ShieldAlert size={20} /> All Users
+          </li>
           <li className={activeTab === 'products' ? 'active' : ''} onClick={() => setActiveTab('products')} style={{position: 'relative'}}>
             <LayoutDashboard size={20} /> Product Approvals
             {pendingCount > 0 && (
@@ -156,7 +230,7 @@ const AdminDashboard = () => {
 
       <main className="admin-main">
         <header className="admin-header">
-          <h1>{activeTab === 'providers' ? 'Manage Experts (Ranking)' : activeTab === 'products' ? 'Product Approvals' : activeTab === 'orders' ? 'All Platform Orders' : 'Admin Panel'}</h1>
+          <h1>{activeTab === 'providers' ? 'Manage Experts (Ranking)' : activeTab === 'users' ? 'User Management' : activeTab === 'products' ? 'Product Approvals' : activeTab === 'orders' ? 'All Platform Orders' : 'Admin Panel'}</h1>
           {activeTab === 'providers' && <button className="btn btn-primary" onClick={() => setShowAddModal(true)}>+ Add New Expert</button>}
         </header>
 
@@ -347,6 +421,58 @@ const AdminDashboard = () => {
               </div>
 
               <button className="btn btn-primary" style={{ marginTop: '2rem' }}>Save Settings</button>
+            </div>
+          )}
+
+          {activeTab === 'users' && (
+            <div className="glass-panel table-container">
+              <p className="admin-hint">Manage all registered users on the platform. You can update roles or completely delete accounts.</p>
+              {loadingUsers ? <p>Loading users...</p> : (
+                <table className="admin-table">
+                  <thead>
+                    <tr>
+                      <th>Name</th>
+                      <th>Email</th>
+                      <th>Role</th>
+                      <th>Joined</th>
+                      <th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {platformUsers.map(u => (
+                      <tr key={u.id}>
+                        <td className="fw-bold">{u.name || 'N/A'}</td>
+                        <td>{u.email}</td>
+                        <td>
+                          <select 
+                            value={u.role || 'user'} 
+                            onChange={(e) => handleUpdateRole(u.id, e.target.value)}
+                            style={{ padding: '0.3rem', borderRadius: '4px', border: '1px solid #ccc', background: 'var(--surface-color)', color: 'var(--text-primary)' }}
+                            disabled={u.email === 'yes.manujaya@gmail.com'}
+                          >
+                            <option value="user">User</option>
+                            <option value="doctor">Doctor</option>
+                            <option value="clinic">Clinic</option>
+                            <option value="organization">Organization</option>
+                            {u.email === 'yes.manujaya@gmail.com' && <option value="admin">Admin</option>}
+                          </select>
+                        </td>
+                        <td>{u.createdAt ? new Date(u.createdAt).toLocaleDateString() : 'N/A'}</td>
+                        <td>
+                          <button 
+                            className="btn btn-outline" 
+                            style={{color: 'white', background: 'var(--error-color)', borderColor: 'var(--error-color)', padding: '0.25rem 0.75rem', fontSize: '0.85rem'}}
+                            onClick={() => handleDeleteUser(u.id)}
+                            disabled={u.email === 'yes.manujaya@gmail.com'}
+                          >
+                            Delete
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
             </div>
           )}
         </div>

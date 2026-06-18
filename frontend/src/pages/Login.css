@@ -63,7 +63,7 @@
   color: var(--text-secondary);
 }
 
-.form-group input {
+.form-group input, .form-group select {
   padding: 0.8rem 1rem;
   border-radius: var(--radius-sm);
   border: 1px solid rgba(212, 175, 55, 0.3);
@@ -71,6 +71,11 @@
   color: var(--text-primary);
   font-family: inherit;
   transition: var(--transition);
+}
+
+.form-group select option {
+  background-color: var(--surface-color);
+  color: var(--text-primary);
 }
 
 .form-group input:focus {
