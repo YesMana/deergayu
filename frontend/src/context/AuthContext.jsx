@@ -21,7 +21,7 @@ export const AuthProvider = ({ children }) => {
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       if (currentUser) {
         const superAdmins = ['yes.manujaya@gmail.com'];
-        if (superAdmins.includes(currentUser.email)) {
+        if (currentUser.email && superAdmins.includes(currentUser.email.toLowerCase())) {
           currentUser.role = 'admin';
         } else {
           try {
