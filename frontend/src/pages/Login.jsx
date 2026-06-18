@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
@@ -21,6 +21,11 @@ const Login = () => {
   const [specialty, setSpecialty] = useState('');
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
+  
+  useEffect(() => {
+    if (location.state?.mode) setMode(location.state.mode);
+    if (location.state?.role) setRole(location.state.role);
+  }, [location.state]);
   
   const { loginWithEmail, signupWithEmail, loginWithGoogle, resetPassword } = useAuth();
   const { t } = useLanguage();
