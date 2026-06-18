@@ -87,7 +87,7 @@ const AdminDashboard = () => {
     try {
       const token = await auth.currentUser.getIdToken();
       const res = await fetch(`/api/users/${uid}/role`, {
-        method: 'PUT',
+        method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
@@ -116,7 +116,7 @@ const AdminDashboard = () => {
     try {
       const token = await auth.currentUser.getIdToken();
       const res = await fetch(`/api/users/${uid}/status`, {
-        method: 'PUT',
+        method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
@@ -145,8 +145,8 @@ const AdminDashboard = () => {
     
     try {
       const token = await auth.currentUser.getIdToken();
-      const res = await fetch(`/api/users/${uid}`, {
-        method: 'DELETE',
+      const res = await fetch(`/api/users/${uid}/delete`, {
+        method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -181,7 +181,7 @@ const AdminDashboard = () => {
       
       const token = await auth.currentUser.getIdToken();
       const res = await fetch(`/api/products/${id}/status`, {
-        method: 'PUT',
+        method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`

@@ -61,7 +61,7 @@ app.get('/api/users', verifyAdmin, async (req, res) => {
 });
 
 // Route: Delete a user
-app.delete('/api/users/:uid', verifyAdmin, async (req, res) => {
+app.post('/api/users/:uid/delete', verifyAdmin, async (req, res) => {
   const { uid } = req.params;
   try {
     try {
@@ -81,7 +81,7 @@ app.delete('/api/users/:uid', verifyAdmin, async (req, res) => {
 });
 
 // Route: Update user role
-app.put('/api/users/:uid/role', verifyAdmin, async (req, res) => {
+app.post('/api/users/:uid/role', verifyAdmin, async (req, res) => {
   const { uid } = req.params;
   const { role } = req.body;
   
@@ -100,7 +100,7 @@ app.put('/api/users/:uid/role', verifyAdmin, async (req, res) => {
 });
 
 // Route: Update user status
-app.put('/api/users/:uid/status', verifyAdmin, async (req, res) => {
+app.post('/api/users/:uid/status', verifyAdmin, async (req, res) => {
   const { uid } = req.params;
   const { status } = req.body;
   
@@ -117,7 +117,7 @@ app.put('/api/users/:uid/status', verifyAdmin, async (req, res) => {
 });
 
 // Route: Update product status
-app.put('/api/products/:id/status', verifyAdmin, async (req, res) => {
+app.post('/api/products/:id/status', verifyAdmin, async (req, res) => {
   const { id } = req.params;
   const { status } = req.body;
   
