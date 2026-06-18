@@ -1,6 +1,8 @@
 const express = require('express');
 const cors = require('cors');
 const admin = require('firebase-admin');
+const { getFirestore } = require('firebase-admin/firestore');
+const { getAuth } = require('firebase-admin/auth');
 const dotenv = require('dotenv');
 
 dotenv.config();
@@ -27,7 +29,8 @@ try {
   console.error("Firebase Admin initialization error:", error);
 }
 
-const db = admin.firestore();
+const db = getFirestore();
+const auth = getAuth();
 
 // Middleware to verify Admin Token
 const verifyAdmin = async (req, res, next) => {
@@ -35,7 +38,7 @@ const verifyAdmin = async (req, res, next) => {
   if (!token) return res.status(401).json({ error: 'No token provided' });
 
   try {
-    const decodedToken = await admin.auth().verifyIdToken(token);
+    const decodedToken = await auth.verifyIdToken(token);
     // In our system, yes.manujaya@gmail.com is the hardcoded superadmin
     if (decodedToken.email !== 'yes.manujaya@gmail.com') {
       return res.status(403).json({ error: 'Unauthorized: Admin access required' });
@@ -50,7 +53,7 @@ const verifyAdmin = async (req, res, next) => {
 // Route: Get all users (optional, currently using Firestore from frontend, but good to have)
 app.get('/api/users', verifyAdmin, async (req, res) => {
   try {
-    const listUsersResult = await admin.auth().listUsers(1000);
+    const listUsersResult = await auth.listUsers(1000);
     res.json(listUsersResult.users);
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -62,7 +65,7 @@ app.delete('/api/users/:uid', verifyAdmin, async (req, res) => {
   const { uid } = req.params;
   try {
     try {
-      await admin.auth().deleteUser(uid);
+      await auth.deleteUser(uid);
     } catch (authError) {
       if (authError.code !== 'auth/user-not-found') {
         throw authError;
