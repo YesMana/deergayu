@@ -50,8 +50,10 @@ const verifyAdmin = async (req, res, next) => {
   }
 };
 
-// Route: Get all users (optional, currently using Firestore from frontend, but good to have)
-app.get('/api/users', verifyAdmin, async (req, res) => {
+const apiRouter = express.Router();
+
+// Route: Get all users
+apiRouter.get('/users', verifyAdmin, async (req, res) => {
   try {
     const listUsersResult = await auth.listUsers(1000);
     res.json(listUsersResult.users);
@@ -61,7 +63,7 @@ app.get('/api/users', verifyAdmin, async (req, res) => {
 });
 
 // Route: Delete a user
-app.post('/api/users/:uid/delete', verifyAdmin, async (req, res) => {
+apiRouter.post('/users/:uid/delete', verifyAdmin, async (req, res) => {
   const { uid } = req.params;
   try {
     try {
@@ -81,7 +83,7 @@ app.post('/api/users/:uid/delete', verifyAdmin, async (req, res) => {
 });
 
 // Route: Update user role
-app.post('/api/users/:uid/role', verifyAdmin, async (req, res) => {
+apiRouter.post('/users/:uid/role', verifyAdmin, async (req, res) => {
   const { uid } = req.params;
   const { role } = req.body;
   
@@ -100,7 +102,7 @@ app.post('/api/users/:uid/role', verifyAdmin, async (req, res) => {
 });
 
 // Route: Update user status
-app.post('/api/users/:uid/status', verifyAdmin, async (req, res) => {
+apiRouter.post('/users/:uid/status', verifyAdmin, async (req, res) => {
   const { uid } = req.params;
   const { status } = req.body;
   
@@ -117,7 +119,7 @@ app.post('/api/users/:uid/status', verifyAdmin, async (req, res) => {
 });
 
 // Route: Update product status
-app.post('/api/products/:id/status', verifyAdmin, async (req, res) => {
+apiRouter.post('/products/:id/status', verifyAdmin, async (req, res) => {
   const { id } = req.params;
   const { status } = req.body;
   
@@ -134,8 +136,23 @@ app.post('/api/products/:id/status', verifyAdmin, async (req, res) => {
 });
 
 // Basic health check
-app.get('/api/health', (req, res) => {
+apiRouter.get('/health', (req, res) => {
   res.json({ status: 'OK', message: 'Deergayu API is running' });
+});
+
+// Mount the router on both /api and / to handle Passenger URI stripping
+app.use('/api', apiRouter);
+app.use('/', apiRouter);
+
+// Catch-all route to debug what paths are reaching Express
+app.all('*', (req, res) => {
+  res.status(404).json({
+    error: 'Route not found in Express',
+    method: req.method,
+    originalUrl: req.originalUrl,
+    url: req.url,
+    path: req.path
+  });
 });
 
 const PORT = process.env.PORT || 3000;
