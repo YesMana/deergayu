@@ -85,8 +85,7 @@ const Home = () => {
             Join the Deergayu platform to offer your services, manage channelings, and sell your traditional medical products directly to our community.
           </p>
           <Link 
-            to="/login" 
-            state={{ mode: 'signup', role: 'doctor' }} 
+            to="/login?mode=signup&role=doctor" 
             className="btn btn-primary"
             style={{padding: '0.8rem 2rem', fontSize: '1.1rem'}}
           >

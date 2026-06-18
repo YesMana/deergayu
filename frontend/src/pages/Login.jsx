@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
 import { db } from '../firebase';
@@ -8,9 +8,13 @@ import './Login.css';
 
 const Login = () => {
   const location = useLocation();
-  const [mode, setMode] = useState(location.state?.mode || 'login'); // 'login', 'signup', 'forgot'
+  const [searchParams] = useSearchParams();
+  const initialMode = searchParams.get('mode') || location.state?.mode || 'login';
+  const initialRole = searchParams.get('role') || location.state?.role || 'user';
+  
+  const [mode, setMode] = useState(initialMode); // 'login', 'signup', 'forgot'
   const [name, setName] = useState('');
-  const [role, setRole] = useState(location.state?.role || 'user');
+  const [role, setRole] = useState(initialRole);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   
@@ -23,9 +27,14 @@ const Login = () => {
   const [message, setMessage] = useState('');
   
   useEffect(() => {
-    if (location.state?.mode) setMode(location.state.mode);
-    if (location.state?.role) setRole(location.state.role);
-  }, [location.state]);
+    const qMode = searchParams.get('mode');
+    const qRole = searchParams.get('role');
+    if (qMode) setMode(qMode);
+    else if (location.state?.mode) setMode(location.state.mode);
+    
+    if (qRole) setRole(qRole);
+    else if (location.state?.role) setRole(location.state.role);
+  }, [location.state, searchParams]);
   
   const { loginWithEmail, signupWithEmail, loginWithGoogle, resetPassword } = useAuth();
   const { t } = useLanguage();
