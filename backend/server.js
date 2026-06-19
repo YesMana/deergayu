@@ -145,7 +145,7 @@ app.use('/api', apiRouter);
 app.use('/', apiRouter);
 
 // Catch-all route to debug what paths are reaching Express
-app.all('*', (req, res) => {
+app.all('{*path}', (req, res) => {
   res.status(404).json({
     error: 'Route not found in Express',
     method: req.method,
