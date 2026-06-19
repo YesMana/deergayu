@@ -122,7 +122,14 @@ const Login = () => {
       }
       await handleAdminRouting(user);
     } catch (err) {
-      setError('Google Sign-In failed.');
+      console.error("Google Auth Error:", err);
+      if (err.code === 'auth/unauthorized-domain') {
+        setError('Error: This domain (deergayu.com) is not authorized in Firebase. Please add it in Firebase Console -> Authentication -> Settings -> Authorized domains.');
+      } else if (err.code === 'auth/popup-closed-by-user') {
+        setError(''); // User just closed the popup
+      } else {
+        setError(`Google Sign-In failed: ${err.message}`);
+      }
     }
   };
 
