@@ -3,6 +3,7 @@ import { Leaf, UserCircle, ShoppingBag, Globe, Mic, Sun, Moon, Menu, X } from 'l
 import { useLanguage } from '../context/LanguageContext';
 import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
+import { useCart } from '../context/CartContext';
 import React, { useState, useEffect } from 'react';
 import './Navbar.css';
 
@@ -10,6 +11,7 @@ const Navbar = () => {
   const { lang, toggleLanguage, t } = useLanguage();
   const { theme, toggleTheme } = useTheme();
   const { user, logout } = useAuth();
+  const { cartCount } = useCart();
   const [isListening, setIsListening] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const location = useLocation();
@@ -66,8 +68,13 @@ const Navbar = () => {
             <button className="icon-btn language-btn" onClick={toggleLanguage} title="Switch Language">
               <Globe size={20} /> <span>{lang.toUpperCase()}</span>
             </button>
-            <Link to="/shop/cart" className="icon-btn">
+            <Link to="/shop/cart" className="icon-btn" style={{ position: 'relative' }}>
               <ShoppingBag size={20} />
+              {cartCount > 0 && (
+                <span style={{ position: 'absolute', top: '-5px', right: '-5px', background: 'var(--error-color)', color: 'white', fontSize: '0.65rem', padding: '0.1rem 0.3rem', borderRadius: '10px', fontWeight: 'bold' }}>
+                  {cartCount}
+                </span>
+              )}
             </Link>
             {user ? (
               <div className="user-profile-nav" style={{display: 'flex', alignItems: 'center', gap: '0.8rem', background: 'rgba(var(--primary-color-rgb), 0.1)', padding: '0.4rem 1rem', borderRadius: '20px'}}>
@@ -75,10 +82,13 @@ const Navbar = () => {
                   <span style={{fontWeight: 'bold', fontSize: '0.9rem', color: 'var(--text-primary)'}}>{user.displayName || user.email.split('@')[0]}</span>
                   {user.role === 'admin' ? (
                     <Link to="/admin" style={{fontSize: '0.75rem', color: 'var(--primary-color)', textTransform: 'capitalize', fontWeight: 'bold', textDecoration: 'none'}}>➜ Admin Panel</Link>
-                  ) : user.role === 'vendor' || user.role === 'clinic' ? (
-                    <Link to="/vendor" style={{fontSize: '0.75rem', color: 'var(--primary-color)', textTransform: 'capitalize', fontWeight: 'bold', textDecoration: 'none'}}>➜ Vendor Panel</Link>
+                  ) : user.role === 'vendor' || user.role === 'clinic' || user.role === 'doctor' || user.role === 'organization' ? (
+                    <Link to="/vendor" style={{fontSize: '0.75rem', color: 'var(--primary-color)', textTransform: 'capitalize', fontWeight: 'bold', textDecoration: 'none'}}>➜ Dashboard</Link>
                   ) : (
-                    <span style={{fontSize: '0.7rem', color: 'var(--primary-color)', textTransform: 'capitalize'}}>{user.role}</span>
+                    <div style={{ display: 'flex', gap: '0.5rem' }}>
+                      <Link to="/my-orders" style={{fontSize: '0.7rem', color: 'var(--primary-color)', textDecoration: 'none'}}>Orders</Link>
+                      <Link to="/my-appointments" style={{fontSize: '0.7rem', color: 'var(--primary-color)', textDecoration: 'none'}}>Appointments</Link>
+                    </div>
                   )}
                 </div>
                 <button onClick={logout} className="icon-btn" title="Logout" style={{color: 'var(--error-color)', padding: '0.2rem'}}>

@@ -1,13 +1,18 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Filter, ShoppingCart, Heart } from 'lucide-react';
+import { Search, Filter, ShoppingCart, Heart, CheckCircle } from 'lucide-react';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '../firebase';
+import { useCart } from '../context/CartContext';
 import './Shop.css';
 
 const Shop = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [selectedCategory, setSelectedCategory] = useState('All');
+  const [toastMessage, setToastMessage] = useState('');
+  
+  const { addToCart } = useCart();
 
   useEffect(() => {
     const fetchApprovedProducts = async () => {
@@ -28,16 +33,44 @@ const Shop = () => {
 
     fetchApprovedProducts();
   }, []);
+
+  const handleAddToCart = async (product) => {
+    const success = await addToCart(product);
+    if (success) {
+      setToastMessage(`${product.name} added to cart!`);
+      setTimeout(() => setToastMessage(''), 3000);
+    }
+  };
+
+  const categories = ['All', ...new Set(products.map(p => p.category))];
+  
+  const filteredProducts = products.filter(p => {
+    const matchSearch = p.name.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchCategory = selectedCategory === 'All' || p.category === selectedCategory;
+    return matchSearch && matchCategory;
+  });
   
   return (
-    <div className="shop-page animate-fade-in">
+    <div className="shop-page animate-fade-in" style={{ position: 'relative' }}>
+      {toastMessage && (
+        <div style={{
+          position: 'fixed', top: '20px', right: '20px', zIndex: 1000,
+          background: 'var(--success-color)', color: 'white', padding: '1rem 2rem',
+          borderRadius: 'var(--radius-md)', display: 'flex', alignItems: 'center', gap: '0.5rem',
+          boxShadow: '0 4px 12px rgba(0,0,0,0.15)', animation: 'slideInRight 0.3s ease-out'
+        }}>
+          <CheckCircle size={20} />
+          {toastMessage}
+        </div>
+      )}
+
       <div className="shop-header">
         <div className="container">
           <h1 className="shop-title">Ayurvedic Pharmacy</h1>
           <p className="shop-subtitle">Authentic, pure, and trusted herbal remedies for your holistic wellbeing.</p>
           
-          <div className="shop-controls">
-            <div className="search-bar glass-panel">
+          <div className="shop-controls" style={{ display: 'flex', flexWrap: 'wrap', gap: '1rem', alignItems: 'center' }}>
+            <div className="search-bar glass-panel" style={{ flex: '1', minWidth: '250px' }}>
               <Search size={20} className="search-icon" />
               <input 
                 type="text" 
@@ -46,9 +79,19 @@ const Shop = () => {
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
             </div>
-            <button className="btn btn-outline filter-btn">
-              <Filter size={20} /> Filter
-            </button>
+            
+            <div className="filter-dropdown glass-panel" style={{ display: 'flex', alignItems: 'center', padding: '0 1rem', borderRadius: '30px' }}>
+              <Filter size={20} style={{ color: 'var(--primary-color)', marginRight: '0.5rem' }} />
+              <select 
+                value={selectedCategory} 
+                onChange={(e) => setSelectedCategory(e.target.value)}
+                style={{ border: 'none', background: 'transparent', padding: '0.8rem', color: 'var(--text-primary)', outline: 'none', cursor: 'pointer' }}
+              >
+                {categories.map(cat => (
+                  <option key={cat} value={cat}>{cat}</option>
+                ))}
+              </select>
+            </div>
           </div>
         </div>
       </div>
@@ -57,14 +100,14 @@ const Shop = () => {
         <div className="product-grid">
           {loading ? (
             <div style={{ padding: '2rem', textAlign: 'center', width: '100%', color: 'var(--text-secondary)' }}>Loading products...</div>
-          ) : products.length === 0 ? (
-            <div style={{ padding: '2rem', textAlign: 'center', width: '100%', color: 'var(--text-secondary)' }}>No approved products found yet.</div>
+          ) : filteredProducts.length === 0 ? (
+            <div style={{ padding: '2rem', textAlign: 'center', width: '100%', color: 'var(--text-secondary)' }}>No products match your search.</div>
           ) : 
-            products.filter(p => p.name.toLowerCase().includes(searchTerm.toLowerCase())).map(product => (
+            filteredProducts.map(product => (
               <div key={product.id} className="product-card glass-panel">
                 <div className="product-image-container">
                   {/* Using a placeholder if no image exists yet */}
-                  <img src={product.image || "https://images.unsplash.com/photo-1611078516086-6ab28122db63?w=500&q=80"} alt={product.name} className="product-image" />
+                  <img src={product.imageUrl || product.image || "https://images.unsplash.com/photo-1611078516086-6ab28122db63?w=500&q=80"} alt={product.name} className="product-image" />
                   <button className="wishlist-btn">
                     <Heart size={20} />
                   </button>
@@ -72,16 +115,17 @@ const Shop = () => {
                 </div>
                 <div className="product-info">
                   <h3 className="product-name">{product.name}</h3>
-                <div className="product-meta">
-                  <span className="product-rating">★ {product.rating}</span>
+                  <div className="product-meta">
+                    <span className="product-rating">★ {product.rating || '4.5'}</span>
+                    <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginLeft: 'auto' }}>By {product.vendorName || 'Deergayu'}</span>
+                  </div>
+                  <div className="product-bottom">
+                    <span className="product-price">Rs. {product.price}</span>
+                    <button className="btn btn-primary add-to-cart-btn" onClick={() => handleAddToCart(product)}>
+                      <ShoppingCart size={18} /> Add
+                    </button>
+                  </div>
                 </div>
-                <div className="product-bottom">
-                  <span className="product-price">Rs. {product.price}</span>
-                  <button className="btn btn-primary add-to-cart-btn">
-                    <ShoppingCart size={18} /> Add
-                  </button>
-                </div>
-              </div>
             </div>
           ))}
         </div>

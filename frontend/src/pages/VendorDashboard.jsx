@@ -1,20 +1,20 @@
-import React, { useState } from 'react';
-import { Package, ShoppingBag, Settings, CheckCircle, Clock } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Package, ShoppingBag, Settings, CheckCircle, Clock, Calendar, Trash2 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-import { db } from '../firebase';
-import { doc, updateDoc } from 'firebase/firestore';
+import { db, auth } from '../firebase';
+import { doc, updateDoc, collection } from 'firebase/firestore';
 import './AdminDashboard.css';
 
-const initialOrders = [
-  { id: '#ORD-1002', customer: 'Saman Kumara', product: 'Ashwagandha Extract', qty: 1, total: 2500, status: 'Processing' },
-  { id: '#ORD-1005', customer: 'Nimali Perera', product: 'Herbal Hair Oil', qty: 2, total: 3000, status: 'Shipped' },
-];
+const API_URL = import.meta.env.VITE_API_URL || '';
 
 const VendorDashboard = () => {
   const [activeTab, setActiveTab] = useState('products');
-  const [orders, setOrders] = useState(initialOrders);
+  const [orders, setOrders] = useState([]);
+  const [loadingOrders, setLoadingOrders] = useState(false);
   const [vendorProducts, setVendorProducts] = useState([]);
   const [loadingProducts, setLoadingProducts] = useState(false);
+  const [appointments, setAppointments] = useState([]);
+  const [loadingAppointments, setLoadingAppointments] = useState(false);
   
   const [showAddProductModal, setShowAddProductModal] = useState(false);
   const [newProduct, setNewProduct] = useState({ name: '', category: 'Medicine', basePrice: 0 });
@@ -29,8 +29,129 @@ const VendorDashboard = () => {
   });
   const [submittingProfile, setSubmittingProfile] = useState(false);
 
-  const handleUpdateOrderStatus = (orderId, newStatus) => {
-    setOrders(orders.map(order => order.id === orderId ? { ...order, status: newStatus } : order));
+  // Fetch vendor's products
+  useEffect(() => {
+    if (activeTab === 'products' && user) {
+      fetchProducts();
+    }
+  }, [activeTab, user]);
+
+  // Fetch vendor's orders
+  useEffect(() => {
+    if (activeTab === 'orders' && user) {
+      fetchOrders();
+    }
+  }, [activeTab, user]);
+
+  // Fetch vendor's appointments
+  useEffect(() => {
+    if (activeTab === 'appointments' && user) {
+      fetchAppointments();
+    }
+  }, [activeTab, user]);
+
+  const fetchProducts = async () => {
+    setLoadingProducts(true);
+    try {
+      const token = await auth.currentUser.getIdToken();
+      const res = await fetch(`${API_URL}/api/vendor/products`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setVendorProducts(data);
+      } else {
+        console.error('Failed to fetch products');
+      }
+    } catch (err) {
+      console.error('Error fetching vendor products:', err);
+    } finally {
+      setLoadingProducts(false);
+    }
+  };
+
+  const fetchOrders = async () => {
+    setLoadingOrders(true);
+    try {
+      const token = await auth.currentUser.getIdToken();
+      const res = await fetch(`${API_URL}/api/vendor/orders`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setOrders(data);
+      } else {
+        console.error('Failed to fetch orders');
+      }
+    } catch (err) {
+      console.error('Error fetching vendor orders:', err);
+    } finally {
+      setLoadingOrders(false);
+    }
+  };
+
+  const fetchAppointments = async () => {
+    setLoadingAppointments(true);
+    try {
+      const token = await auth.currentUser.getIdToken();
+      const res = await fetch(`${API_URL}/api/vendor/appointments`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setAppointments(data);
+      } else {
+        console.error('Failed to fetch appointments');
+      }
+    } catch (err) {
+      console.error('Error fetching appointments:', err);
+    } finally {
+      setLoadingAppointments(false);
+    }
+  };
+
+  const handleUpdateOrderStatus = async (orderId, newStatus) => {
+    try {
+      const token = await auth.currentUser.getIdToken();
+      const res = await fetch(`${API_URL}/api/vendor/orders/${orderId}/status`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ status: newStatus })
+      });
+      if (res.ok) {
+        setOrders(orders.map(order => order.id === orderId ? { ...order, status: newStatus } : order));
+      } else {
+        alert('Failed to update order status');
+      }
+    } catch (err) {
+      console.error('Error updating order status:', err);
+      alert('Error updating order status');
+    }
+  };
+
+  const handleAppointmentAction = async (appointmentId, status) => {
+    try {
+      const token = await auth.currentUser.getIdToken();
+      const res = await fetch(`${API_URL}/api/vendor/appointments/${appointmentId}/status`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ status })
+      });
+      if (res.ok) {
+        setAppointments(appointments.map(a => a.id === appointmentId ? { ...a, status } : a));
+      } else {
+        alert('Failed to update appointment status');
+      }
+    } catch (err) {
+      console.error('Error updating appointment:', err);
+      alert('Error updating appointment');
+    }
   };
 
   const calculateSitePrice = (basePrice) => {
@@ -47,29 +168,56 @@ const VendorDashboard = () => {
     
     try {
       const sitePrice = calculateSitePrice(newProduct.basePrice);
-      const newDocRef = doc(collection(db, 'products'));
-      const productObj = {
-        name: newProduct.name,
-        category: newProduct.category,
-        basePrice: Number(newProduct.basePrice),
-        price: sitePrice,
-        vendorId: user.uid,
-        vendorName: user.name || user.displayName || 'Vendor',
-        status: 'pending',
-        createdAt: new Date().toISOString()
-      };
-      
-      await setDoc(newDocRef, productObj);
-      alert("Product submitted for approval!");
-      setShowAddProductModal(false);
-      setNewProduct({ name: '', category: 'Medicine', basePrice: 0 });
-      // In a real app, fetch products again here
-      setVendorProducts([...vendorProducts, { id: newDocRef.id, ...productObj }]);
+      const token = await auth.currentUser.getIdToken();
+      const res = await fetch(`${API_URL}/api/vendor/products`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          name: newProduct.name,
+          category: newProduct.category,
+          basePrice: Number(newProduct.basePrice),
+          price: sitePrice
+        })
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        alert("Product submitted for approval!");
+        setShowAddProductModal(false);
+        setNewProduct({ name: '', category: 'Medicine', basePrice: 0 });
+        fetchProducts();
+      } else {
+        const errData = await res.json().catch(() => ({}));
+        alert(errData.error || "Failed to add product");
+      }
     } catch (err) {
       console.error("Error adding product", err);
       alert("Failed to add product");
     } finally {
       setAddingProduct(false);
+    }
+  };
+
+  const handleDeleteProduct = async (productId) => {
+    if (!window.confirm("Are you sure you want to delete this product?")) return;
+    try {
+      const token = await auth.currentUser.getIdToken();
+      const res = await fetch(`${API_URL}/api/vendor/products/${productId}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (res.ok) {
+        setVendorProducts(vendorProducts.filter(p => p.id !== productId));
+        alert("Product deleted successfully!");
+      } else {
+        alert("Failed to delete product");
+      }
+    } catch (err) {
+      console.error("Error deleting product:", err);
+      alert("Error deleting product");
     }
   };
 
@@ -172,6 +320,9 @@ const VendorDashboard = () => {
           <li className={activeTab === 'orders' ? 'active' : ''} onClick={() => setActiveTab('orders')}>
             <ShoppingBag size={20} /> Customer Orders
           </li>
+          <li className={activeTab === 'appointments' ? 'active' : ''} onClick={() => setActiveTab('appointments')}>
+            <Calendar size={20} /> Appointments
+          </li>
           <li className={activeTab === 'settings' ? 'active' : ''} onClick={() => setActiveTab('settings')}>
             <Settings size={20} /> Settings
           </li>
@@ -180,7 +331,7 @@ const VendorDashboard = () => {
 
       <main className="admin-main">
         <header className="admin-header">
-          <h1>{activeTab === 'products' ? 'Manage My Products' : activeTab === 'orders' ? 'Customer Orders' : 'Vendor Panel'}</h1>
+          <h1>{activeTab === 'products' ? 'Manage My Products' : activeTab === 'orders' ? 'Customer Orders' : activeTab === 'appointments' ? 'Appointments' : 'Vendor Panel'}</h1>
           {activeTab === 'products' && <button onClick={() => setShowAddProductModal(true)} className="btn btn-primary">+ Add New Product</button>}
         </header>
 
@@ -188,41 +339,56 @@ const VendorDashboard = () => {
           {activeTab === 'products' && (
             <div className="glass-panel table-container">
               <p className="admin-hint">Add products to your shop. Once approved by the main Admin, they will appear on the public shop.</p>
-              <table className="admin-table">
-                <thead>
-                  <tr>
-                    <th>Product Name</th>
-                    <th>Category</th>
-                    <th>Price</th>
-                    <th>Status</th>
-                    <th>Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {vendorProducts.map(p => (
-                    <tr key={p.id}>
-                      <td className="fw-bold">{p.name}</td>
-                      <td>{p.category}</td>
-                      <td>Rs. {p.price} <br/><small style={{color: 'var(--text-secondary)'}}>(You get Rs. {p.basePrice})</small></td>
-                      <td>
-                        {p.status === 'pending' ? (
-                          <span className="type-badge astrologer" style={{background: '#fff3cd', color: '#856404'}}>Pending Approval</span>
-                        ) : p.status === 'approved' ? (
-                          <span className="type-badge doctor" style={{background: '#d4edda', color: '#155724'}}>Live</span>
-                        ) : (
-                          <span className="type-badge" style={{background: '#f8d7da', color: '#721c24'}}>Rejected</span>
-                        )}
-                      </td>
-                      <td><button className="btn btn-outline" style={{padding: '0.25rem 0.75rem', fontSize: '0.85rem'}}>Edit</button></td>
-                    </tr>
-                  ))}
-                  {vendorProducts.length === 0 && (
+              {loadingProducts ? (
+                <p style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-secondary)' }}>Loading products...</p>
+              ) : (
+                <table className="admin-table">
+                  <thead>
                     <tr>
-                      <td colSpan="5" style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-secondary)' }}>You haven't added any products yet.</td>
+                      <th>Product Name</th>
+                      <th>Category</th>
+                      <th>Price</th>
+                      <th>Status</th>
+                      <th>Actions</th>
                     </tr>
-                  )}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {vendorProducts.map(p => (
+                      <tr key={p.id}>
+                        <td className="fw-bold">{p.name}</td>
+                        <td>{p.category}</td>
+                        <td>Rs. {p.price} <br/><small style={{color: 'var(--text-secondary)'}}>(You get Rs. {p.basePrice})</small></td>
+                        <td>
+                          {p.status === 'pending' ? (
+                            <span className="type-badge astrologer" style={{background: '#fff3cd', color: '#856404'}}>Pending Approval</span>
+                          ) : p.status === 'approved' ? (
+                            <span className="type-badge doctor" style={{background: '#d4edda', color: '#155724'}}>Live</span>
+                          ) : (
+                            <span className="type-badge" style={{background: '#f8d7da', color: '#721c24'}}>Rejected</span>
+                          )}
+                        </td>
+                        <td>
+                          <div style={{ display: 'flex', gap: '0.5rem' }}>
+                            <button className="btn btn-outline" style={{padding: '0.25rem 0.75rem', fontSize: '0.85rem'}}>Edit</button>
+                            <button 
+                              onClick={() => handleDeleteProduct(p.id)} 
+                              className="btn btn-outline" 
+                              style={{padding: '0.25rem 0.75rem', fontSize: '0.85rem', color: 'var(--error-color)', borderColor: 'var(--error-color)'}}
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                    {vendorProducts.length === 0 && (
+                      <tr>
+                        <td colSpan="5" style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-secondary)' }}>You haven't added any products yet.</td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              )}
             </div>
           )}
 
@@ -303,44 +469,108 @@ const VendorDashboard = () => {
           {activeTab === 'orders' && (
             <div className="glass-panel table-container">
               <p className="admin-hint">View and process orders placed by customers for your products.</p>
-              <table className="admin-table">
-                <thead>
-                  <tr>
-                    <th>Order ID</th>
-                    <th>Product</th>
-                    <th>Qty</th>
-                    <th>Total</th>
-                    <th>Status</th>
-                    <th>Action</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {orders.map(order => (
-                    <tr key={order.id}>
-                      <td className="fw-bold">{order.id}</td>
-                      <td>{order.product} <br/><small style={{color: 'var(--text-secondary)'}}>({order.customer})</small></td>
-                      <td>{order.qty}</td>
-                      <td>Rs. {order.total}</td>
-                      <td>
-                        {order.status === 'Processing' && <span className="type-badge astrologer" style={{background: '#fff3cd', color: '#856404'}}>Processing</span>}
-                        {order.status === 'Shipped' && <span className="type-badge doctor" style={{background: '#d4edda', color: '#155724'}}>Shipped</span>}
-                        {order.status === 'Delivered' && <span className="type-badge" style={{background: '#cce5ff', color: '#004085'}}>Delivered</span>}
-                      </td>
-                      <td>
-                        {order.status === 'Processing' && (
-                          <button onClick={() => handleUpdateOrderStatus(order.id, 'Shipped')} className="btn btn-primary" style={{padding: '0.25rem 0.75rem', fontSize: '0.85rem'}}>Mark Shipped</button>
-                        )}
-                        {order.status === 'Shipped' && (
-                          <button onClick={() => handleUpdateOrderStatus(order.id, 'Delivered')} className="btn btn-primary" style={{padding: '0.25rem 0.75rem', fontSize: '0.85rem', background: 'var(--success-color)'}}>Mark Delivered</button>
-                        )}
-                        {order.status === 'Delivered' && (
-                          <span style={{color: 'var(--success-color)', display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.85rem'}}><CheckCircle size={16} /> Done</span>
-                        )}
-                      </td>
+              {loadingOrders ? (
+                <p style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-secondary)' }}>Loading orders...</p>
+              ) : (
+                <table className="admin-table">
+                  <thead>
+                    <tr>
+                      <th>Order ID</th>
+                      <th>Product</th>
+                      <th>Qty</th>
+                      <th>Total</th>
+                      <th>Status</th>
+                      <th>Action</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {orders.map(order => (
+                      <tr key={order.id}>
+                        <td className="fw-bold">{order.id}</td>
+                        <td>{order.product} <br/><small style={{color: 'var(--text-secondary)'}}>({order.customer})</small></td>
+                        <td>{order.qty}</td>
+                        <td>Rs. {order.total}</td>
+                        <td>
+                          {order.status === 'Processing' && <span className="type-badge astrologer" style={{background: '#fff3cd', color: '#856404'}}>Processing</span>}
+                          {order.status === 'Shipped' && <span className="type-badge doctor" style={{background: '#d4edda', color: '#155724'}}>Shipped</span>}
+                          {order.status === 'Delivered' && <span className="type-badge" style={{background: '#cce5ff', color: '#004085'}}>Delivered</span>}
+                        </td>
+                        <td>
+                          {order.status === 'Processing' && (
+                            <button onClick={() => handleUpdateOrderStatus(order.id, 'Shipped')} className="btn btn-primary" style={{padding: '0.25rem 0.75rem', fontSize: '0.85rem'}}>Mark Shipped</button>
+                          )}
+                          {order.status === 'Shipped' && (
+                            <button onClick={() => handleUpdateOrderStatus(order.id, 'Delivered')} className="btn btn-primary" style={{padding: '0.25rem 0.75rem', fontSize: '0.85rem', background: 'var(--success-color)'}}>Mark Delivered</button>
+                          )}
+                          {order.status === 'Delivered' && (
+                            <span style={{color: 'var(--success-color)', display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.85rem'}}><CheckCircle size={16} /> Done</span>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                    {orders.length === 0 && (
+                      <tr>
+                        <td colSpan="6" style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-secondary)' }}>No orders yet.</td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          )}
+
+          {activeTab === 'appointments' && (
+            <div className="glass-panel table-container">
+              <p className="admin-hint">Manage appointment requests from patients.</p>
+              {loadingAppointments ? (
+                <p style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-secondary)' }}>Loading appointments...</p>
+              ) : (
+                <table className="admin-table">
+                  <thead>
+                    <tr>
+                      <th>Patient</th>
+                      <th>Date</th>
+                      <th>Time</th>
+                      <th>Notes</th>
+                      <th>Status</th>
+                      <th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {appointments.map(apt => (
+                      <tr key={apt.id}>
+                        <td className="fw-bold">{apt.patientName || apt.userName || 'N/A'}</td>
+                        <td>{apt.date}</td>
+                        <td>{apt.time}</td>
+                        <td>{apt.notes || '-'}</td>
+                        <td>
+                          {apt.status === 'pending' && <span className="type-badge astrologer" style={{background: '#fff3cd', color: '#856404'}}>Pending</span>}
+                          {apt.status === 'accepted' && <span className="type-badge doctor" style={{background: '#d4edda', color: '#155724'}}>Accepted</span>}
+                          {apt.status === 'rejected' && <span className="type-badge" style={{background: '#f8d7da', color: '#721c24'}}>Rejected</span>}
+                        </td>
+                        <td>
+                          {apt.status === 'pending' && (
+                            <div style={{ display: 'flex', gap: '0.5rem' }}>
+                              <button onClick={() => handleAppointmentAction(apt.id, 'accepted')} className="btn btn-primary" style={{padding: '0.25rem 0.75rem', fontSize: '0.85rem', background: 'var(--success-color)'}}>Accept</button>
+                              <button onClick={() => handleAppointmentAction(apt.id, 'rejected')} className="btn btn-outline" style={{padding: '0.25rem 0.75rem', fontSize: '0.85rem', color: 'var(--error-color)', borderColor: 'var(--error-color)'}}>Reject</button>
+                            </div>
+                          )}
+                          {apt.status !== 'pending' && (
+                            <span style={{ color: apt.status === 'accepted' ? 'var(--success-color)' : 'var(--error-color)', fontSize: '0.85rem' }}>
+                              {apt.status === 'accepted' ? '✓ Confirmed' : '✗ Declined'}
+                            </span>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                    {appointments.length === 0 && (
+                      <tr>
+                        <td colSpan="6" style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-secondary)' }}>No appointments yet.</td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              )}
             </div>
           )}
 

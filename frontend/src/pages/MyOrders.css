@@ -1,0 +1,246 @@
+.orders-page {
+  padding-bottom: 4rem;
+  min-height: 70vh;
+}
+
+.orders-header {
+  background: linear-gradient(135deg, rgba(212, 175, 55, 0.05), rgba(43, 89, 63, 0.05));
+  padding: 3rem 0;
+  text-align: center;
+  margin-bottom: 3rem;
+  border-bottom: 1px solid rgba(212, 175, 55, 0.2);
+}
+
+.orders-title {
+  color: var(--primary-color);
+  font-size: 2.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.orders-subtitle {
+  color: var(--text-secondary);
+  font-size: 1.1rem;
+}
+
+.orders-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  max-width: 850px;
+  margin: 0 auto;
+}
+
+.order-card {
+  padding: 1.75rem;
+  transition: var(--transition);
+  animation: orderSlideIn 0.5s ease-out forwards;
+  opacity: 0;
+}
+
+@keyframes orderSlideIn {
+  from { opacity: 0; transform: translateY(15px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.order-card:hover {
+  box-shadow: var(--shadow-lg);
+  transform: translateY(-3px);
+}
+
+.order-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 1.25rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--glass-border);
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.order-id-section h3 {
+  font-size: 1.1rem;
+  color: var(--text-primary);
+  margin-bottom: 0.25rem;
+}
+
+.order-date {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+.order-vendor {
+  font-size: 0.85rem;
+  color: var(--primary-color);
+  font-weight: 500;
+  margin-top: 0.15rem;
+}
+
+/* Status Badges */
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.35rem 1rem;
+  border-radius: var(--radius-full);
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.status-pending {
+  background: rgba(255, 165, 0, 0.15);
+  color: #f39c12;
+}
+
+.status-confirmed {
+  background: rgba(52, 152, 219, 0.15);
+  color: #3498db;
+}
+
+.status-processing {
+  background: rgba(155, 89, 182, 0.15);
+  color: #9b59b6;
+}
+
+.status-shipped {
+  background: rgba(75, 0, 130, 0.15);
+  color: #6c5ce7;
+}
+
+.status-delivered {
+  background: rgba(46, 204, 113, 0.15);
+  color: #2ecc71;
+}
+
+.status-cancelled {
+  background: rgba(231, 76, 60, 0.15);
+  color: #e74c3c;
+}
+
+.status-completed {
+  background: rgba(52, 152, 219, 0.15);
+  color: #3498db;
+}
+
+/* Order Items */
+.order-items-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  margin-bottom: 1.25rem;
+}
+
+.order-item-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.5rem 0.75rem;
+  background: rgba(0, 0, 0, 0.03);
+  border-radius: var(--radius-sm);
+  font-size: 0.95rem;
+}
+
+.order-item-name {
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+.order-item-qty {
+  color: var(--text-secondary);
+  margin-left: 0.5rem;
+  font-size: 0.85rem;
+}
+
+.order-item-price {
+  color: var(--primary-color);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.order-card-footer {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  padding-top: 1rem;
+  border-top: 1px solid var(--glass-border);
+}
+
+.order-total {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.order-total span {
+  color: var(--primary-color);
+}
+
+/* Empty */
+.orders-empty {
+  text-align: center;
+  padding: 4rem 2rem;
+  animation: fadeIn 0.6s ease-out;
+}
+
+.orders-empty-icon {
+  font-size: 4rem;
+  margin-bottom: 1.5rem;
+  opacity: 0.4;
+}
+
+.orders-empty h2 {
+  font-size: 1.8rem;
+  color: var(--text-primary);
+  margin-bottom: 0.75rem;
+}
+
+.orders-empty p {
+  color: var(--text-secondary);
+  margin-bottom: 2rem;
+  font-size: 1.05rem;
+}
+
+/* Loading */
+.orders-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 4rem;
+  gap: 1rem;
+  color: var(--text-secondary);
+}
+
+.orders-spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid var(--glass-border);
+  border-top-color: var(--primary-color);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@media (max-width: 768px) {
+  .orders-header {
+    padding: 2rem 0;
+  }
+
+  .orders-title {
+    font-size: 2rem;
+  }
+
+  .order-card {
+    padding: 1.25rem;
+  }
+
+  .order-card-header {
+    flex-direction: column;
+  }
+
+  .order-item-row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.25rem;
+  }
+}
