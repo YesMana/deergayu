@@ -4,6 +4,8 @@ import { collection, getDocs, doc, deleteDoc } from 'firebase/firestore';
 import { db, auth } from '../firebase';
 import './AdminDashboard.css';
 
+const API_URL = import.meta.env.VITE_API_URL || '';
+
 const initialProviders = [
   { id: 1, name: "Dr. Anura Dissanayake", role: "Ayurvedic Physician", rank: 1, type: "doctor" },
   { id: 2, name: "Vedamahaththaya Somarathna", role: "Traditional Healer", rank: 2, type: "doctor" },
@@ -86,7 +88,7 @@ const AdminDashboard = () => {
   const handleUpdateRole = async (uid, newRole) => {
     try {
       const token = await auth.currentUser.getIdToken();
-      const res = await fetch(`/api/users/${uid}/role`, {
+      const res = await fetch(`${API_URL}/api/users/${uid}/role`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -115,7 +117,7 @@ const AdminDashboard = () => {
     if (!window.confirm("Approve this expert?")) return;
     try {
       const token = await auth.currentUser.getIdToken();
-      const res = await fetch(`/api/users/${uid}/status`, {
+      const res = await fetch(`${API_URL}/api/users/${uid}/status`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -152,7 +154,7 @@ const AdminDashboard = () => {
       // Attempt backend deletion for Auth cleanup (silently fail if backend is down)
       try {
         const token = await auth.currentUser.getIdToken();
-        await fetch(`/api/users/${uid}/delete`, {
+        await fetch(`${API_URL}/api/users/${uid}/delete`, {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${token}`
@@ -178,7 +180,7 @@ const AdminDashboard = () => {
       const newStatus = action === 'approve' ? 'approved' : action === 'hide' ? 'hidden' : 'rejected';
       
       const token = await auth.currentUser.getIdToken();
-      const res = await fetch(`/api/products/${id}/status`, {
+      const res = await fetch(`${API_URL}/api/products/${id}/status`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
