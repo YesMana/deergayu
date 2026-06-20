@@ -373,22 +373,14 @@ const VendorDashboard = () => {
           <li className={activeTab === 'orders' ? 'active' : ''} onClick={() => setActiveTab('orders')}>
             <ShoppingBag size={20} /> Customer Orders
           </li>
-          <button 
-          className={`tab-btn ${activeTab === 'appointments' ? 'active' : ''}`} 
-          onClick={() => setActiveTab('appointments')}
-        >
-          <Calendar size={18} /> Channeling
-        </button>
-        <button 
-          className={`tab-btn ${activeTab === 'schedule' ? 'active' : ''}`} 
-          onClick={() => setActiveTab('schedule')}
-        >
-          <Clock size={18} /> My Schedule
-        </button>
-        <button 
-          className={`tab-btn ${activeTab === 'profile' ? 'active' : ''}`} 
-          onClick={() => setActiveTab('profile')}
-        >    <Settings size={20} /> Settings
+          <li className={activeTab === 'appointments' ? 'active' : ''} onClick={() => setActiveTab('appointments')}>
+            <Calendar size={20} /> Appointments
+          </li>
+          <li className={activeTab === 'schedule' ? 'active' : ''} onClick={() => setActiveTab('schedule')}>
+            <Clock size={20} /> My Schedule
+          </li>
+          <li className={activeTab === 'profile' ? 'active' : ''} onClick={() => setActiveTab('profile')}>
+            <Settings size={20} /> Settings
           </li>
         </ul>
       </aside>
