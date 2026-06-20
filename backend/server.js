@@ -4,6 +4,7 @@ const admin = require('firebase-admin');
 const { getFirestore, FieldValue } = require('firebase-admin/firestore');
 const { getAuth } = require('firebase-admin/auth');
 const dotenv = require('dotenv');
+const { sendEmail } = require('./emailService');
 
 dotenv.config();
 
@@ -292,15 +293,20 @@ apiRouter.post('/vendor/products', verifyVendor, async (req, res) => {
   }
 
   try {
+    const userDoc = await db.collection('users').doc(req.user.uid).get();
+    const vendorName = userDoc.exists ? userDoc.data().name : req.user.email;
+
     const productData = {
       name,
       description: description || '',
+      basePrice: req.body.basePrice ? Number(req.body.basePrice) : Number(price),
       price: Number(price),
       category: category || 'General',
       imageUrl: imageUrl || '',
       stock: Number(stock) || 0,
       vendorId: req.user.uid,
       vendorEmail: req.user.email,
+      vendorName: vendorName,
       status: 'pending',
       rating: 0,
       reviewCount: 0,
@@ -308,14 +314,8 @@ apiRouter.post('/vendor/products', verifyVendor, async (req, res) => {
       updatedAt: new Date().toISOString()
     };
     
-    // Get vendor name
-    const vendorDoc = await db.collection('users').doc(req.user.uid).get();
-    if (vendorDoc.exists) {
-      productData.vendorName = vendorDoc.data().name || req.user.email;
-    }
-
     const docRef = await db.collection('products').add(productData);
-    res.json({ id: docRef.id, ...productData });
+    res.status(201).json({ id: docRef.id, ...productData });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -665,6 +665,18 @@ apiRouter.post('/appointments', verifyUser, async (req, res) => {
   }
 
   try {
+    // Prevent double booking
+    const existing = await db.collection('appointments')
+      .where('providerId', '==', providerId)
+      .where('date', '==', date)
+      .where('time', '==', time)
+      .where('status', 'in', ['pending', 'accepted'])
+      .get();
+      
+    if (!existing.empty) {
+      return res.status(400).json({ error: 'This time slot is already booked.' });
+    }
+
     const userDoc = await db.collection('users').doc(req.user.uid).get();
     const userName = userDoc.exists ? userDoc.data().name : req.user.email;
     
@@ -683,6 +695,33 @@ apiRouter.post('/appointments', verifyUser, async (req, res) => {
     };
     
     const docRef = await db.collection('appointments').add(appointmentData);
+
+    // Send Email
+    try {
+      const providerDoc = await db.collection('users').doc(providerId).get();
+      if (providerDoc.exists && providerDoc.data().email) {
+        const providerEmail = providerDoc.data().email;
+        const htmlBody = `
+          <div style="font-family: Arial, sans-serif; padding: 20px; color: #333;">
+            <h2 style="color: #2e7d32;">New Appointment Request</h2>
+            <p>Hello ${providerName},</p>
+            <p>You have a new appointment booking request from <strong>${userName}</strong>.</p>
+            <div style="background: #f5f5f5; padding: 15px; border-radius: 8px; margin: 20px 0;">
+              <p style="margin: 5px 0;"><strong>Date:</strong> ${date}</p>
+              <p style="margin: 5px 0;"><strong>Time:</strong> ${time}</p>
+              <p style="margin: 5px 0;"><strong>Patient Note:</strong> ${notes || 'None'}</p>
+            </div>
+            <p>Please log in to your Deergayu Vendor Dashboard to accept or decline this request.</p>
+            <br/>
+            <p>Thanks,<br/>Deergayu Platform Team</p>
+          </div>
+        `;
+        await sendEmail(providerEmail, 'New Appointment Booking - Deergayu', '', htmlBody);
+      }
+    } catch (emailErr) {
+      console.error("Failed to send booking email:", emailErr);
+    }
+
     res.json({ id: docRef.id, ...appointmentData, message: 'Appointment booked successfully' });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -722,6 +761,89 @@ apiRouter.post('/my-appointments/:id/cancel', verifyUser, async (req, res) => {
       updatedAt: new Date().toISOString() 
     });
     res.json({ message: 'Appointment cancelled successfully' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Save Vendor Schedule
+apiRouter.post('/vendor/schedule', verifyUser, async (req, res) => {
+  try {
+    const { schedule } = req.body; // e.g. { slotDuration, workingDays, unavailableDates }
+    await db.collection('users').doc(req.user.uid).update({
+      'profileDetails.schedule': schedule
+    });
+    res.json({ message: 'Schedule updated successfully' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Get available slots for a provider on a specific date
+apiRouter.get('/appointments/available/:providerId', async (req, res) => {
+  const { providerId } = req.params;
+  const { date } = req.query; // YYYY-MM-DD
+  
+  if (!date) return res.status(400).json({ error: "Date query param required" });
+
+  try {
+    // 1. Get Provider Schedule
+    const providerDoc = await db.collection('users').doc(providerId).get();
+    if (!providerDoc.exists) return res.status(404).json({ error: "Provider not found" });
+    
+    const profile = providerDoc.data().profileDetails || {};
+    const schedule = profile.schedule || {
+      slotDuration: 30,
+      workingDays: {
+        "Monday": { start: "09:00", end: "17:00" },
+        "Tuesday": { start: "09:00", end: "17:00" },
+        "Wednesday": { start: "09:00", end: "17:00" },
+        "Thursday": { start: "09:00", end: "17:00" },
+        "Friday": { start: "09:00", end: "17:00" },
+      },
+      unavailableDates: []
+    };
+
+    // Check if date is unavailable
+    if (schedule.unavailableDates && schedule.unavailableDates.includes(date)) {
+      return res.json({ allSlots: [], bookedSlots: [] });
+    }
+
+    const dayOfWeek = new Date(date).toLocaleDateString('en-US', { weekday: 'long' });
+    const workingDay = schedule.workingDays ? schedule.workingDays[dayOfWeek] : null;
+
+    if (!workingDay || !workingDay.start || !workingDay.end) {
+      return res.json({ allSlots: [], bookedSlots: [] });
+    }
+
+    // 2. Fetch existing appointments for this provider on this date
+    const apptsSnapshot = await db.collection('appointments')
+      .where('providerId', '==', providerId)
+      .where('date', '==', date)
+      .where('status', 'in', ['pending', 'accepted'])
+      .get();
+      
+    const bookedSlots = apptsSnapshot.docs.map(doc => doc.data().time);
+
+    // 3. Generate slots
+    const availableSlots = [];
+    const [startH, startM] = workingDay.start.split(':').map(Number);
+    const [endH, endM] = workingDay.end.split(':').map(Number);
+    
+    let currentMins = startH * 60 + startM;
+    const endMins = endH * 60 + endM;
+    const slotDuration = Number(schedule.slotDuration) || 30;
+
+    while (currentMins + slotDuration <= endMins) {
+      const h = Math.floor(currentMins / 60).toString().padStart(2, '0');
+      const m = (currentMins % 60).toString().padStart(2, '0');
+      const timeString = `${h}:${m}`;
+      
+      availableSlots.push(timeString);
+      currentMins += slotDuration;
+    }
+
+    res.json({ allSlots: availableSlots, bookedSlots });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

@@ -9,19 +9,33 @@ import './AdminDashboard.css';
 const API_URL = import.meta.env.VITE_API_URL || '';
 
 const VendorDashboard = () => {
+  const { user } = useAuth();
+  const { success, error } = useToast();
   const [activeTab, setActiveTab] = useState('products');
   const [orders, setOrders] = useState([]);
-  const [loadingOrders, setLoadingOrders] = useState(false);
   const [vendorProducts, setVendorProducts] = useState([]);
   const [loadingProducts, setLoadingProducts] = useState(false);
   const [appointments, setAppointments] = useState([]);
   const [loadingAppointments, setLoadingAppointments] = useState(false);
   
   const [showAddProductModal, setShowAddProductModal] = useState(false);
-  const [newProduct, setNewProduct] = useState({ name: '', category: 'Medicine', basePrice: 0 });
+  const [newProduct, setNewProduct] = useState({ name: '', category: 'Medicine', basePrice: 0, imageUrl: '', description: '' });
   const [addingProduct, setAddingProduct] = useState(false);
 
-  const { user } = useAuth();
+  const [schedule, setSchedule] = useState({
+    slotDuration: 30,
+    workingDays: {
+      "Monday": { start: "09:00", end: "17:00", active: true },
+      "Tuesday": { start: "09:00", end: "17:00", active: true },
+      "Wednesday": { start: "09:00", end: "17:00", active: true },
+      "Thursday": { start: "09:00", end: "17:00", active: true },
+      "Friday": { start: "09:00", end: "17:00", active: true },
+      "Saturday": { start: "09:00", end: "13:00", active: false },
+      "Sunday": { start: "09:00", end: "13:00", active: false },
+    },
+    unavailableDates: []
+  });
+  const [savingSchedule, setSavingSchedule] = useState(false);
   
   const [profileData, setProfileData] = useState({
     category: 'Ayurvedic Doctor',
@@ -30,10 +44,13 @@ const VendorDashboard = () => {
   });
   const [submittingProfile, setSubmittingProfile] = useState(false);
 
-  // Fetch vendor's products
+  // Fetch vendor's products & schedule
   useEffect(() => {
-    if (activeTab === 'products' && user) {
-      fetchProducts();
+    if (user) {
+      if (activeTab === 'products') fetchProducts();
+      if (user.profileDetails?.schedule) {
+        setSchedule(user.profileDetails.schedule);
+      }
     }
   }, [activeTab, user]);
 
@@ -182,7 +199,9 @@ const VendorDashboard = () => {
           name: newProduct.name,
           category: newProduct.category,
           basePrice: Number(newProduct.basePrice),
-          price: sitePrice
+          price: sitePrice,
+          imageUrl: newProduct.imageUrl,
+          description: newProduct.description
         })
       });
 
@@ -190,7 +209,7 @@ const VendorDashboard = () => {
         const data = await res.json();
         success("Product submitted for approval!");
         setShowAddProductModal(false);
-        setNewProduct({ name: '', category: 'Medicine', basePrice: 0 });
+        setNewProduct({ name: '', category: 'Medicine', basePrice: 0, imageUrl: '', description: '' });
         fetchProducts();
       } else {
         const errData = await res.json().catch(() => ({}));
@@ -239,6 +258,35 @@ const VendorDashboard = () => {
       error("Failed to save profile details");
     } finally {
       setSubmittingProfile(false);
+    }
+  };
+
+  const handleScheduleSubmit = async (e) => {
+    e.preventDefault();
+    setSavingSchedule(true);
+    try {
+      const token = await auth.currentUser.getIdToken();
+      const res = await fetch(`${API_URL}/api/vendor/schedule`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ schedule })
+      });
+      if (res.ok) {
+        // Update local user state
+        if (!user.profileDetails) user.profileDetails = {};
+        user.profileDetails.schedule = schedule;
+        success("Schedule updated successfully!");
+      } else {
+        error("Failed to update schedule");
+      }
+    } catch (err) {
+      console.error("Error updating schedule", err);
+      error("Error updating schedule");
+    } finally {
+      setSavingSchedule(false);
     }
   };
 
@@ -325,11 +373,22 @@ const VendorDashboard = () => {
           <li className={activeTab === 'orders' ? 'active' : ''} onClick={() => setActiveTab('orders')}>
             <ShoppingBag size={20} /> Customer Orders
           </li>
-          <li className={activeTab === 'appointments' ? 'active' : ''} onClick={() => setActiveTab('appointments')}>
-            <Calendar size={20} /> Appointments
-          </li>
-          <li className={activeTab === 'settings' ? 'active' : ''} onClick={() => setActiveTab('settings')}>
-            <Settings size={20} /> Settings
+          <button 
+          className={`tab-btn ${activeTab === 'appointments' ? 'active' : ''}`} 
+          onClick={() => setActiveTab('appointments')}
+        >
+          <Calendar size={18} /> Channeling
+        </button>
+        <button 
+          className={`tab-btn ${activeTab === 'schedule' ? 'active' : ''}`} 
+          onClick={() => setActiveTab('schedule')}
+        >
+          <Clock size={18} /> My Schedule
+        </button>
+        <button 
+          className={`tab-btn ${activeTab === 'profile' ? 'active' : ''}`} 
+          onClick={() => setActiveTab('profile')}
+        >    <Settings size={20} /> Settings
           </li>
         </ul>
       </aside>
@@ -341,7 +400,101 @@ const VendorDashboard = () => {
         </header>
 
         <div className="admin-content">
-          {activeTab === 'products' && (
+          {activeTab === 'schedule' && (
+            <div className="glass-panel" style={{ padding: '2rem' }}>
+              <h2 style={{ color: 'var(--secondary-color)', marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <Clock size={24} /> Schedule Management
+              </h2>
+              <p style={{ color: 'var(--text-secondary)', marginBottom: '2rem' }}>
+                Set your working hours and appointment slot duration. This will determine the time slots available for patients to book.
+              </p>
+
+              <form onSubmit={handleScheduleSubmit}>
+                <div className="form-group" style={{ marginBottom: '2rem' }}>
+                  <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold' }}>Slot Duration (minutes)</label>
+                  <select 
+                    value={schedule.slotDuration} 
+                    onChange={e => setSchedule({...schedule, slotDuration: Number(e.target.value)})}
+                    className="form-control"
+                    style={{ width: '100%', maxWidth: '200px', padding: '0.8rem', borderRadius: '4px', background: 'var(--surface-color)', color: 'var(--text-primary)' }}
+                  >
+                    <option value={15}>15 Minutes</option>
+                    <option value={20}>20 Minutes</option>
+                    <option value={30}>30 Minutes</option>
+                    <option value={45}>45 Minutes</option>
+                    <option value={60}>1 Hour</option>
+                  </select>
+                </div>
+
+                <div style={{ marginBottom: '2rem' }}>
+                  <h3 style={{ marginBottom: '1rem', color: 'var(--text-primary)' }}>Working Days</h3>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                    {Object.keys(schedule.workingDays).map(day => (
+                      <div key={day} style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap', background: 'var(--surface-color)', padding: '1rem', borderRadius: '8px' }}>
+                        <div style={{ width: '120px' }}>
+                          <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
+                            <input 
+                              type="checkbox" 
+                              checked={schedule.workingDays[day].active !== false}
+                              onChange={e => setSchedule({
+                                ...schedule, 
+                                workingDays: { 
+                                  ...schedule.workingDays, 
+                                  [day]: { ...schedule.workingDays[day], active: e.target.checked }
+                                }
+                              })}
+                            />
+                            {day}
+                          </label>
+                        </div>
+                        
+                        {schedule.workingDays[day].active !== false && (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                            <input 
+                              type="time" 
+                              value={schedule.workingDays[day].start || '09:00'}
+                              onChange={e => setSchedule({
+                                ...schedule, 
+                                workingDays: { 
+                                  ...schedule.workingDays, 
+                                  [day]: { ...schedule.workingDays[day], start: e.target.value }
+                                }
+                              })}
+                              style={{ padding: '0.5rem', borderRadius: '4px', background: 'rgba(0,0,0,0.2)', color: 'var(--text-primary)', border: '1px solid rgba(255,255,255,0.1)' }}
+                            />
+                            <span>to</span>
+                            <input 
+                              type="time" 
+                              value={schedule.workingDays[day].end || '17:00'}
+                              onChange={e => setSchedule({
+                                ...schedule, 
+                                workingDays: { 
+                                  ...schedule.workingDays, 
+                                  [day]: { ...schedule.workingDays[day], end: e.target.value }
+                                }
+                              })}
+                              style={{ padding: '0.5rem', borderRadius: '4px', background: 'rgba(0,0,0,0.2)', color: 'var(--text-primary)', border: '1px solid rgba(255,255,255,0.1)' }}
+                            />
+                          </div>
+                        )}
+                        {schedule.workingDays[day].active === false && (
+                          <span style={{ color: 'var(--text-secondary)', fontStyle: 'italic' }}>Closed</span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div style={{ marginTop: '2rem', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '2rem' }}>
+                  <button disabled={savingSchedule} type="submit" className="btn btn-primary">
+                    {savingSchedule ? 'Saving...' : 'Save Schedule'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          )}
+
+          {activeTab === 'profile' && (
             <div className="glass-panel table-container">
               <p className="admin-hint">Add products to your shop. Once approved by the main Admin, they will appear on the public shop.</p>
               {loadingProducts ? (
@@ -431,6 +584,28 @@ const VendorDashboard = () => {
                       <option value="Pain Relief">Pain Relief Oils</option>
                       <option value="Equipment">Medical Equipment</option>
                     </select>
+                  </div>
+                  <div className="form-group">
+                    <label>Image URL (Optional)</label>
+                    <input 
+                      type="url" 
+                      placeholder="https://example.com/image.jpg"
+                      value={newProduct.imageUrl || ''} 
+                      onChange={e => setNewProduct({...newProduct, imageUrl: e.target.value})} 
+                      className="form-control"
+                      style={{ width: '100%', padding: '0.8rem', borderRadius: '4px', background: 'var(--surface-color)', color: 'var(--text-primary)' }}
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label>Description (Optional)</label>
+                    <textarea 
+                      placeholder="Product description..."
+                      value={newProduct.description || ''} 
+                      onChange={e => setNewProduct({...newProduct, description: e.target.value})} 
+                      className="form-control"
+                      rows="3"
+                      style={{ width: '100%', padding: '0.8rem', borderRadius: '4px', background: 'var(--surface-color)', color: 'var(--text-primary)' }}
+                    ></textarea>
                   </div>
                   <div className="form-group">
                     <label>Your Selling Price (Base Price Rs.)</label>

@@ -45,6 +45,9 @@ const Channeling = () => {
   const [bookingTime, setBookingTime] = useState('');
   const [bookingNotes, setBookingNotes] = useState('');
   const [isBooking, setIsBooking] = useState(false);
+  const [availableSlots, setAvailableSlots] = useState([]);
+  const [bookedSlots, setBookedSlots] = useState([]);
+  const [loadingSlots, setLoadingSlots] = useState(false);
 
   useEffect(() => {
     fetchProviders();
@@ -61,6 +64,29 @@ const Channeling = () => {
       console.error('Error fetching providers:', err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (bookingDate && selectedProvider) {
+      fetchAvailableSlots(bookingDate);
+    }
+  }, [bookingDate, selectedProvider]);
+
+  const fetchAvailableSlots = async (date) => {
+    setLoadingSlots(true);
+    setBookingTime('');
+    try {
+      const res = await fetch(`${API_URL}/api/appointments/available/${selectedProvider.id}?date=${date}`);
+      if (res.ok) {
+        const data = await res.json();
+        setAvailableSlots(data.allSlots || []);
+        setBookedSlots(data.bookedSlots || []);
+      }
+    } catch (err) {
+      console.error("Error fetching slots", err);
+    } finally {
+      setLoadingSlots(false);
     }
   };
 
@@ -126,6 +152,8 @@ const Channeling = () => {
         setBookingDate('');
         setBookingTime('');
         setBookingNotes('');
+        setAvailableSlots([]);
+        setBookedSlots([]);
         navigate('/my-appointments');
       } else {
         error("Failed to book appointment.");
@@ -276,35 +304,59 @@ const Channeling = () => {
               <span style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>{selectedProvider.profileDetails?.specialty || selectedProvider.role}</span>
             </div>
             
-            <form onSubmit={handleBookingSubmit} className="admin-form">
+            <form onSubmit={handleBookingSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
               <div className="form-group">
-                <label>Date</label>
+                <label>Select Date</label>
                 <input 
                   type="date" 
                   value={bookingDate} 
-                  onChange={(e) => setBookingDate(e.target.value)} 
+                  onChange={e => setBookingDate(e.target.value)} 
                   required 
                   min={new Date().toISOString().split('T')[0]}
-                  style={{ width: '100%', padding: '0.8rem', borderRadius: 'var(--radius-sm)', border: '1px solid rgba(212, 175, 55, 0.3)', background: 'var(--surface-color)', color: 'var(--text-primary)' }}
+                  className="form-control"
+                  style={{ width: '100%', padding: '0.8rem', borderRadius: '4px', background: 'var(--surface-color)', color: 'var(--text-primary)' }}
                 />
               </div>
-              <div className="form-group">
-                <label>Time Slot</label>
-                <select 
-                  value={bookingTime} 
-                  onChange={(e) => setBookingTime(e.target.value)} 
-                  required
-                  style={{ width: '100%', padding: '0.8rem', borderRadius: 'var(--radius-sm)', border: '1px solid rgba(212, 175, 55, 0.3)', background: 'var(--surface-color)', color: 'var(--text-primary)' }}
-                >
-                  <option value="">Select a time slot</option>
-                  <option value="09:00 AM">09:00 AM</option>
-                  <option value="10:00 AM">10:00 AM</option>
-                  <option value="11:00 AM">11:00 AM</option>
-                  <option value="02:00 PM">02:00 PM</option>
-                  <option value="04:00 PM">04:00 PM</option>
-                  <option value="06:00 PM">06:00 PM</option>
-                </select>
-              </div>
+              
+              {bookingDate && (
+                <div className="form-group">
+                  <label>Available Time Slots</label>
+                  {loadingSlots ? (
+                    <div style={{ padding: '1rem', textAlign: 'center', color: 'var(--text-secondary)' }}>Loading slots...</div>
+                  ) : availableSlots.length === 0 ? (
+                    <div style={{ padding: '1rem', background: 'rgba(255,0,0,0.1)', color: 'var(--error-color)', borderRadius: '4px', textAlign: 'center' }}>
+                      No available slots for this date. Provider is closed.
+                    </div>
+                  ) : (
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(80px, 1fr))', gap: '0.5rem', marginTop: '0.5rem' }}>
+                      {availableSlots.map(slot => {
+                        const isBooked = bookedSlots.includes(slot);
+                        return (
+                          <button
+                            key={slot}
+                            type="button"
+                            disabled={isBooked}
+                            onClick={() => setBookingTime(slot)}
+                            style={{
+                              padding: '0.5rem',
+                              borderRadius: '4px',
+                              border: '1px solid',
+                              borderColor: isBooked ? 'transparent' : bookingTime === slot ? 'var(--success-color)' : 'var(--primary-color)',
+                              background: isBooked ? 'rgba(255,255,255,0.05)' : bookingTime === slot ? 'var(--success-color)' : 'transparent',
+                              color: isBooked ? 'rgba(255,255,255,0.3)' : bookingTime === slot ? '#fff' : 'var(--primary-color)',
+                              cursor: isBooked ? 'not-allowed' : 'pointer',
+                              textDecoration: isBooked ? 'line-through' : 'none',
+                              transition: 'all 0.2s'
+                            }}
+                          >
+                            {slot}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              )}
               <div className="form-group">
                 <label>Notes/Symptoms (Optional)</label>
                 <textarea 
