@@ -461,10 +461,12 @@ apiRouter.post('/vendor/appointments/:id/status', verifyVendor, async (req, res)
             <p>Thanks,<br/>Deergayu Platform Team</p>
           </div>
         `;
-        await sendEmail(apptData.customerEmail, `Appointment ${statusText} - Deergayu`, '', htmlBody);
+        // Fire and forget email sending to avoid blocking the response
+        sendEmail(apptData.customerEmail, `Appointment ${statusText} - Deergayu`, '', htmlBody)
+          .catch(emailErr => console.error('Failed to send appointment status email in background:', emailErr));
       }
     } catch (emailErr) {
-      console.error('Failed to send appointment status email:', emailErr);
+      console.error('Error preparing email:', emailErr);
     }
     
     res.json({ message: 'Appointment status updated' });
@@ -742,10 +744,12 @@ apiRouter.post('/appointments', verifyUser, async (req, res) => {
             <p>Thanks,<br/>Deergayu Platform Team</p>
           </div>
         `;
-        await sendEmail(providerEmail, 'New Appointment Booking - Deergayu', '', htmlBody);
+        // Fire and forget email sending to avoid blocking the response
+        sendEmail(providerEmail, 'New Appointment Booking - Deergayu', '', htmlBody)
+          .catch(emailErr => console.error('Failed to send booking email in background:', emailErr));
       }
     } catch (emailErr) {
-      console.error("Failed to send booking email:", emailErr);
+      console.error("Error preparing booking email:", emailErr);
     }
 
     res.json({ id: docRef.id, ...appointmentData, message: 'Appointment booked successfully' });
