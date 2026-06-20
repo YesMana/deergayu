@@ -33,6 +33,8 @@ const AdminDashboard = () => {
   
   const [platformUsers, setPlatformUsers] = useState([]);
   const [loadingUsers, setLoadingUsers] = useState(false);
+  const [userSearch, setUserSearch] = useState('');
+  const [userRoleFilter, setUserRoleFilter] = useState('all');
   const [loadingProviders, setLoadingProviders] = useState(false);
   const [loadingOrders, setLoadingOrders] = useState(false);
 
@@ -574,6 +576,51 @@ const AdminDashboard = () => {
           {activeTab === 'users' && (
             <div className="glass-panel table-container">
               <p className="admin-hint">Manage all registered users on the platform. You can update roles or completely delete accounts.</p>
+              
+              {/* Search & Filter Bar */}
+              <div style={{ display: 'flex', gap: '1rem', marginBottom: '1.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
+                <div style={{ position: 'relative', flex: 1, minWidth: '200px' }}>
+                  <Search size={16} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-secondary)' }} />
+                  <input
+                    type="text"
+                    placeholder="Search by name or email..."
+                    value={userSearch}
+                    onChange={e => setUserSearch(e.target.value)}
+                    style={{ width: '100%', padding: '0.6rem 0.8rem 0.6rem 2rem', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.15)', background: 'var(--surface-color)', color: 'var(--text-primary)', fontSize: '0.9rem', boxSizing: 'border-box' }}
+                  />
+                </div>
+                <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                  {['all','user','doctor','clinic','organization','vendor'].map(role => (
+                    <button
+                      key={role}
+                      onClick={() => setUserRoleFilter(role)}
+                      style={{
+                        padding: '0.4rem 0.9rem',
+                        borderRadius: '20px',
+                        border: '1px solid',
+                        borderColor: userRoleFilter === role ? 'var(--primary-color)' : 'rgba(255,255,255,0.2)',
+                        background: userRoleFilter === role ? 'var(--primary-color)' : 'transparent',
+                        color: userRoleFilter === role ? '#000' : 'var(--text-secondary)',
+                        cursor: 'pointer',
+                        fontSize: '0.82rem',
+                        fontWeight: userRoleFilter === role ? 'bold' : 'normal',
+                        textTransform: 'capitalize',
+                        transition: 'all 0.2s'
+                      }}
+                    >
+                      {role === 'all' ? 'All' : role.charAt(0).toUpperCase() + role.slice(1)}
+                    </button>
+                  ))}
+                </div>
+                <span style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', whiteSpace: 'nowrap' }}>
+                  {platformUsers.filter(u => {
+                    const matchSearch = userSearch === '' || u.name?.toLowerCase().includes(userSearch.toLowerCase()) || u.email?.toLowerCase().includes(userSearch.toLowerCase());
+                    const matchRole = userRoleFilter === 'all' || u.role === userRoleFilter;
+                    return matchSearch && matchRole;
+                  }).length} users
+                </span>
+              </div>
+
               {loadingUsers ? <p style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-secondary)' }}>Loading users...</p> : (
                 <table className="admin-table">
                   <thead>
@@ -587,7 +634,11 @@ const AdminDashboard = () => {
                     </tr>
                   </thead>
                   <tbody>
-                    {platformUsers.map(u => (
+                    {platformUsers.filter(u => {
+                        const matchSearch = userSearch === '' || u.name?.toLowerCase().includes(userSearch.toLowerCase()) || u.email?.toLowerCase().includes(userSearch.toLowerCase());
+                        const matchRole = userRoleFilter === 'all' || u.role === userRoleFilter;
+                        return matchSearch && matchRole;
+                      }).map(u => (
                       <tr key={u.id}>
                         <td className="fw-bold">{u.name || 'N/A'}</td>
                         <td>{u.email}</td>
