@@ -701,6 +701,7 @@ const VendorDashboard = () => {
                   <thead>
                     <tr>
                       <th>Patient</th>
+                      <th>Email</th>
                       <th>Date</th>
                       <th>Time</th>
                       <th>Notes</th>
@@ -711,7 +712,12 @@ const VendorDashboard = () => {
                   <tbody>
                     {appointments.map(apt => (
                       <tr key={apt.id}>
-                        <td className="fw-bold">{apt.patientName || apt.userName || 'N/A'}</td>
+                        <td className="fw-bold">{apt.customerName || apt.patientName || apt.userName || 'N/A'}</td>
+                        <td>
+                          {apt.customerEmail ? (
+                            <a href={`mailto:${apt.customerEmail}`} style={{ color: 'var(--primary-color)', textDecoration: 'none', fontSize: '0.85rem' }}>✉️ {apt.customerEmail}</a>
+                          ) : 'N/A'}
+                        </td>
                         <td>{apt.date}</td>
                         <td>{apt.time}</td>
                         <td>{apt.notes || '-'}</td>
@@ -737,7 +743,7 @@ const VendorDashboard = () => {
                     ))}
                     {appointments.length === 0 && (
                       <tr>
-                        <td colSpan="6" style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-secondary)' }}>No appointments yet.</td>
+                        <td colSpan="7" style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-secondary)' }}>No appointments yet.</td>
                       </tr>
                     )}
                   </tbody>

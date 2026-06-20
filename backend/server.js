@@ -428,9 +428,9 @@ apiRouter.post('/vendor/appointments/:id/status', verifyVendor, async (req, res)
   const { id } = req.params;
   const { status } = req.body;
   
-  const validStatuses = ['confirmed', 'completed', 'cancelled'];
+  const validStatuses = ['pending', 'accepted', 'rejected', 'confirmed', 'completed', 'cancelled'];
   if (!validStatuses.includes(status)) {
-    return res.status(400).json({ error: 'Invalid status' });
+    return res.status(400).json({ error: `Invalid status. Must be one of: ${validStatuses.join(', ')}` });
   }
 
   try {
@@ -441,6 +441,32 @@ apiRouter.post('/vendor/appointments/:id/status', verifyVendor, async (req, res)
     }
 
     await db.collection('appointments').doc(id).update({ status, updatedAt: new Date().toISOString() });
+    
+    // Send email to customer
+    try {
+      const apptData = apptDoc.data();
+      if (apptData.customerEmail) {
+        const statusText = status === 'accepted' ? '✅ Confirmed' : status === 'rejected' ? '❌ Declined' : status;
+        const htmlBody = `
+          <div style="font-family: Arial, sans-serif; padding: 20px; color: #333;">
+            <h2 style="color: ${status === 'accepted' ? '#2e7d32' : '#c62828'};">Appointment ${statusText}</h2>
+            <p>Hello ${apptData.customerName || 'Patient'},</p>
+            <p>Your appointment request has been <strong>${status}</strong> by <strong>${apptData.providerName}</strong>.</p>
+            <div style="background: #f5f5f5; padding: 15px; border-radius: 8px; margin: 20px 0;">
+              <p style="margin: 5px 0;"><strong>Date:</strong> ${apptData.date}</p>
+              <p style="margin: 5px 0;"><strong>Time:</strong> ${apptData.time}</p>
+            </div>
+            ${status === 'accepted' ? '<p>Please be ready 10 minutes before your appointment time.</p>' : '<p>You may try booking another available slot.</p>'}
+            <br/>
+            <p>Thanks,<br/>Deergayu Platform Team</p>
+          </div>
+        `;
+        await sendEmail(apptData.customerEmail, `Appointment ${statusText} - Deergayu`, '', htmlBody);
+      }
+    } catch (emailErr) {
+      console.error('Failed to send appointment status email:', emailErr);
+    }
+    
     res.json({ message: 'Appointment status updated' });
   } catch (error) {
     res.status(500).json({ error: error.message });
