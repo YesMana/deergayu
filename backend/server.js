@@ -712,6 +712,7 @@ apiRouter.post('/appointments', verifyUser, async (req, res) => {
       customerId: req.user.uid,
       customerName: userName,
       customerEmail: req.user.email,
+      customerPhone: req.body.phone || '',
       providerId,
       providerName: providerName || '',
       date,

@@ -701,7 +701,7 @@ const VendorDashboard = () => {
                   <thead>
                     <tr>
                       <th>Patient</th>
-                      <th>Email</th>
+                      <th>Contact</th>
                       <th>Date</th>
                       <th>Time</th>
                       <th>Notes</th>
@@ -714,9 +714,16 @@ const VendorDashboard = () => {
                       <tr key={apt.id}>
                         <td className="fw-bold">{apt.customerName || apt.patientName || apt.userName || 'N/A'}</td>
                         <td>
+                          {apt.customerPhone && (
+                            <div style={{ marginBottom: '0.25rem' }}>
+                              <a href={`tel:${apt.customerPhone}`} style={{ color: 'var(--text-primary)', textDecoration: 'none', fontSize: '0.85rem' }}>📞 {apt.customerPhone}</a>
+                            </div>
+                          )}
                           {apt.customerEmail ? (
-                            <a href={`mailto:${apt.customerEmail}`} style={{ color: 'var(--primary-color)', textDecoration: 'none', fontSize: '0.85rem' }}>✉️ {apt.customerEmail}</a>
-                          ) : 'N/A'}
+                            <div>
+                              <a href={`mailto:${apt.customerEmail}`} style={{ color: 'var(--primary-color)', textDecoration: 'none', fontSize: '0.85rem' }}>✉️ {apt.customerEmail}</a>
+                            </div>
+                          ) : <span style={{fontSize: '0.85rem', color: 'var(--text-secondary)'}}>No Email</span>}
                         </td>
                         <td>{apt.date}</td>
                         <td>{apt.time}</td>

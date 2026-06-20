@@ -44,6 +44,7 @@ const Channeling = () => {
   const [bookingDate, setBookingDate] = useState('');
   const [bookingTime, setBookingTime] = useState('');
   const [bookingNotes, setBookingNotes] = useState('');
+  const [bookingPhone, setBookingPhone] = useState('');
   const [isBooking, setIsBooking] = useState(false);
   const [availableSlots, setAvailableSlots] = useState([]);
   const [bookedSlots, setBookedSlots] = useState([]);
@@ -142,25 +143,28 @@ const Channeling = () => {
           providerName: selectedProvider.name,
           date: bookingDate,
           time: bookingTime,
+          phone: bookingPhone,
           notes: bookingNotes
         })
       });
 
       if (res.ok) {
-        success("Appointment booked successfully!");
+        success("Appointment booked successfully! ✓");
         setSelectedProvider(null);
         setBookingDate('');
         setBookingTime('');
+        setBookingPhone('');
         setBookingNotes('');
         setAvailableSlots([]);
         setBookedSlots([]);
         navigate('/my-appointments');
       } else {
-        error("Failed to book appointment.");
+        const errData = await res.json().catch(() => ({}));
+        error(errData.error || "Failed to book appointment. Please try again.");
       }
     } catch (err) {
       console.error('Error booking:', err);
-      error("An error occurred while booking.");
+      error("Network error. Please check your connection and try again.");
     } finally {
       setIsBooking(false);
     }
@@ -294,7 +298,7 @@ const Channeling = () => {
 
       {selectedProvider && (
         <div
-          onClick={() => { setSelectedProvider(null); setBookingDate(''); setBookingTime(''); setAvailableSlots([]); setBookedSlots([]); }}
+          onClick={() => { setSelectedProvider(null); setBookingDate(''); setBookingTime(''); setBookingPhone(''); setBookingNotes(''); setAvailableSlots([]); setBookedSlots([]); }}
           style={{
             position: 'fixed', inset: 0, zIndex: 9999,
             background: 'rgba(0,0,0,0.75)',
@@ -345,7 +349,7 @@ const Channeling = () => {
               </div>
               <button
                 type="button"
-                onClick={() => { setSelectedProvider(null); setBookingDate(''); setBookingTime(''); setAvailableSlots([]); setBookedSlots([]); }}
+                onClick={() => { setSelectedProvider(null); setBookingDate(''); setBookingTime(''); setBookingPhone(''); setBookingNotes(''); setAvailableSlots([]); setBookedSlots([]); }}
                 style={{
                   background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)',
                   borderRadius: '50%', width: '36px', height: '36px',
@@ -451,10 +455,33 @@ const Channeling = () => {
                   </div>
                 )}
 
-                {/* Step 3 – Notes */}
+                {/* Step 3 – Phone Number */}
                 <div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '0.75rem' }}>
                     <div style={{ width: '24px', height: '24px', borderRadius: '50%', background: 'rgba(212,175,55,0.15)', border: '1px solid rgba(212,175,55,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.75rem', color: '#d4af37', fontWeight: 'bold', flexShrink: 0 }}>3</div>
+                    <label style={{ color: 'rgba(255,255,255,0.85)', fontWeight: '600', fontSize: '0.9rem' }}>Contact Number <span style={{ color: '#ef4444' }}>*</span></label>
+                  </div>
+                  <input
+                    type="tel"
+                    value={bookingPhone}
+                    onChange={e => setBookingPhone(e.target.value)}
+                    required
+                    placeholder="e.g. 0712345678"
+                    style={{
+                      width: '100%', padding: '0.85rem 1rem',
+                      borderRadius: '10px',
+                      border: bookingPhone ? '1px solid rgba(212,175,55,0.6)' : '1px solid rgba(255,255,255,0.12)',
+                      background: 'rgba(255,255,255,0.05)',
+                      color: '#fff', fontSize: '0.95rem',
+                      outline: 'none', boxSizing: 'border-box'
+                    }}
+                  />
+                </div>
+
+                {/* Step 4 – Notes */}
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '0.75rem' }}>
+                    <div style={{ width: '24px', height: '24px', borderRadius: '50%', background: 'rgba(212,175,55,0.15)', border: '1px solid rgba(212,175,55,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.75rem', color: '#d4af37', fontWeight: 'bold', flexShrink: 0 }}>4</div>
                     <label style={{ color: 'rgba(255,255,255,0.85)', fontWeight: '600', fontSize: '0.9rem' }}>
                       Notes / Symptoms <span style={{ color: 'rgba(255,255,255,0.3)', fontWeight: 'normal' }}>(Optional)</span>
                     </label>
@@ -479,22 +506,22 @@ const Channeling = () => {
                 {/* Confirm Button */}
                 <button
                   type="submit"
-                  disabled={isBooking || !bookingDate || !bookingTime}
+                  disabled={isBooking || !bookingDate || !bookingTime || !bookingPhone}
                   style={{
                     width: '100%', padding: '1rem',
                     borderRadius: '12px', border: 'none',
-                    background: (!bookingDate || !bookingTime || isBooking)
+                    background: (!bookingDate || !bookingTime || !bookingPhone || isBooking)
                       ? 'rgba(255,255,255,0.07)'
                       : 'linear-gradient(135deg, #d4af37, #b8960c)',
-                    color: (!bookingDate || !bookingTime || isBooking) ? 'rgba(255,255,255,0.25)' : '#1a1208',
+                    color: (!bookingDate || !bookingTime || !bookingPhone || isBooking) ? 'rgba(255,255,255,0.25)' : '#1a1208',
                     fontWeight: 'bold', fontSize: '1rem',
-                    cursor: (!bookingDate || !bookingTime || isBooking) ? 'not-allowed' : 'pointer',
+                    cursor: (!bookingDate || !bookingTime || !bookingPhone || isBooking) ? 'not-allowed' : 'pointer',
                     transition: 'all 0.2s',
                     letterSpacing: '0.5px',
-                    boxShadow: (!bookingDate || !bookingTime || isBooking) ? 'none' : '0 4px 20px rgba(212,175,55,0.35)'
+                    boxShadow: (!bookingDate || !bookingTime || !bookingPhone || isBooking) ? 'none' : '0 4px 20px rgba(212,175,55,0.35)'
                   }}
                 >
-                  {isBooking ? '⏳ Booking...' : !bookingDate ? '← Select a date first' : !bookingTime ? '← Select a time slot' : '✓ Confirm Appointment'}
+                  {isBooking ? '⏳ Booking...' : !bookingDate ? '← Select a date first' : !bookingTime ? '← Select a time slot' : !bookingPhone ? '← Enter contact number' : '✓ Confirm Appointment'}
                 </button>
 
               </form>
