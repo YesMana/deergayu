@@ -3,7 +3,7 @@ import { Package, ShoppingBag, Settings, CheckCircle, Clock, Calendar, Trash2 } 
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { db, auth } from '../firebase';
-import { doc, updateDoc, collection } from 'firebase/firestore';
+import { doc, updateDoc, collection, query, where, orderBy, onSnapshot } from 'firebase/firestore';
 import './AdminDashboard.css';
 
 const API_URL = import.meta.env.VITE_API_URL || '';
@@ -61,12 +61,40 @@ const VendorDashboard = () => {
     }
   }, [activeTab, user]);
 
-  // Fetch vendor's appointments
+  // Listen to vendor's appointments in real-time
   useEffect(() => {
-    if (activeTab === 'appointments' && user) {
-      fetchAppointments();
-    }
-  }, [activeTab, user]);
+    if (!user) return;
+    
+    setLoadingAppointments(true);
+    let initialLoad = true;
+    
+    const q = query(
+      collection(db, 'appointments'),
+      where('providerId', '==', user.uid)
+    );
+    
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const appts = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      appts.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+      setAppointments(appts);
+      setLoadingAppointments(false);
+      
+      if (!initialLoad) {
+        snapshot.docChanges().forEach((change) => {
+          if (change.type === 'added') {
+            const data = change.doc.data();
+            success(`🔔 New Appointment from ${data.customerName || data.patientName}!`);
+          }
+        });
+      }
+      initialLoad = false;
+    }, (err) => {
+      console.error('Error listening to appointments:', err);
+      setLoadingAppointments(false);
+    });
+    
+    return () => unsubscribe();
+  }, [user]);
 
   const fetchProducts = async () => {
     setLoadingProducts(true);
@@ -108,25 +136,6 @@ const VendorDashboard = () => {
     }
   };
 
-  const fetchAppointments = async () => {
-    setLoadingAppointments(true);
-    try {
-      const token = await auth.currentUser.getIdToken();
-      const res = await fetch(`${API_URL}/api/vendor/appointments`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setAppointments(data);
-      } else {
-        console.error('Failed to fetch appointments');
-      }
-    } catch (err) {
-      console.error('Error fetching appointments:', err);
-    } finally {
-      setLoadingAppointments(false);
-    }
-  };
 
   const handleUpdateOrderStatus = async (orderId, newStatus) => {
     try {
