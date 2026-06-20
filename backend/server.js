@@ -274,9 +274,9 @@ apiRouter.get('/vendor/products', verifyVendor, async (req, res) => {
   try {
     const snapshot = await db.collection('products')
       .where('vendorId', '==', req.user.uid)
-      .orderBy('createdAt', 'desc')
       .get();
-    const products = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    let products = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    products.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
     res.json(products);
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -376,9 +376,9 @@ apiRouter.get('/vendor/orders', verifyVendor, async (req, res) => {
   try {
     const snapshot = await db.collection('orders')
       .where('vendorId', '==', req.user.uid)
-      .orderBy('createdAt', 'desc')
       .get();
-    const orders = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    let orders = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    orders.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
     res.json(orders);
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -414,9 +414,9 @@ apiRouter.get('/vendor/appointments', verifyVendor, async (req, res) => {
   try {
     const snapshot = await db.collection('appointments')
       .where('providerId', '==', req.user.uid)
-      .orderBy('createdAt', 'desc')
       .get();
-    const appointments = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    let appointments = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    appointments.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
     res.json(appointments);
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -647,9 +647,9 @@ apiRouter.get('/my-orders', verifyUser, async (req, res) => {
   try {
     const snapshot = await db.collection('orders')
       .where('customerId', '==', req.user.uid)
-      .orderBy('createdAt', 'desc')
       .get();
-    const orders = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    let orders = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    orders.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
     res.json(orders);
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -694,9 +694,9 @@ apiRouter.get('/my-appointments', verifyUser, async (req, res) => {
   try {
     const snapshot = await db.collection('appointments')
       .where('customerId', '==', req.user.uid)
-      .orderBy('createdAt', 'desc')
       .get();
-    const appointments = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    let appointments = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    appointments.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
     res.json(appointments);
   } catch (error) {
     res.status(500).json({ error: error.message });
