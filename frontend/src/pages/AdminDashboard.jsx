@@ -368,12 +368,12 @@ const AdminDashboard = () => {
                           ) : 'N/A'}
                         </td>
                         <td>
-                          {provider.profileDetails?.phone ? (
+                          {(provider.profileDetails?.phone || provider.profileDetails?.telephone) ? (
                             <a
-                              href={`tel:${provider.profileDetails.phone}`}
+                              href={`tel:${provider.profileDetails.phone || provider.profileDetails.telephone}`}
                               style={{ color: 'var(--secondary-color)', textDecoration: 'none' }}
                             >
-                              📞 {provider.profileDetails.phone}
+                              📞 {provider.profileDetails.phone || provider.profileDetails.telephone}
                             </a>
                           ) : 'N/A'}
                         </td>
