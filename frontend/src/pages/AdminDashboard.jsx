@@ -343,6 +343,8 @@ const AdminDashboard = () => {
                       <th>Name</th>
                       <th>Role</th>
                       <th>Specialty/Type</th>
+                      <th>Email</th>
+                      <th>Phone</th>
                       <th>Location</th>
                       <th>Status</th>
                       <th>Actions</th>
@@ -353,7 +355,28 @@ const AdminDashboard = () => {
                       <tr key={provider.id}>
                         <td className="fw-bold">{provider.name || 'N/A'}</td>
                         <td style={{ textTransform: 'capitalize' }}>{provider.role}</td>
-                        <td>{provider.profileDetails?.specialty || provider.profileDetails?.doctorType || 'N/A'}</td>
+                        <td>{provider.profileDetails?.specialty || provider.profileDetails?.doctorType || provider.profileDetails?.category || 'N/A'}</td>
+                        <td>
+                          {provider.email ? (
+                            <a
+                              href={`mailto:${provider.email}`}
+                              style={{ color: 'var(--primary-color)', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '4px' }}
+                              title={`Email ${provider.name}`}
+                            >
+                              ✉️ {provider.email}
+                            </a>
+                          ) : 'N/A'}
+                        </td>
+                        <td>
+                          {provider.profileDetails?.phone ? (
+                            <a
+                              href={`tel:${provider.profileDetails.phone}`}
+                              style={{ color: 'var(--secondary-color)', textDecoration: 'none' }}
+                            >
+                              📞 {provider.profileDetails.phone}
+                            </a>
+                          ) : 'N/A'}
+                        </td>
                         <td>{provider.profileDetails?.address || 'N/A'}</td>
                         <td>
                           {provider.status === 'pending' ? (
@@ -370,7 +393,7 @@ const AdminDashboard = () => {
                       </tr>
                     ))}
                     {providers.length === 0 && (
-                      <tr><td colSpan="6" style={{textAlign: 'center', padding: '2rem'}}>No experts found.</td></tr>
+                      <tr><td colSpan="8" style={{textAlign: 'center', padding: '2rem'}}>No experts found.</td></tr>
                     )}
                   </tbody>
                 </table>
