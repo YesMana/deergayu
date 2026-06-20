@@ -293,89 +293,212 @@ const Channeling = () => {
       </div>
 
       {selectedProvider && (
-        <div className="modal-overlay" onClick={() => setSelectedProvider(null)}>
-          <div className="modal-content glass-panel" onClick={e => e.stopPropagation()} style={{ maxWidth: '500px', width: '90%' }}>
-            <div className="modal-header">
-              <h2>Book Appointment</h2>
-              <button className="icon-btn" onClick={() => setSelectedProvider(null)}><X size={24} /></button>
-            </div>
-            <div style={{ marginBottom: '1.5rem', padding: '1rem', background: 'rgba(var(--primary-color-rgb), 0.1)', borderRadius: 'var(--radius-sm)' }}>
-              <strong>Expert:</strong> {selectedProvider.name} <br/>
-              <span style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>{selectedProvider.profileDetails?.specialty || selectedProvider.role}</span>
-            </div>
-            
-            <form onSubmit={handleBookingSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              <div className="form-group">
-                <label>Select Date</label>
-                <input 
-                  type="date" 
-                  value={bookingDate} 
-                  onChange={e => setBookingDate(e.target.value)} 
-                  required 
-                  min={new Date().toISOString().split('T')[0]}
-                  className="form-control"
-                  style={{ width: '100%', padding: '0.8rem', borderRadius: '4px', background: 'var(--surface-color)', color: 'var(--text-primary)' }}
-                />
-              </div>
-              
-              {bookingDate && (
-                <div className="form-group">
-                  <label>Available Time Slots</label>
-                  {loadingSlots ? (
-                    <div style={{ padding: '1rem', textAlign: 'center', color: 'var(--text-secondary)' }}>Loading slots...</div>
-                  ) : availableSlots.length === 0 ? (
-                    <div style={{ padding: '1rem', background: 'rgba(255,0,0,0.1)', color: 'var(--error-color)', borderRadius: '4px', textAlign: 'center' }}>
-                      No available slots for this date. Provider is closed.
-                    </div>
-                  ) : (
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(80px, 1fr))', gap: '0.5rem', marginTop: '0.5rem' }}>
-                      {availableSlots.map(slot => {
-                        const isBooked = bookedSlots.includes(slot);
-                        return (
-                          <button
-                            key={slot}
-                            type="button"
-                            disabled={isBooked}
-                            onClick={() => setBookingTime(slot)}
-                            style={{
-                              padding: '0.5rem',
-                              borderRadius: '4px',
-                              border: '1px solid',
-                              borderColor: isBooked ? 'transparent' : bookingTime === slot ? 'var(--success-color)' : 'var(--primary-color)',
-                              background: isBooked ? 'rgba(255,255,255,0.05)' : bookingTime === slot ? 'var(--success-color)' : 'transparent',
-                              color: isBooked ? 'rgba(255,255,255,0.3)' : bookingTime === slot ? '#fff' : 'var(--primary-color)',
-                              cursor: isBooked ? 'not-allowed' : 'pointer',
-                              textDecoration: isBooked ? 'line-through' : 'none',
-                              transition: 'all 0.2s'
-                            }}
-                          >
-                            {slot}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  )}
+        <div
+          onClick={() => { setSelectedProvider(null); setBookingDate(''); setBookingTime(''); setAvailableSlots([]); setBookedSlots([]); }}
+          style={{
+            position: 'fixed', inset: 0, zIndex: 9999,
+            background: 'rgba(0,0,0,0.75)',
+            backdropFilter: 'blur(6px)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            padding: '1rem'
+          }}
+        >
+          <div
+            onClick={e => e.stopPropagation()}
+            style={{
+              width: '100%', maxWidth: '560px',
+              background: 'linear-gradient(145deg, #1a1208, #251a0a)',
+              border: '1px solid rgba(212,175,55,0.25)',
+              borderRadius: '20px',
+              boxShadow: '0 30px 80px rgba(0,0,0,0.6)',
+              overflow: 'hidden',
+              maxHeight: '90vh',
+              overflowY: 'auto'
+            }}
+          >
+            {/* Header */}
+            <div style={{
+              background: 'linear-gradient(135deg, rgba(212,175,55,0.2), rgba(212,175,55,0.05))',
+              borderBottom: '1px solid rgba(212,175,55,0.15)',
+              padding: '1.5rem 2rem',
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                <div style={{
+                  width: '52px', height: '52px', borderRadius: '50%',
+                  background: 'linear-gradient(135deg, rgba(212,175,55,0.4), rgba(212,175,55,0.1))',
+                  border: '2px solid rgba(212,175,55,0.5)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: '1.5rem', overflow: 'hidden', flexShrink: 0
+                }}>
+                  {selectedProvider.photoUrl
+                    ? <img src={selectedProvider.photoUrl} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="" />
+                    : '👨‍⚕️'}
                 </div>
-              )}
-              <div className="form-group">
-                <label>Notes/Symptoms (Optional)</label>
-                <textarea 
-                  value={bookingNotes} 
-                  onChange={(e) => setBookingNotes(e.target.value)} 
-                  rows="3"
-                  placeholder="Briefly describe your symptoms..."
-                  style={{ width: '100%', padding: '0.8rem', borderRadius: 'var(--radius-sm)', border: '1px solid rgba(212, 175, 55, 0.3)', background: 'var(--surface-color)', color: 'var(--text-primary)' }}
-                ></textarea>
+                <div>
+                  <div style={{ fontSize: '0.72rem', color: 'rgba(212,175,55,0.7)', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '2px' }}>Book Appointment</div>
+                  <div style={{ fontWeight: 'bold', color: '#fff', fontSize: '1.1rem' }}>{selectedProvider.name}</div>
+                  <div style={{ fontSize: '0.82rem', color: 'rgba(255,255,255,0.5)' }}>
+                    {selectedProvider.profileDetails?.specialty || selectedProvider.profileDetails?.doctorType || selectedProvider.role}
+                  </div>
+                </div>
               </div>
-              <button 
-                type="submit" 
-                className="btn btn-primary" 
-                style={{ width: '100%', marginTop: '1rem' }}
-                disabled={isBooking}
+              <button
+                type="button"
+                onClick={() => { setSelectedProvider(null); setBookingDate(''); setBookingTime(''); setAvailableSlots([]); setBookedSlots([]); }}
+                style={{
+                  background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)',
+                  borderRadius: '50%', width: '36px', height: '36px',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  cursor: 'pointer', color: '#fff', flexShrink: 0
+                }}
               >
-                {isBooking ? 'Booking...' : 'Confirm Appointment'}
+                <X size={18} />
               </button>
-            </form>
+            </div>
+
+            {/* Body */}
+            <div style={{ padding: '2rem' }}>
+              <form onSubmit={handleBookingSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+
+                {/* Step 1 */}
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '0.75rem' }}>
+                    <div style={{ width: '24px', height: '24px', borderRadius: '50%', background: 'rgba(212,175,55,0.15)', border: '1px solid rgba(212,175,55,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.75rem', color: '#d4af37', fontWeight: 'bold', flexShrink: 0 }}>1</div>
+                    <label style={{ color: 'rgba(255,255,255,0.85)', fontWeight: '600', fontSize: '0.9rem' }}>Select Date</label>
+                  </div>
+                  <input
+                    type="date"
+                    value={bookingDate}
+                    onChange={e => setBookingDate(e.target.value)}
+                    required
+                    min={new Date().toISOString().split('T')[0]}
+                    style={{
+                      width: '100%', padding: '0.85rem 1rem',
+                      borderRadius: '10px',
+                      border: bookingDate ? '1px solid rgba(212,175,55,0.6)' : '1px solid rgba(255,255,255,0.12)',
+                      background: 'rgba(255,255,255,0.05)',
+                      color: '#fff', fontSize: '1rem',
+                      outline: 'none', boxSizing: 'border-box',
+                      colorScheme: 'dark'
+                    }}
+                  />
+                </div>
+
+                {/* Step 2 – Time Slots */}
+                {bookingDate && (
+                  <div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '0.75rem' }}>
+                      <div style={{ width: '24px', height: '24px', borderRadius: '50%', background: 'rgba(212,175,55,0.15)', border: '1px solid rgba(212,175,55,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.75rem', color: '#d4af37', fontWeight: 'bold', flexShrink: 0 }}>2</div>
+                      <label style={{ color: 'rgba(255,255,255,0.85)', fontWeight: '600', fontSize: '0.9rem' }}>
+                        Available Time Slots
+                        {bookingTime && <span style={{ marginLeft: '0.5rem', color: '#86efac', fontSize: '0.8rem' }}>✓ {bookingTime} selected</span>}
+                      </label>
+                    </div>
+
+                    {loadingSlots ? (
+                      <div style={{ padding: '1.5rem', textAlign: 'center', color: 'rgba(255,255,255,0.4)', background: 'rgba(255,255,255,0.03)', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.08)' }}>
+                        ⏳ Loading available slots...
+                      </div>
+                    ) : availableSlots.length === 0 ? (
+                      <div style={{ padding: '1.5rem', textAlign: 'center', background: 'rgba(220,53,69,0.1)', borderRadius: '10px', border: '1px solid rgba(220,53,69,0.3)' }}>
+                        <div style={{ fontSize: '1.4rem', marginBottom: '0.4rem' }}>🚫</div>
+                        <div style={{ color: '#f87171', fontWeight: '600' }}>No availability on this date</div>
+                        <div style={{ color: 'rgba(255,255,255,0.35)', fontSize: '0.82rem', marginTop: '0.25rem' }}>Please try a different date.</div>
+                      </div>
+                    ) : (
+                      <div>
+                        <div style={{ display: 'flex', gap: '1rem', marginBottom: '0.6rem', flexWrap: 'wrap' }}>
+                          {[['Available', 'rgba(212,175,55,0.3)', 'rgba(212,175,55,0.7)'], ['Selected', 'rgba(34,197,94,0.25)', 'rgba(34,197,94,0.8)'], ['Booked', 'rgba(255,255,255,0.04)', 'rgba(255,255,255,0.15)']].map(([label, bg, bc]) => (
+                            <span key={label} style={{ fontSize: '0.72rem', color: 'rgba(255,255,255,0.4)', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                              <span style={{ width: '10px', height: '10px', borderRadius: '2px', background: bg, border: `1px solid ${bc}`, display: 'inline-block' }} />
+                              {label}
+                            </span>
+                          ))}
+                        </div>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(78px, 1fr))', gap: '0.5rem' }}>
+                          {availableSlots.map(slot => {
+                            const isBooked = bookedSlots.includes(slot);
+                            const isSelected = bookingTime === slot;
+                            return (
+                              <button
+                                key={slot}
+                                type="button"
+                                disabled={isBooked}
+                                onClick={() => setBookingTime(slot)}
+                                style={{
+                                  padding: '0.6rem 0.4rem',
+                                  borderRadius: '8px',
+                                  border: '1px solid',
+                                  borderColor: isBooked ? 'rgba(255,255,255,0.08)' : isSelected ? 'rgba(34,197,94,0.8)' : 'rgba(212,175,55,0.4)',
+                                  background: isBooked ? 'rgba(255,255,255,0.03)' : isSelected ? 'rgba(34,197,94,0.2)' : 'rgba(212,175,55,0.08)',
+                                  color: isBooked ? 'rgba(255,255,255,0.18)' : isSelected ? '#86efac' : 'rgba(212,175,55,0.9)',
+                                  cursor: isBooked ? 'not-allowed' : 'pointer',
+                                  textDecoration: isBooked ? 'line-through' : 'none',
+                                  fontSize: '0.85rem', fontWeight: isSelected ? '700' : '500',
+                                  transition: 'all 0.15s',
+                                  transform: isSelected ? 'scale(1.05)' : 'scale(1)',
+                                  boxShadow: isSelected ? '0 0 12px rgba(34,197,94,0.25)' : 'none'
+                                }}
+                              >
+                                {slot}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Step 3 – Notes */}
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '0.75rem' }}>
+                    <div style={{ width: '24px', height: '24px', borderRadius: '50%', background: 'rgba(212,175,55,0.15)', border: '1px solid rgba(212,175,55,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.75rem', color: '#d4af37', fontWeight: 'bold', flexShrink: 0 }}>3</div>
+                    <label style={{ color: 'rgba(255,255,255,0.85)', fontWeight: '600', fontSize: '0.9rem' }}>
+                      Notes / Symptoms <span style={{ color: 'rgba(255,255,255,0.3)', fontWeight: 'normal' }}>(Optional)</span>
+                    </label>
+                  </div>
+                  <textarea
+                    value={bookingNotes}
+                    onChange={e => setBookingNotes(e.target.value)}
+                    rows="3"
+                    placeholder="Briefly describe your symptoms or reason for visit..."
+                    style={{
+                      width: '100%', padding: '0.85rem 1rem',
+                      borderRadius: '10px',
+                      border: '1px solid rgba(255,255,255,0.12)',
+                      background: 'rgba(255,255,255,0.05)',
+                      color: '#fff', fontSize: '0.9rem', resize: 'vertical',
+                      outline: 'none', boxSizing: 'border-box',
+                      fontFamily: 'inherit', lineHeight: '1.5'
+                    }}
+                  />
+                </div>
+
+                {/* Confirm Button */}
+                <button
+                  type="submit"
+                  disabled={isBooking || !bookingDate || !bookingTime}
+                  style={{
+                    width: '100%', padding: '1rem',
+                    borderRadius: '12px', border: 'none',
+                    background: (!bookingDate || !bookingTime || isBooking)
+                      ? 'rgba(255,255,255,0.07)'
+                      : 'linear-gradient(135deg, #d4af37, #b8960c)',
+                    color: (!bookingDate || !bookingTime || isBooking) ? 'rgba(255,255,255,0.25)' : '#1a1208',
+                    fontWeight: 'bold', fontSize: '1rem',
+                    cursor: (!bookingDate || !bookingTime || isBooking) ? 'not-allowed' : 'pointer',
+                    transition: 'all 0.2s',
+                    letterSpacing: '0.5px',
+                    boxShadow: (!bookingDate || !bookingTime || isBooking) ? 'none' : '0 4px 20px rgba(212,175,55,0.35)'
+                  }}
+                >
+                  {isBooking ? '⏳ Booking...' : !bookingDate ? '← Select a date first' : !bookingTime ? '← Select a time slot' : '✓ Confirm Appointment'}
+                </button>
+
+              </form>
+            </div>
           </div>
         </div>
       )}
