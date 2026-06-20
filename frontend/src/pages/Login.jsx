@@ -41,9 +41,11 @@ const Login = () => {
   const navigate = useNavigate();
 
   const handleAdminRouting = async (user) => {
+    const returnUrl = searchParams.get('returnUrl');
+    
     const superAdmins = ['yes.manujaya@gmail.com'];
     if (user && superAdmins.includes(user.email)) {
-      navigate('/admin');
+      navigate(returnUrl || '/admin');
       return;
     }
     
@@ -53,7 +55,7 @@ const Login = () => {
       if (userDoc.exists()) {
         const data = userDoc.data();
         if (['vendor', 'doctor', 'clinic', 'organization'].includes(data.role)) {
-          navigate('/vendor');
+          navigate(returnUrl || '/vendor');
           return;
         }
       }
@@ -61,7 +63,7 @@ const Login = () => {
       console.error("Error fetching role for routing:", e);
     }
     
-    navigate('/');
+    navigate(returnUrl || '/');
   };
 
   const handleSubmit = async (e) => {

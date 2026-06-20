@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { useToast } from '../context/ToastContext';
 import { auth } from '../firebase';
 import { Calendar, Clock, AlertCircle, CheckCircle, XCircle } from 'lucide-react';
 import './AdminDashboard.css';
@@ -8,6 +9,7 @@ const API_URL = import.meta.env.VITE_API_URL || '';
 
 const MyAppointments = () => {
   const { currentUser } = useAuth();
+  const { success, error } = useToast();
   const [appointments, setAppointments] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -42,12 +44,13 @@ const MyAppointments = () => {
       });
       if (res.ok) {
         setAppointments(appointments.map(a => a.id === id ? { ...a, status: 'cancelled' } : a));
+        success("Appointment cancelled successfully");
       } else {
-        alert("Failed to cancel appointment");
+        error("Failed to cancel appointment");
       }
     } catch (err) {
       console.error('Error cancelling appointment:', err);
-      alert("Error cancelling appointment");
+      error("Error cancelling appointment");
     }
   };
 

@@ -17,50 +17,53 @@ import { LanguageProvider } from './context/LanguageContext';
 import { AuthProvider } from './context/AuthContext';
 import { ThemeProvider } from './context/ThemeContext';
 import { CartProvider } from './context/CartContext';
+import { ToastProvider } from './context/ToastContext';
 import './App.css';
 
 function App() {
   return (
     <ThemeProvider>
-      <AuthProvider>
-        <CartProvider>
-          <LanguageProvider>
-            <Router>
-            <div className="app-container">
-              <LanguagePopup />
-              <Navbar />
-              <AyurBot />
-              <main>
-                <Routes>
-                  <Route path="/" element={<Home />} />
-                  <Route path="/shop" element={<Shop />} />
-                  <Route path="/shop/cart" element={<Cart />} />
-                  <Route path="/channeling" element={<Channeling />} />
-                  <Route path="/symptom-checker" element={<SymptomChecker />} />
-                  <Route path="/login" element={<Login />} />
-                  
-                  {/* Protected User Routes */}
-                  <Route element={<ProtectedRoute requiredRole={['user', 'admin', 'vendor', 'doctor', 'clinic', 'organization']} />}>
-                    <Route path="/my-orders" element={<MyOrders />} />
-                    <Route path="/my-appointments" element={<MyAppointments />} />
-                  </Route>
+      <ToastProvider>
+        <AuthProvider>
+          <CartProvider>
+            <LanguageProvider>
+              <Router>
+              <div className="app-container">
+                <LanguagePopup />
+                <Navbar />
+                <AyurBot />
+                <main>
+                  <Routes>
+                    <Route path="/" element={<Home />} />
+                    <Route path="/shop" element={<Shop />} />
+                    <Route path="/channeling" element={<Channeling />} />
+                    <Route path="/symptom-checker" element={<SymptomChecker />} />
+                    <Route path="/login" element={<Login />} />
+                    
+                    {/* Protected User Routes */}
+                    <Route element={<ProtectedRoute requiredRole={['user', 'admin', 'vendor', 'doctor', 'clinic', 'organization']} />}>
+                      <Route path="/shop/cart" element={<Cart />} />
+                      <Route path="/my-orders" element={<MyOrders />} />
+                      <Route path="/my-appointments" element={<MyAppointments />} />
+                    </Route>
 
-                  {/* Protected Admin Routes */}
-                  <Route element={<ProtectedRoute requiredRole="admin" />}>
-                    <Route path="/admin/*" element={<AdminDashboard />} />
-                  </Route>
+                    {/* Protected Admin Routes */}
+                    <Route element={<ProtectedRoute requiredRole="admin" />}>
+                      <Route path="/admin/*" element={<AdminDashboard />} />
+                    </Route>
 
-                  {/* Protected Vendor Routes */}
-                  <Route element={<ProtectedRoute requiredRole={['vendor', 'doctor', 'clinic', 'organization']} />}>
-                    <Route path="/vendor/*" element={<VendorDashboard />} />
-                  </Route>
-                </Routes>
-              </main>
-            </div>
-            </Router>
-          </LanguageProvider>
-        </CartProvider>
-      </AuthProvider>
+                    {/* Protected Vendor Routes */}
+                    <Route element={<ProtectedRoute requiredRole={['vendor', 'doctor', 'clinic', 'organization']} />}>
+                      <Route path="/vendor/*" element={<VendorDashboard />} />
+                    </Route>
+                  </Routes>
+                </main>
+              </div>
+              </Router>
+            </LanguageProvider>
+          </CartProvider>
+        </AuthProvider>
+      </ToastProvider>
     </ThemeProvider>
   );
 }

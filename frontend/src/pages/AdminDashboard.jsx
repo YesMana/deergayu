@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Users, LayoutDashboard, Settings, ArrowUp, ArrowDown, Bell, Search, Filter, ShieldAlert } from 'lucide-react';
 import { collection, getDocs, doc, deleteDoc } from 'firebase/firestore';
 import { db, auth } from '../firebase';
+import { useToast } from '../context/ToastContext';
 import './AdminDashboard.css';
 
 const API_URL = import.meta.env.VITE_API_URL || '';
@@ -22,6 +23,7 @@ const sriLankaData = {
 const specialtiesList = ["Sarwanga Roga (General)", "Kadum Bindum (Orthopedic)", "Sarpa Visha (Toxicology)", "Yantra & Mantra", "Vastu Shastra"];
 
 const AdminDashboard = () => {
+  const { success, error } = useToast();
   const [providers, setProviders] = useState([]);
   const [products, setProducts] = useState([]);
   const [orders, setOrders] = useState([]);
@@ -133,12 +135,12 @@ const AdminDashboard = () => {
         body: JSON.stringify(settings)
       });
       if (res.ok) {
-        alert("Settings saved successfully!");
+        success("Settings saved successfully!");
       } else {
-        alert("Failed to save settings");
+        error("Failed to save settings");
       }
     } catch (err) {
-      alert(`Network Error: ${err.message}`);
+      error(`Network Error: ${err.message}`);
     }
   };
 
@@ -154,19 +156,19 @@ const AdminDashboard = () => {
         body: JSON.stringify({ role: newRole })
       });
       if (res.ok) {
-        alert("Role updated successfully!");
+        success("Role updated successfully!");
         fetchUsers();
       } else {
         const text = await res.text();
         try {
           const data = JSON.parse(text);
-          alert(`Failed: ${data.error}`);
+          error(`Failed: ${data.error}`);
         } catch (e) {
-          alert(`Server Error: ${res.status} - ${text.substring(0, 50)}`);
+          error(`Server Error: ${res.status} - ${text.substring(0, 50)}`);
         }
       }
     } catch (err) {
-      alert(`Network Error: ${err.message}`);
+      error(`Network Error: ${err.message}`);
     }
   };
 
@@ -183,20 +185,20 @@ const AdminDashboard = () => {
         body: JSON.stringify({ status: 'approved' })
       });
       if (res.ok) {
-        alert("Expert approved successfully!");
+        success("Expert approved successfully!");
         fetchUsers();
         fetchProviders();
       } else {
         const text = await res.text();
         try {
           const data = JSON.parse(text);
-          alert(`Failed: ${data.error}`);
+          error(`Failed: ${data.error}`);
         } catch (e) {
-          alert(`Server Error: ${res.status} - ${text.substring(0, 50)}`);
+          error(`Server Error: ${res.status} - ${text.substring(0, 50)}`);
         }
       }
     } catch (err) {
-      alert(`Network Error: ${err.message}`);
+      error(`Network Error: ${err.message}`);
     }
   };
 
@@ -207,7 +209,7 @@ const AdminDashboard = () => {
       // Direct Firestore Deletion (Frontend Bypass)
       await deleteDoc(doc(db, 'users', uid));
       setPlatformUsers(platformUsers.filter(u => u.id !== uid));
-      alert("User deleted successfully!");
+      success("User deleted successfully!");
       
       // Attempt backend deletion for Auth cleanup (silently fail if backend is down)
       try {
@@ -222,7 +224,7 @@ const AdminDashboard = () => {
         console.warn("Backend auth deletion failed, but Firestore doc removed.");
       }
     } catch (err) {
-      alert(`Error deleting user: ${err.message}`);
+      error(`Error deleting user: ${err.message}`);
     }
   };
   
@@ -244,7 +246,7 @@ const AdminDashboard = () => {
       });
       
       if (res.ok) {
-        alert(`Product ${action}d successfully!`);
+        success(`Product ${action}d successfully!`);
         fetchProducts();
       } else {
         // Fallback to local state if API isn't ready
@@ -258,7 +260,7 @@ const AdminDashboard = () => {
         }).filter(Boolean));
       }
     } catch (err) {
-      alert(`Error updating product status`);
+      error(`Error updating product status`);
     }
   };
 

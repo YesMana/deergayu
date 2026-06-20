@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Package, ShoppingBag, Settings, CheckCircle, Clock, Calendar, Trash2 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { useToast } from '../context/ToastContext';
 import { db, auth } from '../firebase';
 import { doc, updateDoc, collection } from 'firebase/firestore';
 import './AdminDashboard.css';
@@ -123,12 +124,13 @@ const VendorDashboard = () => {
       });
       if (res.ok) {
         setOrders(orders.map(order => order.id === orderId ? { ...order, status: newStatus } : order));
+        success(`Order status updated to ${newStatus}`);
       } else {
-        alert('Failed to update order status');
+        error('Failed to update order status');
       }
     } catch (err) {
       console.error('Error updating order status:', err);
-      alert('Error updating order status');
+      error('Error updating order status');
     }
   };
 
@@ -145,12 +147,13 @@ const VendorDashboard = () => {
       });
       if (res.ok) {
         setAppointments(appointments.map(a => a.id === appointmentId ? { ...a, status } : a));
+        success(`Appointment status updated to ${status}`);
       } else {
-        alert('Failed to update appointment status');
+        error('Failed to update appointment status');
       }
     } catch (err) {
       console.error('Error updating appointment:', err);
-      alert('Error updating appointment');
+      error('Error updating appointment');
     }
   };
 
@@ -163,7 +166,7 @@ const VendorDashboard = () => {
 
   const handleAddProduct = async (e) => {
     e.preventDefault();
-    if (newProduct.basePrice <= 0) return alert("Base price must be greater than 0");
+    if (newProduct.basePrice <= 0) return error("Base price must be greater than 0");
     setAddingProduct(true);
     
     try {
@@ -185,17 +188,17 @@ const VendorDashboard = () => {
 
       if (res.ok) {
         const data = await res.json();
-        alert("Product submitted for approval!");
+        success("Product submitted for approval!");
         setShowAddProductModal(false);
         setNewProduct({ name: '', category: 'Medicine', basePrice: 0 });
         fetchProducts();
       } else {
         const errData = await res.json().catch(() => ({}));
-        alert(errData.error || "Failed to add product");
+        error(errData.error || "Failed to add product");
       }
     } catch (err) {
       console.error("Error adding product", err);
-      alert("Failed to add product");
+      error("Failed to add product");
     } finally {
       setAddingProduct(false);
     }
@@ -211,13 +214,13 @@ const VendorDashboard = () => {
       });
       if (res.ok) {
         setVendorProducts(vendorProducts.filter(p => p.id !== productId));
-        alert("Product deleted successfully!");
+        success("Product deleted successfully!");
       } else {
-        alert("Failed to delete product");
+        error("Failed to delete product");
       }
     } catch (err) {
       console.error("Error deleting product:", err);
-      alert("Error deleting product");
+      error("Error deleting product");
     }
   };
 
@@ -230,8 +233,10 @@ const VendorDashboard = () => {
       });
       // Update local state temporarily to avoid reload
       user.profileDetails = profileData;
+      success("Profile details saved!");
     } catch (err) {
       console.error("Error updating profile", err);
+      error("Failed to save profile details");
     } finally {
       setSubmittingProfile(false);
     }

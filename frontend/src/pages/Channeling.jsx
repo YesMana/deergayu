@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Search, Calendar as CalendarIcon, Star, Video, MapPin, CheckCircle2, X } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext';
+import { useToast } from '../context/ToastContext';
 import { auth } from '../firebase';
 import { useNavigate } from 'react-router-dom';
 import './Channeling.css';
@@ -26,6 +27,7 @@ const specialties = ["Sarwanga Roga (General)", "Kadum Bindum (Orthopedic)", "Sa
 const Channeling = () => {
   const { t } = useLanguage();
   const { user } = useAuth();
+  const { success, error, info } = useToast();
   const navigate = useNavigate();
   
   const [providers, setProviders] = useState([]);
@@ -86,8 +88,8 @@ const Channeling = () => {
 
   const handleBookClick = (provider) => {
     if (!user) {
-      alert("Please login to book an appointment.");
-      navigate('/login');
+      error("Please login to book an appointment.");
+      navigate('/login?returnUrl=/channeling');
       return;
     }
     setSelectedProvider(provider);
@@ -96,7 +98,7 @@ const Channeling = () => {
   const handleBookingSubmit = async (e) => {
     e.preventDefault();
     if (!bookingDate || !bookingTime) {
-      alert("Please select a date and time.");
+      error("Please select a date and time.");
       return;
     }
 
@@ -119,18 +121,18 @@ const Channeling = () => {
       });
 
       if (res.ok) {
-        alert("Appointment booked successfully!");
+        success("Appointment booked successfully!");
         setSelectedProvider(null);
         setBookingDate('');
         setBookingTime('');
         setBookingNotes('');
         navigate('/my-appointments');
       } else {
-        alert("Failed to book appointment.");
+        error("Failed to book appointment.");
       }
     } catch (err) {
       console.error('Error booking:', err);
-      alert("An error occurred while booking.");
+      error("An error occurred while booking.");
     } finally {
       setIsBooking(false);
     }

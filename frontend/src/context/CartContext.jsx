@@ -69,6 +69,7 @@ export const CartProvider = ({ children }) => {
       });
       if (!res.ok) throw new Error('Failed to add to cart');
       await fetchCart();
+      return true;
     } catch (err) {
       console.error('Error adding to cart:', err);
       throw err;

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Search, Activity, Stethoscope, ShoppingBag } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
+import { Link } from 'react-router-dom';
 import './SymptomChecker.css';
 
 const mockRecommendations = {
@@ -84,7 +85,7 @@ const SymptomChecker = () => {
                 </li>
               ))}
             </ul>
-            <button className="btn btn-outline" style={{width: '100%', marginTop: '1rem'}}>Go to Shop</button>
+            <Link to="/shop" className="btn btn-outline" style={{width: '100%', marginTop: '1rem', display: 'inline-block', textAlign: 'center'}}>Go to Shop</Link>
           </div>
 
           <div className="result-card glass-panel">
@@ -98,7 +99,7 @@ const SymptomChecker = () => {
                 </li>
               ))}
             </ul>
-            <button className="btn btn-outline" style={{width: '100%', marginTop: '1rem'}}>Book Appointment</button>
+            <Link to="/channeling" className="btn btn-outline" style={{width: '100%', marginTop: '1rem', display: 'inline-block', textAlign: 'center'}}>Book Appointment</Link>
           </div>
         </div>
       )}

@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Filter, ShoppingCart, Heart, CheckCircle } from 'lucide-react';
+import { Search, Filter, ShoppingCart, Heart } from 'lucide-react';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useCart } from '../context/CartContext';
+import { useToast } from '../context/ToastContext';
+import { useNavigate } from 'react-router-dom';
 import './Shop.css';
 
 const Shop = () => {
@@ -10,9 +12,10 @@ const Shop = () => {
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedCategory, setSelectedCategory] = useState('All');
-  const [toastMessage, setToastMessage] = useState('');
   
   const { addToCart } = useCart();
+  const { success, error } = useToast();
+  const navigate = useNavigate();
 
   useEffect(() => {
     const fetchApprovedProducts = async () => {
@@ -35,10 +38,18 @@ const Shop = () => {
   }, []);
 
   const handleAddToCart = async (product) => {
-    const success = await addToCart(product);
-    if (success) {
-      setToastMessage(`${product.name} added to cart!`);
-      setTimeout(() => setToastMessage(''), 3000);
+    try {
+      const isAdded = await addToCart(product);
+      if (isAdded) {
+        success(`${product.name} added to cart!`);
+      }
+    } catch (err) {
+      if (err.message.includes("log in")) {
+        error("Please log in to add items to your cart.");
+        navigate('/login?returnUrl=/shop');
+      } else {
+        error("Failed to add item to cart.");
+      }
     }
   };
 
@@ -52,17 +63,6 @@ const Shop = () => {
   
   return (
     <div className="shop-page animate-fade-in" style={{ position: 'relative' }}>
-      {toastMessage && (
-        <div style={{
-          position: 'fixed', top: '20px', right: '20px', zIndex: 1000,
-          background: 'var(--success-color)', color: 'white', padding: '1rem 2rem',
-          borderRadius: 'var(--radius-md)', display: 'flex', alignItems: 'center', gap: '0.5rem',
-          boxShadow: '0 4px 12px rgba(0,0,0,0.15)', animation: 'slideInRight 0.3s ease-out'
-        }}>
-          <CheckCircle size={20} />
-          {toastMessage}
-        </div>
-      )}
 
       <div className="shop-header">
         <div className="container">
