@@ -397,8 +397,9 @@ const VendorDashboard = () => {
                 />
                 {uploadingImage && <small style={{color: 'var(--primary-color)', marginTop: '0.5rem', display: 'block'}}>Uploading image...</small>}
                 {profileData.profileImageUrl && !uploadingImage && (
-                  <div style={{marginTop: '1rem'}}>
+                  <div style={{marginTop: '1rem', display: 'flex', alignItems: 'center', gap: '1rem'}}>
                     <img src={profileData.profileImageUrl} alt="Preview" style={{width: '60px', height: '60px', borderRadius: '50%', objectFit: 'cover', border: '2px solid var(--primary-color)'}} />
+                    <button type="button" className="btn btn-outline" style={{padding: '0.4rem 0.8rem', fontSize: '0.8rem', borderColor: 'var(--error-color)', color: 'var(--error-color)'}} onClick={() => setProfileData({...profileData, profileImageUrl: ''})}>Remove</button>
                   </div>
                 )}
               </div>
@@ -877,7 +878,10 @@ const VendorDashboard = () => {
                 <label style={{color: 'var(--text-secondary)'}}>Profile Picture</label>
                 <div style={{display: 'flex', gap: '1rem', alignItems: 'center'}}>
                   {settingsData.profileImageUrl ? (
-                    <img src={settingsData.profileImageUrl} alt="Profile" style={{width: '50px', height: '50px', borderRadius: '50%', objectFit: 'cover', border: '2px solid var(--primary-color)'}} onError={e => e.target.style.display='none'} />
+                    <div style={{ position: 'relative' }}>
+                      <img src={settingsData.profileImageUrl} alt="Profile" style={{width: '50px', height: '50px', borderRadius: '50%', objectFit: 'cover', border: '2px solid var(--primary-color)'}} onError={e => e.target.style.display='none'} />
+                      <button type="button" onClick={() => setSettingsData({...settingsData, profileImageUrl: ''})} style={{ position: 'absolute', top: '-5px', right: '-5px', background: 'var(--error-color)', color: 'white', border: 'none', borderRadius: '50%', width: '18px', height: '18px', fontSize: '10px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }} title="Remove photo">✕</button>
+                    </div>
                   ) : (
                     <div style={{width: '50px', height: '50px', borderRadius: '50%', background: 'var(--surface-color)', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px dashed var(--border-color)'}}>
                       <span style={{fontSize: '0.8rem', color: 'var(--text-secondary)'}}>No img</span>
