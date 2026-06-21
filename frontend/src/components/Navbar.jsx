@@ -1,4 +1,4 @@
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Leaf, UserCircle, ShoppingBag, Globe, Mic, Sun, Moon, Menu, X } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import { useTheme } from '../context/ThemeContext';
@@ -15,6 +15,7 @@ const Navbar = () => {
   const [isListening, setIsListening] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const location = useLocation();
+  const navigate = useNavigate();
 
   // Close mobile menu on route change
   useEffect(() => {
@@ -22,11 +23,30 @@ const Navbar = () => {
   }, [location.pathname]);
 
   const handleVoiceSearch = () => {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      alert('Voice search is not supported in this browser. Please use Chrome.');
+      return;
+    }
+    const recognition = new SpeechRecognition();
+    recognition.lang = lang === 'si' ? 'si-LK' : 'en-US';
+    recognition.interimResults = false;
+    recognition.maxAlternatives = 1;
     setIsListening(true);
-    setTimeout(() => {
+    recognition.start();
+    recognition.onresult = (event) => {
+      const transcript = event.results[0][0].transcript.toLowerCase();
       setIsListening(false);
-      alert(lang === 'si' ? "කටහඬ හඳුනාගැනීම සාර්ථකයි. (Mock)" : "Voice recognized successfully. (Mock)");
-    }, 2000);
+      if (transcript.includes('appoint') || transcript.includes('doctor') || transcript.includes('channel')) {
+        navigate('/channeling');
+      } else if (transcript.includes('symptom') || transcript.includes('check')) {
+        navigate('/symptom-checker');
+      } else {
+        navigate(`/shop?q=${encodeURIComponent(transcript)}`);
+      }
+    };
+    recognition.onerror = () => setIsListening(false);
+    recognition.onend   = () => setIsListening(false);
   };
 
   const toggleMobileMenu = () => {

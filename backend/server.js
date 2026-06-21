@@ -9,7 +9,21 @@ const { sendEmail } = require('./emailService');
 dotenv.config();
 
 const app = express();
-app.use(cors({ origin: true }));
+const allowedOrigins = [
+  'https://deergayu.com',
+  'https://www.deergayu.com',
+  /\.vercel\.app$/,
+  'http://localhost:5173',
+  'http://localhost:3000',
+];
+app.use(cors({
+  origin: (origin, callback) => {
+    if (!origin) return callback(null, true); // allow non-browser requests
+    const allowed = allowedOrigins.some(o => typeof o === 'string' ? o === origin : o.test(origin));
+    callback(null, allowed ? true : new Error('CORS: Origin not allowed'));
+  },
+  credentials: true
+}));
 app.use(express.json());
 
 // Initialize Firebase Admin
@@ -659,7 +673,62 @@ apiRouter.post('/checkout', verifyUser, async (req, res) => {
       
       const docRef = await db.collection('orders').add(orderData);
       orderIds.push(docRef.id);
+
+      // Send vendor notification (fire and forget)
+      try {
+        const vendorDoc = await db.collection('users').doc(vendorId).get();
+        if (vendorDoc.exists && vendorDoc.data().email) {
+          const itemsHtml = group.items.map(i => `<tr><td style="padding:6px 12px">${i.name}</td><td style="padding:6px 12px">x${i.quantity}</td><td style="padding:6px 12px">Rs. ${(i.price * i.quantity).toLocaleString()}</td></tr>`).join('');
+          const vendorHtml = `<div style="font-family:Arial,sans-serif;padding:20px;color:#333">
+            <h2 style="color:#2e7d32">&#128717; New Order Received!</h2>
+            <p>Hello ${group.vendorName},</p>
+            <p>You have a new order from <strong>${userName}</strong>.</p>
+            <table style="border-collapse:collapse;width:100%;margin:16px 0">
+              <thead><tr style="background:#f5f5f5"><th style="padding:6px 12px;text-align:left">Item</th><th style="padding:6px 12px">Qty</th><th style="padding:6px 12px">Price</th></tr></thead>
+              <tbody>${itemsHtml}</tbody>
+              <tfoot><tr><td colspan="2" style="padding:8px 12px;font-weight:bold">Total</td><td style="padding:8px 12px;font-weight:bold">Rs. ${totalPrice.toLocaleString()}</td></tr></tfoot>
+            </table>
+            <p><strong>Payment:</strong> ${paymentMethod}</p>
+            <p><strong>Delivery Address:</strong> ${deliveryAddress}</p>
+            <p><strong>Phone:</strong> ${phone}</p>
+            <p>Please log in to your Deergayu dashboard to process this order.</p>
+            <br/><p>Thanks,<br/>Deergayu Platform</p>
+          </div>`;
+          sendEmail(vendorDoc.data().email, `New Order - Rs. ${totalPrice.toLocaleString()} - Deergayu`, '', vendorHtml)
+            .catch(e => console.error('Vendor order email error:', e));
+        }
+      } catch(emailErr) { console.error('Vendor email prep error:', emailErr); }
     }
+
+    // Send customer confirmation email (fire and forget)
+    try {
+      const allItemsHtml = items.map(i => `<tr><td style="padding:6px 12px">${i.name}</td><td style="padding:6px 12px">x${i.quantity}</td><td style="padding:6px 12px">Rs. ${(i.price * i.quantity).toLocaleString()}</td></tr>`).join('');
+      const grandTotal = items.reduce((sum, i) => sum + (i.price * i.quantity), 0);
+      const paymentInstructions = (paymentMethod === 'bank_transfer' || paymentMethod === 'qr_pay') 
+        ? `<div style="background:#fff8e1;border-left:4px solid #ffc107;padding:16px;margin:16px 0;border-radius:4px">
+            <h3 style="margin:0 0 8px 0;color:#f57f17">Payment Pending</h3>
+            <p style="margin:0">Your order is reserved. Please complete your payment via <strong>${paymentMethod === 'qr_pay' ? 'QR Pay' : 'Bank Transfer'}</strong> and your order will be confirmed.</p>
+            <p style="margin:8px 0 0 0"><strong>Bank:</strong> People's Bank | <strong>Acc:</strong> 123-4567-8901 | <strong>Name:</strong> Deergayu (Pvt) Ltd | <strong>Ref:</strong> ${orderIds[0]?.slice(-8).toUpperCase()}</p>
+          </div>` 
+        : '';
+      const customerHtml = `<div style="font-family:Arial,sans-serif;padding:20px;color:#333">
+        <h2 style="color:#2e7d32">Order Confirmed!</h2>
+        <p>Hello ${userName},</p>
+        <p>Thank you for shopping at Deergayu! Your order has been placed successfully.</p>
+        <p><strong>Order Reference:</strong> ${orderIds.map(id => id.slice(-8).toUpperCase()).join(', ')}</p>
+        ${paymentInstructions}
+        <table style="border-collapse:collapse;width:100%;margin:16px 0">
+          <thead><tr style="background:#f5f5f5"><th style="padding:6px 12px;text-align:left">Item</th><th style="padding:6px 12px">Qty</th><th style="padding:6px 12px">Price</th></tr></thead>
+          <tbody>${allItemsHtml}</tbody>
+          <tfoot><tr><td colspan="2" style="padding:8px 12px;font-weight:bold">Total</td><td style="padding:8px 12px;font-weight:bold">Rs. ${grandTotal.toLocaleString()}</td></tr></tfoot>
+        </table>
+        <p><strong>Delivery to:</strong> ${deliveryAddress}</p>
+        <p><strong>Payment Method:</strong> ${paymentMethod}</p>
+        <br/><p>Thanks for your order!<br/>Deergayu Team</p>
+      </div>`;
+      sendEmail(req.user.email, `Order Confirmed - Rs. ${grandTotal.toLocaleString()} | Deergayu`, '', customerHtml)
+        .catch(e => console.error('Customer order email error:', e));
+    } catch(emailErr) { console.error('Customer email prep error:', emailErr); }
     
     // Clear cart
     await db.collection('carts').doc(req.user.uid).set({ items: [], updatedAt: new Date().toISOString() });
@@ -885,7 +954,7 @@ apiRouter.get('/appointments/available/:providerId', async (req, res) => {
 // ============================================================
 
 app.use('/api', apiRouter);
-app.use('/', apiRouter);
+// Note: removed duplicate '/' mount to avoid route conflicts
 
 app.all('{*path}', (req, res) => {
   res.status(404).json({

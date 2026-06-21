@@ -56,7 +56,7 @@ const Shop = () => {
   const categories = ['All', ...new Set(products.map(p => p.category))];
   
   const filteredProducts = products.filter(p => {
-    const matchSearch = p.name.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchSearch = (p.name || '').toLowerCase().includes(searchTerm.toLowerCase());
     const matchCategory = selectedCategory === 'All' || p.category === selectedCategory;
     return matchSearch && matchCategory;
   });
@@ -104,25 +104,33 @@ const Shop = () => {
             <div style={{ padding: '2rem', textAlign: 'center', width: '100%', color: 'var(--text-secondary)' }}>No products match your search.</div>
           ) : 
             filteredProducts.map(product => (
-              <div key={product.id} className="product-card glass-panel">
-                <div className="product-image-container">
-                  {/* Using a placeholder if no image exists yet */}
+              <div key={product.id} className="product-card glass-panel" style={{ cursor: 'pointer' }}
+                onClick={() => navigate(`/shop?product=${product.id}`)}>
+                <div className="product-image-container" onClick={e => e.stopPropagation()}>
                   <img src={product.imageUrl || product.image || "https://images.unsplash.com/photo-1611078516086-6ab28122db63?w=500&q=80"} alt={product.name} className="product-image" />
-                  <button className="wishlist-btn">
+                  <button className="wishlist-btn" onClick={e => { e.stopPropagation(); success('Added to wishlist! (Coming soon)'); }}>
                     <Heart size={20} />
                   </button>
                   <div className="product-category">{product.category}</div>
+                  {product.stock === 0 && (
+                    <div style={{ position: 'absolute', bottom: 8, left: 8, background: 'rgba(0,0,0,0.7)', color: '#ff6b6b', borderRadius: 6, padding: '0.2rem 0.5rem', fontSize: '0.72rem', fontWeight: 600 }}>Out of Stock</div>
+                  )}
                 </div>
                 <div className="product-info">
                   <h3 className="product-name">{product.name}</h3>
+                  {product.description && <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', margin: '0 0 0.5rem', lineHeight: 1.5, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{product.description}</p>}
                   <div className="product-meta">
                     <span className="product-rating">★ {product.rating || '4.5'}</span>
                     <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginLeft: 'auto' }}>By {product.vendorName || 'Deergayu'}</span>
                   </div>
                   <div className="product-bottom">
                     <span className="product-price">Rs. {product.price}</span>
-                    <button className="btn btn-primary add-to-cart-btn" onClick={() => handleAddToCart(product)}>
-                      <ShoppingCart size={18} /> Add
+                    <button className="btn btn-primary add-to-cart-btn"
+                      disabled={product.stock === 0}
+                      onClick={e => { e.stopPropagation(); handleAddToCart(product); }}
+                      style={product.stock === 0 ? { opacity: 0.5, cursor: 'not-allowed' } : {}}
+                    >
+                      <ShoppingCart size={18} /> {product.stock === 0 ? 'Out of Stock' : 'Add'}
                     </button>
                   </div>
                 </div>

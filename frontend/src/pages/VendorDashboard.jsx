@@ -13,6 +13,7 @@ const VendorDashboard = () => {
   const { success, error } = useToast();
   const [activeTab, setActiveTab] = useState('products');
   const [orders, setOrders] = useState([]);
+  const [loadingOrders, setLoadingOrders] = useState(false);
   const [vendorProducts, setVendorProducts] = useState([]);
   const [loadingProducts, setLoadingProducts] = useState(false);
   const [appointments, setAppointments] = useState([]);
@@ -495,7 +496,7 @@ const VendorDashboard = () => {
             </div>
           )}
 
-          {activeTab === 'profile' && (
+          {activeTab === 'products' && (
             <div className="glass-panel table-container">
               <p className="admin-hint">Add products to your shop. Once approved by the main Admin, they will appear on the public shop.</p>
               {loadingProducts ? (
@@ -665,30 +666,41 @@ const VendorDashboard = () => {
                     </tr>
                   </thead>
                   <tbody>
-                    {orders.map(order => (
+                    {orders.length === 0 ? (
+                      <tr><td colSpan={6} style={{textAlign:'center',padding:'2rem',color:'var(--text-secondary)'}}>No orders yet.</td></tr>
+                    ) : orders.map(order => {
+                      const itemNames = (order.items || []).map(i => i.name).join(', ');
+                      const itemQty   = (order.items || []).reduce((s,i) => s + (i.quantity||1), 0);
+                      return (
                       <tr key={order.id}>
-                        <td className="fw-bold">{order.id}</td>
-                        <td>{order.product} <br/><small style={{color: 'var(--text-secondary)'}}>({order.customer})</small></td>
-                        <td>{order.qty}</td>
-                        <td>Rs. {order.total}</td>
+                        <td className="fw-bold" style={{fontSize:'0.78rem'}}>{order.id?.slice(-8).toUpperCase()}</td>
+                        <td>{itemNames || '—'} <br/><small style={{color:'var(--text-secondary)'}}>{order.customerName || 'Customer'}</small></td>
+                        <td>{itemQty}</td>
+                        <td>Rs. {(order.totalPrice || 0).toLocaleString()}</td>
                         <td>
-                          {order.status === 'Processing' && <span className="type-badge astrologer" style={{background: '#fff3cd', color: '#856404'}}>Processing</span>}
-                          {order.status === 'Shipped' && <span className="type-badge doctor" style={{background: '#d4edda', color: '#155724'}}>Shipped</span>}
-                          {order.status === 'Delivered' && <span className="type-badge" style={{background: '#cce5ff', color: '#004085'}}>Delivered</span>}
+                          {order.status === 'pending'    && <span className="type-badge astrologer" style={{background:'#fff3cd',color:'#856404'}}>Pending</span>}
+                          {order.status === 'confirmed'  && <span className="type-badge astrologer" style={{background:'#cce5ff',color:'#004085'}}>Confirmed</span>}
+                          {order.status === 'processing' && <span className="type-badge astrologer" style={{background:'#fff3cd',color:'#856404'}}>Processing</span>}
+                          {order.status === 'shipped'    && <span className="type-badge doctor" style={{background:'#d4edda',color:'#155724'}}>Shipped</span>}
+                          {order.status === 'delivered'  && <span className="type-badge" style={{background:'#cce5ff',color:'#004085'}}>Delivered</span>}
+                          {order.status === 'cancelled'  && <span className="type-badge" style={{background:'#f8d7da',color:'#721c24'}}>Cancelled</span>}
                         </td>
                         <td>
-                          {order.status === 'Processing' && (
-                            <button onClick={() => handleUpdateOrderStatus(order.id, 'Shipped')} className="btn btn-primary" style={{padding: '0.25rem 0.75rem', fontSize: '0.85rem'}}>Mark Shipped</button>
+                          {(order.status === 'pending' || order.status === 'confirmed') && (
+                            <button onClick={() => handleUpdateOrderStatus(order.id, 'processing')} className="btn btn-primary" style={{padding:'0.25rem 0.75rem',fontSize:'0.85rem'}}>Process</button>
                           )}
-                          {order.status === 'Shipped' && (
-                            <button onClick={() => handleUpdateOrderStatus(order.id, 'Delivered')} className="btn btn-primary" style={{padding: '0.25rem 0.75rem', fontSize: '0.85rem', background: 'var(--success-color)'}}>Mark Delivered</button>
+                          {order.status === 'processing' && (
+                            <button onClick={() => handleUpdateOrderStatus(order.id, 'shipped')} className="btn btn-primary" style={{padding:'0.25rem 0.75rem',fontSize:'0.85rem'}}>Mark Shipped</button>
                           )}
-                          {order.status === 'Delivered' && (
-                            <span style={{color: 'var(--success-color)', display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.85rem'}}><CheckCircle size={16} /> Done</span>
+                          {order.status === 'shipped' && (
+                            <button onClick={() => handleUpdateOrderStatus(order.id, 'delivered')} className="btn btn-primary" style={{padding:'0.25rem 0.75rem',fontSize:'0.85rem',background:'var(--success-color)'}}>Mark Delivered</button>
+                          )}
+                          {order.status === 'delivered' && (
+                            <span style={{color:'var(--success-color)',display:'flex',alignItems:'center',gap:'0.25rem',fontSize:'0.85rem'}}><CheckCircle size={16}/> Done</span>
                           )}
                         </td>
                       </tr>
-                    ))}
+                    );})}
                     {orders.length === 0 && (
                       <tr>
                         <td colSpan="6" style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-secondary)' }}>No orders yet.</td>

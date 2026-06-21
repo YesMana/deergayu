@@ -11,6 +11,7 @@ import Cart from './pages/Cart';
 import MyOrders from './pages/MyOrders';
 import MyAppointments from './pages/MyAppointments';
 import ProtectedRoute from './components/Auth/ProtectedRoute';
+import NotFound from './pages/NotFound';
 import LanguagePopup from './components/Common/LanguagePopup';
 import AyurBot from './components/AI/AyurBot';
 import { LanguageProvider } from './context/LanguageContext';
@@ -56,6 +57,9 @@ function App() {
                     <Route element={<ProtectedRoute requiredRole={['vendor', 'doctor', 'clinic', 'organization']} />}>
                       <Route path="/vendor/*" element={<VendorDashboard />} />
                     </Route>
+
+                    {/* 404 - Must be last */}
+                    <Route path="*" element={<NotFound />} />
                   </Routes>
                 </main>
               </div>

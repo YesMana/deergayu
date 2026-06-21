@@ -148,7 +148,7 @@ export const CartProvider = ({ children }) => {
       });
       if (!res.ok) {
         const errData = await res.json().catch(() => ({}));
-        throw new Error(errData.message || 'Checkout failed');
+        throw new Error(errData.error || errData.message || 'Checkout failed');
       }
       const data = await res.json();
       setCartItems([]);
