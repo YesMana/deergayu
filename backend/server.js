@@ -5,6 +5,7 @@ const { getFirestore, FieldValue } = require('firebase-admin/firestore');
 const { getAuth } = require('firebase-admin/auth');
 const dotenv = require('dotenv');
 const { sendEmail } = require('./emailService');
+const { GoogleGenerativeAI } = require('@google/generative-ai');
 
 dotenv.config();
 
@@ -946,6 +947,38 @@ apiRouter.get('/appointments/available/:providerId', async (req, res) => {
     res.json({ allSlots: availableSlots, bookedSlots });
   } catch (error) {
     res.status(500).json({ error: error.message });
+  }
+});
+
+// ============================================================
+// AI Chatbot Route (Gemini)
+// ============================================================
+apiRouter.post('/chat', async (req, res) => {
+  try {
+    const { message, lang } = req.body;
+    
+    if (!process.env.GEMINI_API_KEY) {
+      return res.status(500).json({ error: "Gemini API key is not configured in backend." });
+    }
+
+    const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+
+    const systemPrompt = `You are AyurBot, an expert Ayurvedic assistant for the Deergayu platform in Sri Lanka.
+Your job is to provide safe, natural Ayurvedic home remedies for common ailments. 
+If the ailment is serious, strongly advise them to consult a doctor via the 'Channeling' page.
+Keep your answers brief, friendly, and highly relevant to Ayurveda.
+The user is speaking in ${lang === 'si' ? 'Sinhala' : lang === 'ta' ? 'Tamil' : 'English'}. Please reply in the same language.
+User's message: ${message}`;
+
+    const result = await model.generateContent(systemPrompt);
+    const response = await result.response;
+    const text = response.text();
+
+    res.json({ reply: text });
+  } catch (error) {
+    console.error("AI Chat Error:", error);
+    res.status(500).json({ error: "Failed to process chat" });
   }
 });
 

@@ -2,6 +2,7 @@ import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import Navbar from './components/Navbar';
 import Home from './pages/Home';
 import Shop from './pages/Shop';
+import ProductDetail from './pages/ProductDetail';
 import Channeling from './pages/Channeling';
 import SymptomChecker from './pages/SymptomChecker';
 import AdminDashboard from './pages/AdminDashboard';
@@ -37,6 +38,7 @@ function App() {
                   <Routes>
                     <Route path="/" element={<Home />} />
                     <Route path="/shop" element={<Shop />} />
+                    <Route path="/product/:id" element={<ProductDetail />} />
                     <Route path="/channeling" element={<Channeling />} />
                     <Route path="/symptom-checker" element={<SymptomChecker />} />
                     <Route path="/login" element={<Login />} />

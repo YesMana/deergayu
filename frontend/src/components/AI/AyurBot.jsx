@@ -32,7 +32,7 @@ const AyurBot = () => {
     }
   }, [isOpen, lang, messages.length]);
 
-  const handleSend = () => {
+  const handleSend = async () => {
     if (!input.trim()) return;
 
     const userMessage = { id: Date.now(), text: input, sender: 'user' };
@@ -40,22 +40,29 @@ const AyurBot = () => {
     setInput('');
     setIsTyping(true);
 
-    // Mock AI Response
-    setTimeout(() => {
-      let botReply = '';
-      const lowerInput = userMessage.text.toLowerCase();
+    // Real AI Response
+    try {
+      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+      const response = await fetch(`${API_URL}/api/chat`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: input, lang })
+      });
       
-      if (lowerInput.includes('headache') || lowerInput.includes('හිසරුදාව') || lowerInput.includes('ඔලුවෙ කැක්කුම') || lowerInput.includes('தலைவலி')) {
-        botReply = lang === 'si' ? "හිසරුදාවට හොඳම දේ තමයි කොත්තමල්ලි ටිකක් තම්බලා බොන එක. ඒ වගේම 'සීතෝදක තෛලය' ටිකක් නළලේ ගාන්න." : lang === 'ta' ? "தலைவலிக்கு மல்லி விதைகளை கொதிக்க வைத்து அந்த நீரை குடிப்பது மிகவும் சிறந்தது. நெற்றியில் 'சீதோதக எண்ணெய்' தடவலாம்." : "For a headache, boiling coriander seeds and drinking the water is highly effective. You can also apply 'Seethodaka Oil' on your forehead.";
-      } else if (lowerInput.includes('cold') || lowerInput.includes('හම්බිරිස්සාව') || lowerInput.includes('කැස්ස') || lowerInput.includes('சளி')) {
-        botReply = lang === 'si' ? "සෙම්ප්‍රතිශ්‍යාවට පස්පංගුව තම්බලා බොන්න. ඉඟුරු, කොත්තමල්ලි ගොඩක් ගුණදායකයි. අපේ ඔසුසලෙන් 'පස්පංගුව' මිලදී ගන්න පුළුවන්." : lang === 'ta' ? "சளிக்கு 'பஸ்பங்குவ' கொதிக்க வைப்பது சிறந்த தீர்வாகும். இஞ்சி மற்றும் மல்லி மிகவும் பயனுள்ளதாக இருக்கும். 'பஸ்பங்குவ'வை நீங்கள் எங்கள் கடையில் வாங்கலாம்." : "For a cold, boiling 'Paspanguwa' is the best remedy. Ginger and Coriander are very beneficial. You can buy 'Paspanguwa' from our shop.";
+      const data = await response.json();
+      
+      if (response.ok && data.reply) {
+        setMessages(prev => [...prev, { id: Date.now(), text: data.reply, sender: 'bot' }]);
       } else {
-        botReply = lang === 'si' ? "මට ඒ ගැන හරියටම කියන්න අමාරුයි. ඒත් ඔබට පුළුවන් අපේ විශේෂඥ ආයුර්වේද වෛද්‍යවරයෙක්ව සම්බන්ධ කරගන්න. 'Channeling' පිටුවට යන්න." : lang === 'ta' ? "அது பற்றி எனக்கு சரியாகத் தெரியவில்லை. இருப்பினும், நீங்கள் எங்கள் நிபுணத்துவ ஆயுர்வேத மருத்துவர் ஒருவரைத் தொடர்புகொள்ளலாம். தயவுசெய்து 'சானலிங்' பக்கத்திற்குச் செல்லவும்." : "I am not exactly sure about that. However, you can consult one of our expert Ayurvedic physicians. Please visit the 'Channeling' page.";
+        throw new Error(data.error || 'Failed to get AI response');
       }
-
-      setMessages(prev => [...prev, { id: Date.now(), text: botReply, sender: 'bot' }]);
+    } catch (err) {
+      console.error("AI Chat Error:", err);
+      const errorMsg = lang === 'si' ? "සමාවෙන්න, මට දැන් පිළිතුරු දීමට අපහසුයි." : lang === 'ta' ? "மன்னிக்கவும், நான் தற்போது பதிலளிக்க முடியவில்லை." : "Sorry, I am unable to respond right now.";
+      setMessages(prev => [...prev, { id: Date.now(), text: errorMsg, sender: 'bot' }]);
+    } finally {
       setIsTyping(false);
-    }, 1500);
+    }
   };
 
   return (

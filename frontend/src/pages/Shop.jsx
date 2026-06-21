@@ -105,7 +105,7 @@ const Shop = () => {
           ) : 
             filteredProducts.map(product => (
               <div key={product.id} className="product-card glass-panel" style={{ cursor: 'pointer' }}
-                onClick={() => navigate(`/shop?product=${product.id}`)}>
+                onClick={() => navigate(`/product/${product.id}`)}>
                 <div className="product-image-container" onClick={e => e.stopPropagation()}>
                   <img src={product.imageUrl || product.image || "https://images.unsplash.com/photo-1611078516086-6ab28122db63?w=500&q=80"} alt={product.name} className="product-image" />
                   <button className="wishlist-btn" onClick={e => { e.stopPropagation(); success('Added to wishlist! (Coming soon)'); }}>
