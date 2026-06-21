@@ -91,10 +91,11 @@ const VendorDashboard = () => {
       if (user.profileDetails?.schedule) {
         setSchedule(user.profileDetails.schedule);
       }
-      setSettingsData({
-        name: user.name || '',
+      setSettingsData(prev => ({
+        ...prev,
+        name: user.displayName || user.name || '',
         profileImageUrl: user.profileDetails?.profileImageUrl || ''
-      });
+      }));
     }
   }, [activeTab, user]);
 
@@ -454,7 +455,7 @@ const VendorDashboard = () => {
       <aside className="admin-sidebar glass-panel">
         <div className="admin-brand">
           <h2>Vendor Panel</h2>
-          <p style={{fontSize: '0.8rem', color: 'var(--text-secondary)'}}>{user?.name}</p>
+          <p style={{fontSize: '0.8rem', color: 'var(--text-secondary)'}}>{user?.displayName || user?.name}</p>
         </div>
         <ul className="admin-nav">
           <li className={activeTab === 'products' ? 'active' : ''} onClick={() => setActiveTab('products')}>
