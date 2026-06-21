@@ -2,8 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { Package, ShoppingBag, Settings, CheckCircle, Clock, Calendar, Trash2 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
-import { db, auth } from '../firebase';
+import { db, auth, storage } from '../firebase';
 import { doc, updateDoc, collection, query, where, orderBy, onSnapshot } from 'firebase/firestore';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import './AdminDashboard.css';
 
 const API_URL = import.meta.env.VITE_API_URL || '';
@@ -51,6 +52,37 @@ const VendorDashboard = () => {
     profileImageUrl: ''
   });
   const [savingSettings, setSavingSettings] = useState(false);
+  
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const [settingsUploadingImage, setSettingsUploadingImage] = useState(false);
+
+  const handleImageUpload = async (e, isSettings = false) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    if (file.size > 2 * 1024 * 1024) {
+      error("Image must be less than 2MB");
+      return;
+    }
+
+    isSettings ? setSettingsUploadingImage(true) : setUploadingImage(true);
+    try {
+      const storageRef = ref(storage, `profileImages/${user.uid}_${Date.now()}_${file.name}`);
+      const snapshot = await uploadBytes(storageRef, file);
+      const downloadURL = await getDownloadURL(snapshot.ref);
+      
+      if (isSettings) {
+        setSettingsData(prev => ({ ...prev, profileImageUrl: downloadURL }));
+      } else {
+        setProfileData(prev => ({ ...prev, profileImageUrl: downloadURL }));
+      }
+      success("Image uploaded successfully!");
+    } catch (err) {
+      console.error("Error uploading image:", err);
+      error("Failed to upload image");
+    } finally {
+      isSettings ? setSettingsUploadingImage(false) : setUploadingImage(false);
+    }
+  };
 
   // Fetch vendor's products & schedule
   useEffect(() => {
@@ -354,15 +386,21 @@ const VendorDashboard = () => {
                 </div>
               )}
               <div className="form-group">
-                <label>Profile Picture URL <small style={{color: 'var(--text-secondary)'}}>(Optional)</small></label>
+                <label>Profile Picture <small style={{color: 'var(--text-secondary)'}}>(Optional)</small></label>
                 <input 
-                  type="url" 
-                  placeholder="https://example.com/my-photo.jpg"
-                  value={profileData.profileImageUrl}
-                  onChange={e => setProfileData({...profileData, profileImageUrl: e.target.value})}
+                  type="file" 
+                  accept="image/*"
+                  onChange={(e) => handleImageUpload(e, false)}
                   className="form-control"
+                  disabled={uploadingImage}
                   style={{ width: '100%', padding: '0.8rem', borderRadius: '4px', background: 'var(--surface-color)', color: 'var(--text-primary)' }}
                 />
+                {uploadingImage && <small style={{color: 'var(--primary-color)', marginTop: '0.5rem', display: 'block'}}>Uploading image...</small>}
+                {profileData.profileImageUrl && !uploadingImage && (
+                  <div style={{marginTop: '1rem'}}>
+                    <img src={profileData.profileImageUrl} alt="Preview" style={{width: '60px', height: '60px', borderRadius: '50%', objectFit: 'cover', border: '2px solid var(--primary-color)'}} />
+                  </div>
+                )}
               </div>
               <div className="form-group">
                 <label>Address / Clinic Location</label>
@@ -836,13 +874,18 @@ const VendorDashboard = () => {
               </div>
 
               <div className="form-group" style={{marginBottom: '1rem'}}>
-                <label style={{color: 'var(--text-secondary)'}}>Profile Picture URL</label>
+                <label style={{color: 'var(--text-secondary)'}}>Profile Picture</label>
                 <div style={{display: 'flex', gap: '1rem', alignItems: 'center'}}>
-                  {settingsData.profileImageUrl && (
+                  {settingsData.profileImageUrl ? (
                     <img src={settingsData.profileImageUrl} alt="Profile" style={{width: '50px', height: '50px', borderRadius: '50%', objectFit: 'cover', border: '2px solid var(--primary-color)'}} onError={e => e.target.style.display='none'} />
+                  ) : (
+                    <div style={{width: '50px', height: '50px', borderRadius: '50%', background: 'var(--surface-color)', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px dashed var(--border-color)'}}>
+                      <span style={{fontSize: '0.8rem', color: 'var(--text-secondary)'}}>No img</span>
+                    </div>
                   )}
-                  <input type="url" placeholder="https://example.com/my-photo.jpg" value={settingsData.profileImageUrl} onChange={e => setSettingsData({...settingsData, profileImageUrl: e.target.value})} className="form-control" style={{flex: 1, padding: '0.75rem', borderRadius: 'var(--radius-sm)', border: '1px solid rgba(212, 175, 55, 0.3)', background: 'rgba(255, 255, 255, 0.05)', color: 'var(--text-primary)'}} />
+                  <input type="file" accept="image/*" onChange={(e) => handleImageUpload(e, true)} disabled={settingsUploadingImage} className="form-control" style={{flex: 1, padding: '0.5rem', borderRadius: 'var(--radius-sm)', border: '1px solid rgba(212, 175, 55, 0.3)', background: 'rgba(255, 255, 255, 0.05)', color: 'var(--text-primary)'}} />
                 </div>
+                {settingsUploadingImage && <small style={{color: 'var(--primary-color)', marginTop: '0.5rem', display: 'block'}}>Uploading image...</small>}
               </div>
 
               <div style={{display: 'flex', gap: '1rem', marginTop: '2rem'}}>
