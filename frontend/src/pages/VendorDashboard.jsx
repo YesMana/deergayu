@@ -430,7 +430,7 @@ const VendorDashboard = () => {
           <li className={activeTab === 'schedule' ? 'active' : ''} onClick={() => setActiveTab('schedule')}>
             <Clock size={20} /> My Schedule
           </li>
-          <li className={activeTab === 'profile' ? 'active' : ''} onClick={() => setActiveTab('profile')}>
+          <li className={activeTab === 'settings' ? 'active' : ''} onClick={() => setActiveTab('settings')}>
             <Settings size={20} /> Settings
           </li>
         </ul>
