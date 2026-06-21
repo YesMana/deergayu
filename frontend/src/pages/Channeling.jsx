@@ -257,7 +257,7 @@ const Channeling = () => {
             filteredProviders.map(provider => (
               <div key={provider.id} className="provider-card glass-panel">
                 <div className="provider-image-wrapper">
-                  <img src={provider.profileDetails?.image || "https://images.unsplash.com/photo-1612349317150-e413f6a5b16d?w=500&q=80"} alt={provider.name} className="provider-image" />
+                  <img src={provider.profileDetails?.profileImageUrl || provider.profileDetails?.image || "https://images.unsplash.com/photo-1612349317150-e413f6a5b16d?w=500&q=80"} alt={provider.name} className="provider-image" />
                   <div className="provider-rating">
                     <Star size={14} className="star-icon" fill="currentColor" /> {provider.rating || '4.9'}
                   </div>

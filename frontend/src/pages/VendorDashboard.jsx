@@ -41,9 +41,16 @@ const VendorDashboard = () => {
   const [profileData, setProfileData] = useState({
     category: 'Ayurvedic Doctor',
     address: '',
-    phone: ''
+    phone: '',
+    profileImageUrl: ''
   });
   const [submittingProfile, setSubmittingProfile] = useState(false);
+
+  const [settingsData, setSettingsData] = useState({
+    name: '',
+    profileImageUrl: ''
+  });
+  const [savingSettings, setSavingSettings] = useState(false);
 
   // Fetch vendor's products & schedule
   useEffect(() => {
@@ -52,6 +59,10 @@ const VendorDashboard = () => {
       if (user.profileDetails?.schedule) {
         setSchedule(user.profileDetails.schedule);
       }
+      setSettingsData({
+        name: user.name || '',
+        profileImageUrl: user.profileDetails?.profileImageUrl || ''
+      });
     }
   }, [activeTab, user]);
 
@@ -263,11 +274,30 @@ const VendorDashboard = () => {
       // Update local state temporarily to avoid reload
       user.profileDetails = profileData;
       success("Profile details saved!");
+      window.location.reload(); // Reload to clear pending state
     } catch (err) {
       console.error("Error updating profile", err);
       error("Failed to save profile details");
     } finally {
       setSubmittingProfile(false);
+    }
+  };
+
+  const handleSettingsSubmit = async (e) => {
+    e.preventDefault();
+    setSavingSettings(true);
+    try {
+      const userRef = doc(db, 'users', user.uid);
+      await updateDoc(userRef, {
+        name: settingsData.name,
+        'profileDetails.profileImageUrl': settingsData.profileImageUrl
+      });
+      success("Settings saved successfully!");
+    } catch (err) {
+      console.error("Error saving settings:", err);
+      error("Failed to save settings");
+    } finally {
+      setSavingSettings(false);
     }
   };
 
@@ -323,6 +353,17 @@ const VendorDashboard = () => {
                   </select>
                 </div>
               )}
+              <div className="form-group">
+                <label>Profile Picture URL <small style={{color: 'var(--text-secondary)'}}>(Optional)</small></label>
+                <input 
+                  type="url" 
+                  placeholder="https://example.com/my-photo.jpg"
+                  value={profileData.profileImageUrl}
+                  onChange={e => setProfileData({...profileData, profileImageUrl: e.target.value})}
+                  className="form-control"
+                  style={{ width: '100%', padding: '0.8rem', borderRadius: '4px', background: 'var(--surface-color)', color: 'var(--text-primary)' }}
+                />
+              </div>
               <div className="form-group">
                 <label>Address / Clinic Location</label>
                 <textarea 
@@ -782,31 +823,33 @@ const VendorDashboard = () => {
 
           {activeTab === 'settings' && (
             <div className="glass-panel table-container" style={{maxWidth: '600px'}}>
-              <h2 style={{color: 'var(--text-primary)', marginBottom: '1rem'}}>Shop Settings</h2>
-              <div className="form-group" style={{marginBottom: '1rem'}}>
-                <label style={{color: 'var(--text-secondary)'}}>Shop Name</label>
-                <input type="text" defaultValue={user?.name || "Vendor Name"} className="form-control" style={{width: '100%', padding: '0.75rem', borderRadius: 'var(--radius-sm)', border: '1px solid rgba(212, 175, 55, 0.3)', background: 'rgba(255, 255, 255, 0.05)', color: 'var(--text-primary)'}} />
-              </div>
+              <h2 style={{color: 'var(--text-primary)', marginBottom: '1rem'}}>Profile Settings</h2>
+              
               <div className="form-group" style={{marginBottom: '1rem'}}>
                 <label style={{color: 'var(--text-secondary)'}}>Email Address</label>
                 <input type="email" defaultValue={user?.email || "vendor@deergayu.lk"} disabled className="form-control" style={{width: '100%', padding: '0.75rem', borderRadius: 'var(--radius-sm)', border: '1px solid rgba(212, 175, 55, 0.3)', background: 'rgba(255, 255, 255, 0.05)', color: 'var(--text-secondary)', opacity: 0.7}} />
               </div>
-              
-              <hr style={{border: 'none', borderTop: '1px solid rgba(212, 175, 55, 0.2)', margin: '2rem 0'}} />
-              
-              <h3 style={{color: 'var(--text-primary)', marginBottom: '1rem', fontSize: '1.2rem'}}>Change Password</h3>
+
               <div className="form-group" style={{marginBottom: '1rem'}}>
-                <label style={{color: 'var(--text-secondary)'}}>New Password</label>
-                <input type="password" placeholder="Enter new password" className="form-control" style={{width: '100%', padding: '0.75rem', borderRadius: 'var(--radius-sm)', border: '1px solid rgba(212, 175, 55, 0.3)', background: 'rgba(255, 255, 255, 0.05)', color: 'var(--text-primary)'}} />
+                <label style={{color: 'var(--text-secondary)'}}>Display Name</label>
+                <input type="text" value={settingsData.name} onChange={e => setSettingsData({...settingsData, name: e.target.value})} className="form-control" style={{width: '100%', padding: '0.75rem', borderRadius: 'var(--radius-sm)', border: '1px solid rgba(212, 175, 55, 0.3)', background: 'rgba(255, 255, 255, 0.05)', color: 'var(--text-primary)'}} />
               </div>
+
               <div className="form-group" style={{marginBottom: '1rem'}}>
-                <label style={{color: 'var(--text-secondary)'}}>Confirm New Password</label>
-                <input type="password" placeholder="Confirm new password" className="form-control" style={{width: '100%', padding: '0.75rem', borderRadius: 'var(--radius-sm)', border: '1px solid rgba(212, 175, 55, 0.3)', background: 'rgba(255, 255, 255, 0.05)', color: 'var(--text-primary)'}} />
+                <label style={{color: 'var(--text-secondary)'}}>Profile Picture URL</label>
+                <div style={{display: 'flex', gap: '1rem', alignItems: 'center'}}>
+                  {settingsData.profileImageUrl && (
+                    <img src={settingsData.profileImageUrl} alt="Profile" style={{width: '50px', height: '50px', borderRadius: '50%', objectFit: 'cover', border: '2px solid var(--primary-color)'}} onError={e => e.target.style.display='none'} />
+                  )}
+                  <input type="url" placeholder="https://example.com/my-photo.jpg" value={settingsData.profileImageUrl} onChange={e => setSettingsData({...settingsData, profileImageUrl: e.target.value})} className="form-control" style={{flex: 1, padding: '0.75rem', borderRadius: 'var(--radius-sm)', border: '1px solid rgba(212, 175, 55, 0.3)', background: 'rgba(255, 255, 255, 0.05)', color: 'var(--text-primary)'}} />
+                </div>
               </div>
 
               <div style={{display: 'flex', gap: '1rem', marginTop: '2rem'}}>
-                <button className="btn btn-primary">Save Changes</button>
-                <button className="btn btn-outline" style={{borderColor: 'var(--error-color)', color: 'var(--error-color)'}} onClick={() => { localStorage.clear(); window.location.href = '/'; }}>Logout</button>
+                <button className="btn btn-primary" onClick={handleSettingsSubmit} disabled={savingSettings}>
+                  {savingSettings ? 'Saving...' : 'Save Profile'}
+                </button>
+                <button className="btn btn-outline" style={{borderColor: 'var(--error-color)', color: 'var(--error-color)', marginLeft: 'auto'}} onClick={() => { localStorage.clear(); window.location.href = '/'; }}>Logout</button>
               </div>
             </div>
           )}
