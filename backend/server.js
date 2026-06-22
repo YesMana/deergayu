@@ -15,6 +15,8 @@ const allowedOrigins = [
   'https://www.deergayu.com',
   /\.vercel\.app$/,
   'http://localhost:5173',
+  'http://localhost:5174',
+  'http://localhost:5175',
   'http://localhost:3000',
 ];
 app.use(cors({
@@ -962,7 +964,7 @@ apiRouter.post('/chat', async (req, res) => {
     }
 
     const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
     const systemPrompt = `You are AyurBot, an expert Ayurvedic assistant for the Deergayu platform in Sri Lanka.
 Your job is to provide safe, natural Ayurvedic home remedies for common ailments. 
