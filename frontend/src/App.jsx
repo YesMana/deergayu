@@ -11,6 +11,7 @@ import Login from './pages/Login';
 import Cart from './pages/Cart';
 import MyOrders from './pages/MyOrders';
 import MyAppointments from './pages/MyAppointments';
+import CustomerDashboard from './pages/CustomerDashboard';
 import ProtectedRoute from './components/Auth/ProtectedRoute';
 import NotFound from './pages/NotFound';
 import LanguagePopup from './components/Common/LanguagePopup';
@@ -48,6 +49,7 @@ function App() {
                       <Route path="/shop/cart" element={<Cart />} />
                       <Route path="/my-orders" element={<MyOrders />} />
                       <Route path="/my-appointments" element={<MyAppointments />} />
+                      <Route path="/my-account" element={<CustomerDashboard />} />
                     </Route>
 
                     {/* Protected Admin Routes */}

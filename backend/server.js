@@ -131,6 +131,191 @@ apiRouter.get('/health', (req, res) => {
 });
 
 // ============================================================
+// PUBLIC SMART APIs (Home Page, Symptom Checker, etc.)
+// ============================================================
+
+// Get platform stats for Home page
+apiRouter.get('/home-stats', async (req, res) => {
+  try {
+    const [providersSnap, productsSnap, ordersSnap, appointmentsSnap] = await Promise.all([
+      db.collection('users').where('role', 'in', ['doctor', 'clinic', 'organization']).where('status', '==', 'approved').get(),
+      db.collection('products').where('status', '==', 'approved').get(),
+      db.collection('orders').get(),
+      db.collection('appointments').get()
+    ]);
+    res.json({
+      expertCount: providersSnap.size,
+      productCount: productsSnap.size,
+      orderCount: ordersSnap.size,
+      appointmentCount: appointmentsSnap.size,
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Get featured/approved providers for Home page
+apiRouter.get('/featured-providers', async (req, res) => {
+  try {
+    const snapshot = await db.collection('users')
+      .where('role', 'in', ['doctor', 'clinic', 'organization'])
+      .where('status', '==', 'approved')
+      .limit(6)
+      .get();
+    const providers = snapshot.docs.map(doc => {
+      const data = doc.data();
+      return {
+        id: doc.id,
+        name: data.name,
+        role: data.role,
+        profileDetails: data.profileDetails || {},
+        rating: data.rating || 4.5,
+        reviewCount: data.reviewCount || 0
+      };
+    });
+    res.json(providers);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Get featured products for Home page
+apiRouter.get('/featured-products', async (req, res) => {
+  try {
+    const snapshot = await db.collection('products')
+      .where('status', '==', 'approved')
+      .limit(6)
+      .get();
+    const products = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    res.json(products);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// AI-Powered Symptom Checker
+apiRouter.post('/symptom-check', async (req, res) => {
+  try {
+    const { symptom, lang } = req.body;
+    if (!symptom) return res.status(400).json({ error: 'Symptom is required' });
+
+    if (!process.env.GEMINI_API_KEY) {
+      return res.status(500).json({ error: 'Gemini API key not configured' });
+    }
+
+    // Fetch real data from DB in parallel
+    const [providersSnap, productsSnap] = await Promise.all([
+      db.collection('users').where('role', 'in', ['doctor', 'clinic', 'organization']).where('status', '==', 'approved').get(),
+      db.collection('products').where('status', '==', 'approved').get()
+    ]);
+
+    const providersList = providersSnap.docs.map(d => {
+      const data = d.data();
+      return `${data.name} (${data.role}) - Specialty: ${data.profileDetails?.specialty || 'General Ayurveda'} - Location: ${data.profileDetails?.address || 'Sri Lanka'}`;
+    }).join('\n');
+
+    const productsList = productsSnap.docs.map(d => {
+      const data = d.data();
+      return `${data.name} - Category: ${data.category} - Price: Rs.${data.price}`;
+    }).join('\n');
+
+    const { GoogleGenerativeAI } = require('@google/generative-ai');
+    const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
+
+    const prompt = `You are AyurBot, an expert Ayurvedic assistant for the Deergayu platform in Sri Lanka.
+A patient has described their symptoms. Your job is to:
+1. Give a brief Ayurvedic analysis of the likely condition (2-3 sentences)
+2. Suggest 2-4 natural home remedies based on Sri Lankan Ayurveda
+3. From the list of REAL doctors on our platform, pick the TOP 3 most suitable ones for this symptom
+4. From the list of REAL products on our platform, pick the TOP 3 most suitable ones for this symptom
+
+RESPOND ONLY IN VALID JSON in this exact format:
+{
+  "analysis": "Brief Ayurvedic analysis...",
+  "remedies": ["remedy 1", "remedy 2", "remedy 3"],
+  "recommendedDoctors": ["exact name from list", "exact name from list"],
+  "recommendedProducts": ["exact product name from list", "exact product name from list"]
+}
+
+Language: ${lang === 'si' ? 'Sinhala' : lang === 'ta' ? 'Tamil' : 'English'}
+Patient Symptom: ${symptom}
+
+AVAILABLE DOCTORS ON PLATFORM:
+${providersList || 'No doctors available yet'}
+
+AVAILABLE PRODUCTS ON PLATFORM:
+${productsList || 'No products available yet'}
+
+If no matching doctors/products exist for this symptom, return empty arrays. Do not make up names.`;
+
+    const result = await model.generateContent(prompt);
+    const text = result.response.text();
+
+    // Parse JSON from AI response
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) throw new Error('Invalid AI response format');
+    const aiData = JSON.parse(jsonMatch[0]);
+
+    // Find matching provider IDs from DB
+    const matchedProviders = providersSnap.docs
+      .filter(d => aiData.recommendedDoctors?.some(name => d.data().name?.toLowerCase().includes(name.toLowerCase()) || name.toLowerCase().includes(d.data().name?.toLowerCase())))
+      .map(d => ({ id: d.id, ...d.data(), profileDetails: d.data().profileDetails || {} }))
+      .slice(0, 3);
+
+    // Find matching product IDs from DB
+    const matchedProducts = productsSnap.docs
+      .filter(d => aiData.recommendedProducts?.some(name => d.data().name?.toLowerCase().includes(name.toLowerCase()) || name.toLowerCase().includes(d.data().name?.toLowerCase())))
+      .map(d => ({ id: d.id, ...d.data() }))
+      .slice(0, 3);
+
+    res.json({
+      analysis: aiData.analysis || '',
+      remedies: aiData.remedies || [],
+      doctors: matchedProviders,
+      products: matchedProducts
+    });
+  } catch (error) {
+    console.error('Symptom check error:', error);
+    res.status(500).json({ error: 'Failed to analyze symptoms' });
+  }
+});
+
+// Wishlist - add/remove (toggle)
+apiRouter.post('/wishlist/:productId', verifyUser, async (req, res) => {
+  const { productId } = req.params;
+  try {
+    const wishlistRef = db.collection('wishlists').doc(req.user.uid);
+    const doc = await wishlistRef.get();
+    let items = doc.exists ? (doc.data().items || []) : [];
+
+    const idx = items.indexOf(productId);
+    if (idx >= 0) {
+      items.splice(idx, 1); // remove
+      await wishlistRef.set({ items, updatedAt: new Date().toISOString() });
+      res.json({ added: false, items });
+    } else {
+      items.push(productId); // add
+      await wishlistRef.set({ items, updatedAt: new Date().toISOString() });
+      res.json({ added: true, items });
+    }
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Get user's wishlist
+apiRouter.get('/wishlist', verifyUser, async (req, res) => {
+  try {
+    const doc = await db.collection('wishlists').doc(req.user.uid).get();
+    const items = doc.exists ? (doc.data().items || []) : [];
+    res.json({ items });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ============================================================
 // ADMIN ROUTES
 // ============================================================
 
