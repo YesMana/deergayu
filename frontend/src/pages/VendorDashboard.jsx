@@ -978,7 +978,7 @@ const VendorDashboard = () => {
                                   accept="image/*"
                                   onChange={(e) => handleProductImageUpload(e, slotIndex)}
                                   disabled={isUploading || uploadingSlot !== null}
-                                  style={{ display: 'none' }}
+                                  style={{ opacity: 0, position: 'absolute', width: '1px', height: '1px', zIndex: -1 }}
                                 />
                               </label>
                             )}
@@ -1104,7 +1104,7 @@ const VendorDashboard = () => {
                                 ) : (
                                   <><span style={{ fontSize: '1.4rem', opacity: 0.5 }}>📷</span><span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', textAlign: 'center' }}>{isFirst ? 'Main Photo' : `Photo ${slotIndex + 1}`}</span></>
                                 )}
-                                <input type="file" accept="image/*" onChange={(e) => handleEditImageUpload(e, slotIndex)} disabled={isUploading || editUploadingSlot !== null} style={{ display: 'none' }} />
+                                <input type="file" accept="image/*" onChange={(e) => handleEditImageUpload(e, slotIndex)} disabled={isUploading || editUploadingSlot !== null} style={{ opacity: 0, position: 'absolute', width: '1px', height: '1px', zIndex: -1 }} />
                               </label>
                             )}
                           </div>
