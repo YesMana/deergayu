@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
-import { Users, LayoutDashboard, Settings, ArrowUp, ArrowDown, Bell, Search, Filter, ShieldAlert } from 'lucide-react';
-import { collection, getDocs, doc, deleteDoc } from 'firebase/firestore';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { Users, LayoutDashboard, Settings, Search, Filter, ShieldAlert, ChevronLeft, ChevronRight, Loader } from 'lucide-react';
+import { collection, getDocs, doc, deleteDoc, query, orderBy, limit, startAfter, getCountFromServer, where } from 'firebase/firestore';
 import { db, auth } from '../firebase';
 import { useToast } from '../context/ToastContext';
 import './AdminDashboard.css';
@@ -38,8 +38,19 @@ const AdminDashboard = () => {
   const [loadingProviders, setLoadingProviders] = useState(false);
   const [loadingOrders, setLoadingOrders] = useState(false);
 
+  // Pagination state
+  const PAGE_SIZE = 20;
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalUsers, setTotalUsers] = useState(0);
+  const [pagesCursors, setPagesCursors] = useState([null]); // index 0 = first page (no cursor)
+  const searchDebounceRef = useRef(null);
+
   useEffect(() => {
-    if (activeTab === 'users') fetchUsers();
+    if (activeTab === 'users') {
+      setCurrentPage(1);
+      setPagesCursors([null]);
+      fetchUsers(null);
+    }
     if (activeTab === 'products') fetchProducts();
     if (activeTab === 'providers') fetchProviders();
     if (activeTab === 'orders') fetchOrders();
@@ -50,6 +61,26 @@ const AdminDashboard = () => {
       fetchOrders();
     }
   }, [activeTab]);
+
+  // Re-fetch when role filter changes
+  useEffect(() => {
+    if (activeTab !== 'users') return;
+    setCurrentPage(1);
+    setPagesCursors([null]);
+    fetchUsers(null);
+  }, [userRoleFilter]);
+
+  // Debounced search
+  useEffect(() => {
+    if (activeTab !== 'users') return;
+    if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
+    searchDebounceRef.current = setTimeout(() => {
+      setCurrentPage(1);
+      setPagesCursors([null]);
+      fetchUsers(null);
+    }, 400);
+    return () => clearTimeout(searchDebounceRef.current);
+  }, [userSearch]);
 
   const fetchProviders = async () => {
     setLoadingProviders(true);
@@ -78,18 +109,72 @@ const AdminDashboard = () => {
     }
   };
 
-  const fetchUsers = async () => {
+  const fetchUsers = async (startCursor) => {
     setLoadingUsers(true);
     try {
       const usersCol = collection(db, 'users');
-      const userSnapshot = await getDocs(usersCol);
-      const userList = userSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+      // Build base query constraints
+      const constraints = [orderBy('createdAt', 'desc')];
+      if (userRoleFilter !== 'all') {
+        constraints.unshift(where('role', '==', userRoleFilter));
+      }
+      constraints.push(limit(PAGE_SIZE));
+      if (startCursor) constraints.push(startAfter(startCursor));
+
+      const q = query(usersCol, ...constraints);
+      const snap = await getDocs(q);
+      let userList = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+      // Client-side search filter (search is fast with pagination)
+      if (userSearch.trim()) {
+        const term = userSearch.toLowerCase();
+        userList = userList.filter(u =>
+          u.name?.toLowerCase().includes(term) ||
+          u.email?.toLowerCase().includes(term)
+        );
+      }
+
+      // Store the last doc as cursor for next page
+      const lastDoc = snap.docs[snap.docs.length - 1];
+      setPagesCursors(prev => {
+        const updated = [...prev];
+        updated[currentPage] = lastDoc || null;
+        return updated;
+      });
+
       setPlatformUsers(userList);
+
+      // Get total count (only on first load or filter change)
+      if (!startCursor) {
+        try {
+          const countConstraints = userRoleFilter !== 'all'
+            ? [where('role', '==', userRoleFilter)]
+            : [];
+          const countSnap = await getCountFromServer(query(usersCol, ...countConstraints));
+          setTotalUsers(countSnap.data().count);
+        } catch { setTotalUsers(0); }
+      }
     } catch (err) {
-      console.error("Error fetching users:", err);
+      console.error('Error fetching users:', err);
     } finally {
       setLoadingUsers(false);
     }
+  };
+
+  const handleNextPage = () => {
+    const cursor = pagesCursors[currentPage];
+    if (!cursor) return;
+    const nextPage = currentPage + 1;
+    setCurrentPage(nextPage);
+    fetchUsers(cursor);
+  };
+
+  const handlePrevPage = () => {
+    if (currentPage <= 1) return;
+    const prevPage = currentPage - 1;
+    setCurrentPage(prevPage);
+    fetchUsers(pagesCursors[prevPage - 1] || null);
   };
 
   const fetchOrders = async () => {
@@ -575,120 +660,140 @@ const AdminDashboard = () => {
 
           {activeTab === 'users' && (
             <div className="glass-panel table-container">
-              <p className="admin-hint">Manage all registered users on the platform. You can update roles or completely delete accounts.</p>
-              
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+                <p className="admin-hint" style={{ margin: 0 }}>Manage all registered users. Showing {PAGE_SIZE} per page — handles 100,000+ users efficiently.</p>
+                <span style={{ color: 'var(--text-secondary)', fontSize: '0.82rem', whiteSpace: 'nowrap' }}>
+                  {totalUsers > 0 && `Total: ${totalUsers.toLocaleString()} users`}
+                </span>
+              </div>
+
               {/* Search & Filter Bar */}
-              <div style={{ display: 'flex', gap: '1rem', marginBottom: '1.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
-                <div style={{ position: 'relative', flex: 1, minWidth: '200px' }}>
-                  <Search size={16} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-secondary)' }} />
+              <div style={{ display: 'flex', gap: '0.75rem', marginBottom: '1.25rem', flexWrap: 'wrap', alignItems: 'center' }}>
+                <div style={{ position: 'relative', flex: 1, minWidth: '220px' }}>
+                  <Search size={15} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-secondary)' }} />
                   <input
                     type="text"
-                    placeholder="Search by name or email..."
+                    placeholder="Search name or email on this page..."
                     value={userSearch}
                     onChange={e => setUserSearch(e.target.value)}
-                    style={{ width: '100%', padding: '0.6rem 0.8rem 0.6rem 2rem', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.15)', background: 'var(--surface-color)', color: 'var(--text-primary)', fontSize: '0.9rem', boxSizing: 'border-box' }}
+                    style={{ width: '100%', padding: '0.55rem 0.8rem 0.55rem 2rem', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.15)', background: 'var(--surface-color)', color: 'var(--text-primary)', fontSize: '0.88rem', boxSizing: 'border-box' }}
                   />
                 </div>
-                <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
                   {['all','user','doctor','clinic','organization','vendor'].map(role => (
                     <button
                       key={role}
                       onClick={() => setUserRoleFilter(role)}
                       style={{
-                        padding: '0.4rem 0.9rem',
-                        borderRadius: '20px',
-                        border: '1px solid',
+                        padding: '0.35rem 0.8rem', borderRadius: '20px', border: '1px solid',
                         borderColor: userRoleFilter === role ? 'var(--primary-color)' : 'rgba(255,255,255,0.2)',
                         background: userRoleFilter === role ? 'var(--primary-color)' : 'transparent',
                         color: userRoleFilter === role ? '#000' : 'var(--text-secondary)',
-                        cursor: 'pointer',
-                        fontSize: '0.82rem',
-                        fontWeight: userRoleFilter === role ? 'bold' : 'normal',
-                        textTransform: 'capitalize',
-                        transition: 'all 0.2s'
+                        cursor: 'pointer', fontSize: '0.8rem',
+                        fontWeight: userRoleFilter === role ? '700' : 'normal',
+                        textTransform: 'capitalize', transition: 'all 0.2s'
                       }}
                     >
-                      {role === 'all' ? 'All' : role.charAt(0).toUpperCase() + role.slice(1)}
+                      {role === 'all' ? 'All Users' : role.charAt(0).toUpperCase() + role.slice(1)}
                     </button>
                   ))}
                 </div>
-                <span style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', whiteSpace: 'nowrap' }}>
-                  {platformUsers.filter(u => {
-                    const matchSearch = userSearch === '' || u.name?.toLowerCase().includes(userSearch.toLowerCase()) || u.email?.toLowerCase().includes(userSearch.toLowerCase());
-                    const matchRole = userRoleFilter === 'all' || u.role === userRoleFilter;
-                    return matchSearch && matchRole;
-                  }).length} users
-                </span>
               </div>
 
-              {loadingUsers ? <p style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-secondary)' }}>Loading users...</p> : (
-                <table className="admin-table">
-                  <thead>
-                    <tr>
-                      <th>Name</th>
-                      <th>Email</th>
-                      <th>Role</th>
-                      <th>Status & Details</th>
-                      <th>Joined</th>
-                      <th>Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {platformUsers.filter(u => {
-                        const matchSearch = userSearch === '' || u.name?.toLowerCase().includes(userSearch.toLowerCase()) || u.email?.toLowerCase().includes(userSearch.toLowerCase());
-                        const matchRole = userRoleFilter === 'all' || u.role === userRoleFilter;
-                        return matchSearch && matchRole;
-                      }).map(u => (
-                      <tr key={u.id}>
-                        <td className="fw-bold">{u.name || 'N/A'}</td>
-                        <td>{u.email}</td>
-                        <td>
-                          <select 
-                            value={u.role || 'user'} 
-                            onChange={(e) => handleUpdateRole(u.id, e.target.value)}
-                            style={{ padding: '0.3rem', borderRadius: '4px', border: '1px solid #ccc', background: 'var(--surface-color)', color: 'var(--text-primary)' }}
-                            disabled={u.email === 'yes.manujaya@gmail.com'}
-                          >
-                            <option value="user">User</option>
-                            <option value="doctor">Doctor</option>
-                            <option value="clinic">Clinic</option>
-                            <option value="organization">Organization</option>
-                            <option value="vendor">Vendor</option>
-                            {u.email === 'yes.manujaya@gmail.com' && <option value="admin">Admin</option>}
-                          </select>
-                        </td>
-                        <td>
-                          {u.status === 'pending' ? (
-                            <span style={{ color: 'var(--error-color)', fontWeight: 'bold' }}>Pending</span>
-                          ) : (
-                            <span style={{ color: 'var(--success-color)' }}>Approved</span>
-                          )}
-                          {u.profileDetails && (
-                            <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: '0.25rem' }}>
-                              {u.profileDetails.phone} <br/> {u.profileDetails.address}
-                            </div>
-                          )}
-                        </td>
-                        <td>{u.createdAt ? new Date(u.createdAt).toLocaleDateString() : 'N/A'}</td>
-                        <td>
-                          <div style={{ display: 'flex', gap: '0.5rem' }}>
-                            {u.status === 'pending' && (
-                              <button onClick={() => handleApproveUser(u.id)} className="btn btn-primary" style={{ padding: '0.3rem 0.5rem', fontSize: '0.8rem' }}>Approve</button>
-                            )}
-                            <button 
-                              className="btn btn-outline" 
-                              style={{color: 'white', background: 'var(--error-color)', borderColor: 'var(--error-color)', padding: '0.25rem 0.75rem', fontSize: '0.85rem'}}
-                              onClick={() => handleDeleteUser(u.id)}
+              {loadingUsers ? (
+                <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '3rem', gap: '0.75rem', color: 'var(--text-secondary)' }}>
+                  <div className="spinner spinner-sm" />
+                  <span>Loading users...</span>
+                </div>
+              ) : (
+                <>
+                  <table className="admin-table">
+                    <thead>
+                      <tr>
+                        <th>#</th>
+                        <th>Name</th>
+                        <th>Email</th>
+                        <th>Role</th>
+                        <th>Status</th>
+                        <th>Joined</th>
+                        <th>Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {platformUsers.length === 0 ? (
+                        <tr><td colSpan="7" style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>No users found for this filter.</td></tr>
+                      ) : platformUsers.map((u, idx) => (
+                        <tr key={u.id}>
+                          <td style={{ color: 'var(--text-muted)', fontSize: '0.78rem' }}>{(currentPage - 1) * PAGE_SIZE + idx + 1}</td>
+                          <td className="fw-bold">{u.name || 'N/A'}</td>
+                          <td style={{ fontSize: '0.82rem' }}>{u.email}</td>
+                          <td>
+                            <select
+                              value={u.role || 'user'}
+                              onChange={(e) => handleUpdateRole(u.id, e.target.value)}
+                              style={{ padding: '0.3rem 0.5rem', borderRadius: '4px', border: '1px solid var(--glass-border)', background: 'var(--surface-color)', color: 'var(--text-primary)', fontSize: '0.82rem' }}
                               disabled={u.email === 'yes.manujaya@gmail.com'}
                             >
-                              Delete
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                              <option value="user">User</option>
+                              <option value="doctor">Doctor</option>
+                              <option value="clinic">Clinic</option>
+                              <option value="organization">Organization</option>
+                              <option value="vendor">Vendor</option>
+                              {u.email === 'yes.manujaya@gmail.com' && <option value="admin">Admin</option>}
+                            </select>
+                          </td>
+                          <td>
+                            <span style={{
+                              padding: '0.2rem 0.6rem', borderRadius: '999px', fontSize: '0.73rem', fontWeight: '700',
+                              background: u.status === 'pending' ? 'rgba(255,167,38,0.15)' : 'rgba(76,175,80,0.15)',
+                              color: u.status === 'pending' ? '#ffa726' : 'var(--success-color)'
+                            }}>
+                              {u.status === 'pending' ? 'Pending' : 'Active'}
+                            </span>
+                          </td>
+                          <td style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>{u.createdAt ? new Date(u.createdAt).toLocaleDateString() : 'N/A'}</td>
+                          <td>
+                            <div style={{ display: 'flex', gap: '0.4rem' }}>
+                              {u.status === 'pending' && (
+                                <button onClick={() => handleApproveUser(u.id)} className="btn btn-primary" style={{ padding: '0.25rem 0.5rem', fontSize: '0.78rem' }}>Approve</button>
+                              )}
+                              <button
+                                className="btn btn-danger btn-sm"
+                                onClick={() => handleDeleteUser(u.id)}
+                                disabled={u.email === 'yes.manujaya@gmail.com'}
+                              >
+                                Delete
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+
+                  {/* Pagination Controls */}
+                  <div className="users-pagination">
+                    <button
+                      className="btn btn-ghost btn-sm"
+                      onClick={handlePrevPage}
+                      disabled={currentPage <= 1 || loadingUsers}
+                    >
+                      <ChevronLeft size={16} /> Previous
+                    </button>
+                    <span className="page-info">
+                      Page <strong>{currentPage}</strong>
+                      {totalUsers > 0 && ` of ${Math.ceil(totalUsers / PAGE_SIZE)}`}
+                      {totalUsers > 0 && <span style={{ color: 'var(--text-muted)', marginLeft: '0.5rem' }}>({totalUsers.toLocaleString()} total)</span>}
+                    </span>
+                    <button
+                      className="btn btn-ghost btn-sm"
+                      onClick={handleNextPage}
+                      disabled={!pagesCursors[currentPage] || loadingUsers}
+                    >
+                      Next <ChevronRight size={16} />
+                    </button>
+                  </div>
+                </>
               )}
             </div>
           )}
