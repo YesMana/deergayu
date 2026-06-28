@@ -7,10 +7,11 @@ import { doc, updateDoc, collection, query, where, orderBy, onSnapshot } from 'f
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import './AdminDashboard.css';
 
+
 const API_URL = import.meta.env.VITE_API_URL || '';
 
 const VendorDashboard = () => {
-  const { user } = useAuth();
+  const { user, refreshUser } = useAuth();
   const { success, error } = useToast();
   const [activeTab, setActiveTab] = useState('products');
   const [orders, setOrders] = useState([]);
@@ -59,8 +60,14 @@ const VendorDashboard = () => {
   const handleImageUpload = async (e, isSettings = false) => {
     const file = e.target.files[0];
     if (!file) return;
-    if (file.size > 2 * 1024 * 1024) {
-      error("Image must be less than 2MB");
+    
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      error('Please select a valid image file (JPG, PNG, WEBP, etc.)');
+      return;
+    }
+    if (file.size > 3 * 1024 * 1024) {
+      error('Image must be less than 3MB');
       return;
     }
 
@@ -317,18 +324,29 @@ const VendorDashboard = () => {
   };
 
   const handleSettingsSubmit = async (e) => {
-    e.preventDefault();
+    if (e && e.preventDefault) e.preventDefault();
     setSavingSettings(true);
     try {
       const userRef = doc(db, 'users', user.uid);
+      // Merge image URL into existing profileDetails (preserve address, phone, specialty etc.)
+      const existingDetails = user.profileDetails || {};
       await updateDoc(userRef, {
         name: settingsData.name,
         'profileDetails.profileImageUrl': settingsData.profileImageUrl
       });
-      success("Settings saved successfully!");
+      // Refresh the user in AuthContext so Navbar + profile pic updates immediately
+      if (refreshUser) await refreshUser();
+      // Also update local user object for immediate UI feedback
+      if (user.profileDetails) {
+        user.profileDetails.profileImageUrl = settingsData.profileImageUrl;
+      } else {
+        user.profileDetails = { profileImageUrl: settingsData.profileImageUrl };
+      }
+      user.displayName = settingsData.name;
+      success('Profile picture and name updated successfully!');
     } catch (err) {
-      console.error("Error saving settings:", err);
-      error("Failed to save settings");
+      console.error('Error saving settings:', err);
+      error('Failed to save profile. Please try again.');
     } finally {
       setSavingSettings(false);
     }
@@ -879,44 +897,117 @@ const VendorDashboard = () => {
 
           {activeTab === 'settings' && (
             <div className="glass-panel table-container" style={{maxWidth: '600px'}}>
-              <h2 style={{color: 'var(--text-primary)', marginBottom: '1rem'}}>Profile Settings</h2>
+              <h2 style={{color: 'var(--text-primary)', marginBottom: '0.25rem'}}>Profile Settings</h2>
+              <p style={{color: 'var(--text-secondary)', fontSize: '0.875rem', marginBottom: '1.75rem'}}>Update your name and profile picture. Changes apply immediately.</p>
               
-              <div className="form-group" style={{marginBottom: '1rem'}}>
-                <label style={{color: 'var(--text-secondary)'}}>Email Address</label>
-                <input type="email" defaultValue={user?.email || "vendor@deergayu.lk"} disabled className="form-control" style={{width: '100%', padding: '0.75rem', borderRadius: 'var(--radius-sm)', border: '1px solid rgba(212, 175, 55, 0.3)', background: 'rgba(255, 255, 255, 0.05)', color: 'var(--text-secondary)', opacity: 0.7}} />
+              {/* Profile Picture Section - Prominent */}
+              <div style={{
+                background: 'rgba(76,175,80,0.05)',
+                border: '1px solid rgba(76,175,80,0.15)',
+                borderRadius: 'var(--radius-md)',
+                padding: '1.5rem',
+                marginBottom: '1.25rem',
+                display: 'flex',
+                gap: '1.5rem',
+                alignItems: 'center',
+                flexWrap: 'wrap'
+              }}>
+                {/* Avatar Preview */}
+                <div style={{ position: 'relative', flexShrink: 0 }}>
+                  {settingsData.profileImageUrl ? (
+                    <>
+                      <img
+                        src={settingsData.profileImageUrl}
+                        alt="Profile"
+                        style={{
+                          width: '90px', height: '90px', borderRadius: '50%',
+                          objectFit: 'cover',
+                          border: '3px solid var(--primary-color)',
+                          boxShadow: '0 4px 16px rgba(76,175,80,0.3)'
+                        }}
+                        onError={e => { e.target.style.display='none'; }}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setSettingsData({...settingsData, profileImageUrl: ''})}
+                        style={{
+                          position: 'absolute', top: -4, right: -4,
+                          background: 'var(--error-color)', color: 'white',
+                          border: 'none', borderRadius: '50%',
+                          width: '22px', height: '22px', fontSize: '11px',
+                          cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          boxShadow: '0 2px 8px rgba(0,0,0,0.3)'
+                        }}
+                        title="Remove photo"
+                      >✕</button>
+                    </>
+                  ) : (
+                    <div style={{
+                      width: '90px', height: '90px', borderRadius: '50%',
+                      background: 'linear-gradient(135deg, rgba(76,175,80,0.2), rgba(212,175,55,0.2))',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      border: '2px dashed rgba(76,175,80,0.4)',
+                      fontSize: '2rem', color: 'var(--primary-color)'
+                    }}>
+                      {(user?.displayName || user?.name || '?')[0]?.toUpperCase()}
+                    </div>
+                  )}
+                </div>
+
+                {/* Upload Controls */}
+                <div style={{ flex: 1, minWidth: '200px' }}>
+                  <label style={{ color: 'var(--text-primary)', fontWeight: '700', display: 'block', marginBottom: '0.5rem' }}>
+                    Profile Picture
+                  </label>
+                  <p style={{ color: 'var(--text-secondary)', fontSize: '0.78rem', marginBottom: '0.75rem' }}>
+                    JPG, PNG or WEBP. Max 3MB. Square images work best.
+                  </p>
+                  <label style={{
+                    display: 'inline-flex', alignItems: 'center', gap: '0.4rem',
+                    padding: '0.5rem 1rem',
+                    background: settingsUploadingImage ? 'rgba(76,175,80,0.1)' : 'var(--primary-color)',
+                    color: settingsUploadingImage ? 'var(--primary-color)' : 'white',
+                    borderRadius: 'var(--radius-full)',
+                    cursor: settingsUploadingImage ? 'not-allowed' : 'pointer',
+                    fontSize: '0.85rem', fontWeight: '600',
+                    border: '1px solid var(--primary-color)',
+                    transition: 'all 0.2s'
+                  }}>
+                    {settingsUploadingImage ? (
+                      <><div className="spinner spinner-sm" style={{width:'14px',height:'14px',border:'2px solid var(--primary-color)',borderTopColor:'transparent'}}/> Uploading...</>
+                    ) : (
+                      <>📷 {settingsData.profileImageUrl ? 'Change Photo' : 'Upload Photo'}</>
+                    )}
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) => handleImageUpload(e, true)}
+                      disabled={settingsUploadingImage}
+                      style={{ display: 'none' }}
+                    />
+                  </label>
+                </div>
               </div>
 
               <div className="form-group" style={{marginBottom: '1rem'}}>
+                <label style={{color: 'var(--text-secondary)'}}>Email Address</label>
+                <input type="email" defaultValue={user?.email || ''} disabled className="form-control" style={{width: '100%', padding: '0.75rem', borderRadius: 'var(--radius-sm)', border: '1px solid rgba(212, 175, 55, 0.3)', background: 'rgba(255, 255, 255, 0.05)', color: 'var(--text-secondary)', opacity: 0.7}} />
+              </div>
+
+              <div className="form-group" style={{marginBottom: '1.5rem'}}>
                 <label style={{color: 'var(--text-secondary)'}}>Display Name</label>
                 <input type="text" value={settingsData.name} onChange={e => setSettingsData({...settingsData, name: e.target.value})} className="form-control" style={{width: '100%', padding: '0.75rem', borderRadius: 'var(--radius-sm)', border: '1px solid rgba(212, 175, 55, 0.3)', background: 'rgba(255, 255, 255, 0.05)', color: 'var(--text-primary)'}} />
               </div>
 
-              <div className="form-group" style={{marginBottom: '1rem'}}>
-                <label style={{color: 'var(--text-secondary)'}}>Profile Picture</label>
-                <div style={{display: 'flex', gap: '1rem', alignItems: 'center'}}>
-                  {settingsData.profileImageUrl ? (
-                    <div style={{ position: 'relative' }}>
-                      <img src={settingsData.profileImageUrl} alt="Profile" style={{width: '50px', height: '50px', borderRadius: '50%', objectFit: 'cover', border: '2px solid var(--primary-color)'}} onError={e => e.target.style.display='none'} />
-                      <button type="button" onClick={() => setSettingsData({...settingsData, profileImageUrl: ''})} style={{ position: 'absolute', top: '-5px', right: '-5px', background: 'var(--error-color)', color: 'white', border: 'none', borderRadius: '50%', width: '18px', height: '18px', fontSize: '10px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }} title="Remove photo">✕</button>
-                    </div>
-                  ) : (
-                    <div style={{width: '50px', height: '50px', borderRadius: '50%', background: 'var(--surface-color)', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px dashed var(--border-color)'}}>
-                      <span style={{fontSize: '0.8rem', color: 'var(--text-secondary)'}}>No img</span>
-                    </div>
-                  )}
-                  <input type="file" accept="image/*" onChange={(e) => handleImageUpload(e, true)} disabled={settingsUploadingImage} className="form-control" style={{flex: 1, padding: '0.5rem', borderRadius: 'var(--radius-sm)', border: '1px solid rgba(212, 175, 55, 0.3)', background: 'rgba(255, 255, 255, 0.05)', color: 'var(--text-primary)'}} />
-                </div>
-                {settingsUploadingImage && <small style={{color: 'var(--primary-color)', marginTop: '0.5rem', display: 'block'}}>Uploading image...</small>}
-              </div>
-
-              <div style={{display: 'flex', gap: '1rem', marginTop: '2rem'}}>
-                <button className="btn btn-primary" onClick={handleSettingsSubmit} disabled={savingSettings}>
-                  {savingSettings ? 'Saving...' : 'Save Profile'}
+              <div style={{display: 'flex', gap: '1rem', marginTop: '0.5rem'}}>
+                <button className="btn btn-primary" onClick={handleSettingsSubmit} disabled={savingSettings || settingsUploadingImage}>
+                  {savingSettings ? <><div className="spinner spinner-sm" style={{width:'14px',height:'14px',border:'2px solid rgba(255,255,255,0.4)',borderTopColor:'white',display:'inline-block',marginRight:'0.4rem'}}/> Saving...</> : '✓ Save Changes'}
                 </button>
                 <button className="btn btn-outline" style={{borderColor: 'var(--error-color)', color: 'var(--error-color)', marginLeft: 'auto'}} onClick={() => { localStorage.clear(); window.location.href = '/'; }}>Logout</button>
               </div>
             </div>
           )}
+
         </div>
       </main>
     </div>

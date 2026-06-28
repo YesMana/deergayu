@@ -82,6 +82,28 @@ export const AuthProvider = ({ children }) => {
     return signOut(auth);
   };
 
+  // Call this after updating profileDetails in Firestore
+  // to immediately refresh user state across all components
+  const refreshUser = async () => {
+    const currentUser = auth.currentUser;
+    if (!currentUser) return;
+    try {
+      const userDoc = await getDoc(doc(db, 'users', currentUser.uid));
+      if (userDoc.exists()) {
+        const data = userDoc.data();
+        currentUser.role = data.role || 'user';
+        currentUser.status = data.status || 'approved';
+        currentUser.displayName = data.name || currentUser.displayName;
+        currentUser.name = data.name || currentUser.displayName;
+        currentUser.profileDetails = data.profileDetails || null;
+      }
+      // Force React re-render by creating a new object reference
+      setUser({ ...currentUser });
+    } catch (e) {
+      console.error('Error refreshing user:', e);
+    }
+  };
+
   return (
     <AuthContext.Provider value={{ 
       user, 
@@ -90,7 +112,8 @@ export const AuthProvider = ({ children }) => {
       signupWithEmail, 
       loginWithGoogle, 
       resetPassword, 
-      logout 
+      logout,
+      refreshUser
     }}>
       {!loading && children}
     </AuthContext.Provider>
