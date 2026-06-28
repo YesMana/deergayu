@@ -22,7 +22,9 @@ const VendorDashboard = () => {
   const [loadingAppointments, setLoadingAppointments] = useState(false);
   
   const [showAddProductModal, setShowAddProductModal] = useState(false);
-  const [newProduct, setNewProduct] = useState({ name: '', category: 'Medicine', basePrice: 0, imageUrl: '', description: '' });
+  const [newProduct, setNewProduct] = useState({ name: '', category: 'Medicine', basePrice: 0, imageUrl: '', images: [], description: '' });
+  const [productImages, setProductImages] = useState([null, null, null, null]); // up to 4 slots
+  const [uploadingSlot, setUploadingSlot] = useState(null); // which slot is uploading (0-3)
   const [addingProduct, setAddingProduct] = useState(false);
 
   const [schedule, setSchedule] = useState({
@@ -235,11 +237,60 @@ const VendorDashboard = () => {
     }
   };
 
-  const calculateSitePrice = (basePrice) => {
-    const price = Number(basePrice) || 0;
+  const calculateSitePrice = (price) => {
     if (price === 0) return 0;
     const commission = Math.max(300, price * 0.10);
     return price + commission;
+  };
+
+  // Upload one product image to a specific slot (0-3)
+  const handleProductImageUpload = async (e, slotIndex) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      error('Please select a valid image file (JPG, PNG, WEBP)');
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      error('Each image must be less than 5MB');
+      return;
+    }
+    setUploadingSlot(slotIndex);
+    try {
+      const storageRef = ref(storage, `productImages/${user.uid}_${Date.now()}_slot${slotIndex}_${file.name}`);
+      const snapshot = await uploadBytes(storageRef, file);
+      const downloadURL = await getDownloadURL(snapshot.ref);
+      
+      const updated = [...productImages];
+      updated[slotIndex] = downloadURL;
+      setProductImages(updated);
+      
+      // First image becomes the main imageUrl
+      const validUrls = updated.filter(Boolean);
+      setNewProduct(prev => ({
+        ...prev,
+        imageUrl: validUrls[0] || '',
+        images: validUrls
+      }));
+      success(`Photo ${slotIndex + 1} uploaded!`);
+    } catch (err) {
+      console.error('Product image upload error:', err);
+      error('Failed to upload image. Check Firebase Storage rules.');
+    } finally {
+      setUploadingSlot(null);
+    }
+  };
+
+  const removeProductImage = (slotIndex) => {
+    const updated = [...productImages];
+    updated[slotIndex] = null;
+    setProductImages(updated);
+    const validUrls = updated.filter(Boolean);
+    setNewProduct(prev => ({
+      ...prev,
+      imageUrl: validUrls[0] || '',
+      images: validUrls
+    }));
   };
 
   const handleAddProduct = async (e) => {
@@ -262,6 +313,7 @@ const VendorDashboard = () => {
           basePrice: Number(newProduct.basePrice),
           price: sitePrice,
           imageUrl: newProduct.imageUrl,
+          images: newProduct.images || [],
           description: newProduct.description
         })
       });
@@ -270,7 +322,8 @@ const VendorDashboard = () => {
         const data = await res.json();
         success("Product submitted for approval!");
         setShowAddProductModal(false);
-        setNewProduct({ name: '', category: 'Medicine', basePrice: 0, imageUrl: '', description: '' });
+        setNewProduct({ name: '', category: 'Medicine', basePrice: 0, imageUrl: '', images: [], description: '' });
+        setProductImages([null, null, null, null]);
         fetchProducts();
       } else {
         const errData = await res.json().catch(() => ({}));
@@ -653,7 +706,7 @@ const VendorDashboard = () => {
 
           {showAddProductModal && (
             <div className="modal-overlay" style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', background: 'rgba(0,0,0,0.8)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000 }}>
-              <div className="modal-content glass-panel" style={{ padding: '2rem', maxWidth: '500px', width: '90%' }}>
+              <div className="modal-content glass-panel" style={{ padding: '2rem', maxWidth: '560px', width: '92%', maxHeight: '90vh', overflowY: 'auto' }}>
                 <h3 style={{ marginBottom: '1rem', color: 'var(--secondary-color)' }}>Add New Product</h3>
                 <p style={{ marginBottom: '1.5rem', color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
                   Please note: The platform takes a commission of 10% or Rs. 300 (whichever is higher) to cover operational costs. 
@@ -686,16 +739,81 @@ const VendorDashboard = () => {
                       <option value="Equipment">Medical Equipment</option>
                     </select>
                   </div>
+                  {/* ── MULTI-PHOTO UPLOAD (up to 4) ── */}
                   <div className="form-group">
-                    <label>Image URL (Optional)</label>
-                    <input 
-                      type="url" 
-                      placeholder="https://example.com/image.jpg"
-                      value={newProduct.imageUrl || ''} 
-                      onChange={e => setNewProduct({...newProduct, imageUrl: e.target.value})} 
-                      className="form-control"
-                      style={{ width: '100%', padding: '0.8rem', borderRadius: '4px', background: 'var(--surface-color)', color: 'var(--text-primary)' }}
-                    />
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '0.6rem' }}>
+                      Product Photos
+                      <span style={{ fontSize: '0.73rem', fontWeight: '400', color: 'var(--text-muted)', background: 'rgba(76,175,80,0.1)', padding: '0.15rem 0.5rem', borderRadius: '999px' }}>Up to 4 photos</span>
+                      {newProduct.images?.length > 0 && <span style={{ fontSize: '0.73rem', color: 'var(--primary-color)', fontWeight: '600' }}>✓ {newProduct.images.length} uploaded</span>}
+                    </label>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.6rem' }}>
+                      {[0, 1, 2, 3].map(slotIndex => {
+                        const imgUrl = productImages[slotIndex];
+                        const isUploading = uploadingSlot === slotIndex;
+                        const isFirst = slotIndex === 0;
+                        return (
+                          <div key={slotIndex} style={{ position: 'relative', aspectRatio: '1', borderRadius: 'var(--radius-sm)', overflow: 'hidden' }}>
+                            {imgUrl ? (
+                              // Filled slot - show image
+                              <>
+                                <img
+                                  src={imgUrl}
+                                  alt={`Product ${slotIndex + 1}`}
+                                  style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                                />
+                                {isFirst && (
+                                  <div style={{ position: 'absolute', top: 4, left: 4, background: 'var(--primary-color)', color: 'white', fontSize: '0.6rem', fontWeight: '700', padding: '0.1rem 0.35rem', borderRadius: '3px' }}>MAIN</div>
+                                )}
+                                <button
+                                  type="button"
+                                  onClick={() => removeProductImage(slotIndex)}
+                                  style={{
+                                    position: 'absolute', top: 4, right: 4,
+                                    background: 'rgba(239,83,80,0.9)', color: 'white',
+                                    border: 'none', borderRadius: '50%',
+                                    width: '22px', height: '22px', cursor: 'pointer',
+                                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                    fontSize: '11px', fontWeight: '700'
+                                  }}
+                                >✕</button>
+                              </>
+                            ) : (
+                              // Empty slot - upload button
+                              <label style={{
+                                display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                                width: '100%', height: '100%', minHeight: '80px',
+                                background: isUploading ? 'rgba(76,175,80,0.08)' : 'rgba(255,255,255,0.04)',
+                                border: `2px dashed ${isFirst ? 'rgba(76,175,80,0.5)' : 'rgba(255,255,255,0.12)'}`,
+                                borderRadius: 'var(--radius-sm)',
+                                cursor: isUploading ? 'wait' : 'pointer',
+                                gap: '0.35rem', transition: 'all 0.2s'
+                              }}>
+                                {isUploading ? (
+                                  <><div className="spinner spinner-sm" style={{width:'20px',height:'20px'}}/><span style={{fontSize:'0.65rem',color:'var(--primary-color)'}}>Uploading...</span></>
+                                ) : (
+                                  <>
+                                    <span style={{ fontSize: '1.4rem', opacity: 0.5 }}>📷</span>
+                                    <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', textAlign: 'center' }}>
+                                      {isFirst ? 'Main Photo' : `Photo ${slotIndex + 1}`}
+                                    </span>
+                                  </>
+                                )}
+                                <input
+                                  type="file"
+                                  accept="image/*"
+                                  onChange={(e) => handleProductImageUpload(e, slotIndex)}
+                                  disabled={isUploading || uploadingSlot !== null}
+                                  style={{ display: 'none' }}
+                                />
+                              </label>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                    <p style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '0.5rem' }}>
+                      First photo is the main display image. JPG, PNG, WEBP. Max 5MB each.
+                    </p>
                   </div>
                   <div className="form-group">
                     <label>Description (Optional)</label>

@@ -19,6 +19,7 @@ const ProductDetail = () => {
   const [product, setProduct] = useState(null);
   const [loading, setLoading] = useState(true);
   const [reviews, setReviews] = useState([]);
+  const [selectedImage, setSelectedImage] = useState(0); // index into images array
   
   // Review form state
   const [rating, setRating] = useState(5);
@@ -126,13 +127,49 @@ const ProductDetail = () => {
 
         <div className="product-detail-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '3rem', marginBottom: '4rem' }}>
           
-          {/* Left: Image */}
-          <div className="product-image-container glass-panel" style={{ padding: '2rem', display: 'flex', justifyContent: 'center', alignItems: 'center', borderRadius: '1rem', background: 'var(--surface-color)' }}>
-            <img 
-              src={product.imageUrl || product.image || "https://images.unsplash.com/photo-1611078516086-6ab28122db63?w=800&q=80"} 
-              alt={product.name} 
-              style={{ width: '100%', maxWidth: '400px', height: 'auto', objectFit: 'contain', borderRadius: '0.5rem' }} 
-            />
+          {/* Left: Image Gallery */}
+          <div className="product-image-container glass-panel" style={{ padding: '1.5rem', borderRadius: '1rem', background: 'var(--surface-color)' }}>
+            {/* Main image */}
+            {(() => {
+              const allImages = [
+                product.imageUrl || product.image,
+                ...(product.images || []).filter(img => img !== product.imageUrl && img !== product.image)
+              ].filter(Boolean);
+              const dedupedImages = [...new Set(allImages)];
+              const mainImg = dedupedImages[selectedImage] || dedupedImages[0] || 'https://images.unsplash.com/photo-1611078516086-6ab28122db63?w=800&q=80';
+              
+              return (
+                <>
+                  <img 
+                    src={mainImg}
+                    alt={product.name} 
+                    style={{ width: '100%', maxWidth: '400px', height: '320px', objectFit: 'cover', borderRadius: '0.5rem', display: 'block', margin: '0 auto' }} 
+                  />
+                  {/* Thumbnails if multiple images */}
+                  {dedupedImages.length > 1 && (
+                    <div style={{ display: 'flex', gap: '0.5rem', marginTop: '1rem', justifyContent: 'center', flexWrap: 'wrap' }}>
+                      {dedupedImages.map((img, i) => (
+                        <button
+                          key={i}
+                          onClick={() => setSelectedImage(i)}
+                          style={{
+                            width: '60px', height: '60px',
+                            borderRadius: '6px', overflow: 'hidden',
+                            border: selectedImage === i ? '2px solid var(--primary-color)' : '2px solid transparent',
+                            padding: 0, cursor: 'pointer',
+                            opacity: selectedImage === i ? 1 : 0.65,
+                            transition: 'all 0.2s',
+                            flexShrink: 0
+                          }}
+                        >
+                          <img src={img} alt={`View ${i + 1}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </>
+              );
+            })()}
           </div>
 
           {/* Right: Info */}
