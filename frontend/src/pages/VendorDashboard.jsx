@@ -23,9 +23,15 @@ const VendorDashboard = () => {
   
   const [showAddProductModal, setShowAddProductModal] = useState(false);
   const [newProduct, setNewProduct] = useState({ name: '', category: 'Medicine', basePrice: 0, imageUrl: '', images: [], description: '' });
-  const [productImages, setProductImages] = useState([null, null, null, null]); // up to 4 slots
-  const [uploadingSlot, setUploadingSlot] = useState(null); // which slot is uploading (0-3)
+  const [productImages, setProductImages] = useState([null, null, null, null]);
+  const [uploadingSlot, setUploadingSlot] = useState(null);
   const [addingProduct, setAddingProduct] = useState(false);
+
+  // Edit product state
+  const [editingProduct, setEditingProduct] = useState(null); // product object being edited
+  const [editImages, setEditImages] = useState([null, null, null, null]);
+  const [editUploadingSlot, setEditUploadingSlot] = useState(null);
+  const [savingEdit, setSavingEdit] = useState(false);
 
   const [schedule, setSchedule] = useState({
     slotDuration: 30,
@@ -243,7 +249,7 @@ const VendorDashboard = () => {
     return price + commission;
   };
 
-  // Upload one product image to a specific slot (0-3)
+  // Upload product image for NEW product slot
   const handleProductImageUpload = async (e, slotIndex) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -260,18 +266,11 @@ const VendorDashboard = () => {
       const storageRef = ref(storage, `productImages/${user.uid}_${Date.now()}_slot${slotIndex}_${file.name}`);
       const snapshot = await uploadBytes(storageRef, file);
       const downloadURL = await getDownloadURL(snapshot.ref);
-      
       const updated = [...productImages];
       updated[slotIndex] = downloadURL;
       setProductImages(updated);
-      
-      // First image becomes the main imageUrl
       const validUrls = updated.filter(Boolean);
-      setNewProduct(prev => ({
-        ...prev,
-        imageUrl: validUrls[0] || '',
-        images: validUrls
-      }));
+      setNewProduct(prev => ({ ...prev, imageUrl: validUrls[0] || '', images: validUrls }));
       success(`Photo ${slotIndex + 1} uploaded!`);
     } catch (err) {
       console.error('Product image upload error:', err);
@@ -286,11 +285,74 @@ const VendorDashboard = () => {
     updated[slotIndex] = null;
     setProductImages(updated);
     const validUrls = updated.filter(Boolean);
-    setNewProduct(prev => ({
-      ...prev,
-      imageUrl: validUrls[0] || '',
-      images: validUrls
-    }));
+    setNewProduct(prev => ({ ...prev, imageUrl: validUrls[0] || '', images: validUrls }));
+  };
+
+  // Upload product image for EDIT product slot
+  const handleEditImageUpload = async (e, slotIndex) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/')) { error('Please select a valid image file'); return; }
+    if (file.size > 5 * 1024 * 1024) { error('Each image must be less than 5MB'); return; }
+    setEditUploadingSlot(slotIndex);
+    try {
+      const storageRef = ref(storage, `productImages/${user.uid}_edit_${Date.now()}_slot${slotIndex}_${file.name}`);
+      const snapshot = await uploadBytes(storageRef, file);
+      const downloadURL = await getDownloadURL(snapshot.ref);
+      const updated = [...editImages];
+      updated[slotIndex] = downloadURL;
+      setEditImages(updated);
+      const validUrls = updated.filter(Boolean);
+      setEditingProduct(prev => ({ ...prev, imageUrl: validUrls[0] || '', images: validUrls }));
+      success(`Photo ${slotIndex + 1} updated!`);
+    } catch (err) {
+      error('Failed to upload image.');
+    } finally {
+      setEditUploadingSlot(null);
+    }
+  };
+
+  const removeEditImage = (slotIndex) => {
+    const updated = [...editImages];
+    updated[slotIndex] = null;
+    setEditImages(updated);
+    const validUrls = updated.filter(Boolean);
+    setEditingProduct(prev => ({ ...prev, imageUrl: validUrls[0] || '', images: validUrls }));
+  };
+
+  // Open edit modal and pre-fill data
+  const openEditModal = (product) => {
+    setEditingProduct({ ...product });
+    // Pre-fill editImages from product's images array
+    const imgs = product.images || (product.imageUrl ? [product.imageUrl] : []);
+    const slots = [imgs[0] || null, imgs[1] || null, imgs[2] || null, imgs[3] || null];
+    setEditImages(slots);
+  };
+
+  // Save edited product to Firestore directly (pending re-approval not needed for minor edits)
+  const handleSaveEdit = async (e) => {
+    if (e && e.preventDefault) e.preventDefault();
+    if (!editingProduct) return;
+    setSavingEdit(true);
+    try {
+      const { updateDoc, doc: firestoreDoc } = await import('firebase/firestore');
+      await updateDoc(firestoreDoc(db, 'products', editingProduct.id), {
+        name: editingProduct.name,
+        category: editingProduct.category,
+        description: editingProduct.description || '',
+        imageUrl: editingProduct.imageUrl || '',
+        images: editingProduct.images || [],
+        basePrice: Number(editingProduct.basePrice),
+      });
+      success('Product updated successfully!');
+      setEditingProduct(null);
+      fetchProducts();
+    } catch (err) {
+      console.error('Edit product error:', err);
+      error('Failed to save changes.');
+    } finally {
+      setSavingEdit(false);
+    }
   };
 
   const handleAddProduct = async (e) => {
@@ -657,6 +719,7 @@ const VendorDashboard = () => {
                 <table className="admin-table">
                   <thead>
                     <tr>
+                      <th style={{width:'60px'}}></th>
                       <th>Product Name</th>
                       <th>Category</th>
                       <th>Price</th>
@@ -667,6 +730,18 @@ const VendorDashboard = () => {
                   <tbody>
                     {vendorProducts.map(p => (
                       <tr key={p.id}>
+                        <td>
+                          {(p.imageUrl || (p.images && p.images[0])) ? (
+                            <img
+                              src={p.imageUrl || p.images[0]}
+                              alt={p.name}
+                              style={{ width: '48px', height: '48px', objectFit: 'cover', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.1)' }}
+                              onError={e => { e.target.style.display = 'none'; }}
+                            />
+                          ) : (
+                            <div style={{ width: '48px', height: '48px', borderRadius: '6px', background: 'rgba(255,255,255,0.05)', border: '1px dashed rgba(255,255,255,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.2rem' }}>📦</div>
+                          )}
+                        </td>
                         <td className="fw-bold">{p.name}</td>
                         <td>{p.category}</td>
                         <td>Rs. {p.price} <br/><small style={{color: 'var(--text-secondary)'}}>(You get Rs. {p.basePrice})</small></td>
@@ -681,7 +756,11 @@ const VendorDashboard = () => {
                         </td>
                         <td>
                           <div style={{ display: 'flex', gap: '0.5rem' }}>
-                            <button className="btn btn-outline" style={{padding: '0.25rem 0.75rem', fontSize: '0.85rem'}}>Edit</button>
+                            <button
+                              className="btn btn-outline"
+                              style={{padding: '0.25rem 0.75rem', fontSize: '0.85rem'}}
+                              onClick={() => openEditModal(p)}
+                            >✏️ Edit</button>
                             <button 
                               onClick={() => handleDeleteProduct(p.id)} 
                               className="btn btn-outline" 
@@ -859,6 +938,132 @@ const VendorDashboard = () => {
                   <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
                     <button disabled={addingProduct} type="submit" className="btn btn-primary" style={{ flex: 1 }}>{addingProduct ? 'Submitting...' : 'Submit for Approval'}</button>
                     <button type="button" onClick={() => setShowAddProductModal(false)} className="btn btn-outline" style={{ flex: 1 }}>Cancel</button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
+
+          {/* ── EDIT PRODUCT MODAL ── */}
+          {editingProduct && (
+            <div className="modal-overlay" style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', background: 'rgba(0,0,0,0.85)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000 }}>
+              <div className="modal-content glass-panel" style={{ padding: '2rem', maxWidth: '560px', width: '92%', maxHeight: '90vh', overflowY: 'auto' }}>
+                <h3 style={{ marginBottom: '0.25rem', color: 'var(--secondary-color)' }}>✏️ Edit Product</h3>
+                <p style={{ marginBottom: '1.5rem', color: 'var(--text-secondary)', fontSize: '0.85rem' }}>Changes are saved immediately. Name/description edits don't need re-approval.</p>
+
+                <form onSubmit={handleSaveEdit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                  {/* Product Name */}
+                  <div className="form-group">
+                    <label>Product Name</label>
+                    <input
+                      type="text"
+                      value={editingProduct.name}
+                      onChange={e => setEditingProduct({...editingProduct, name: e.target.value})}
+                      required
+                      className="form-control"
+                      style={{ width: '100%', padding: '0.8rem', borderRadius: '4px', background: 'var(--surface-color)', color: 'var(--text-primary)' }}
+                    />
+                  </div>
+
+                  {/* Category */}
+                  <div className="form-group">
+                    <label>Category</label>
+                    <select
+                      value={editingProduct.category}
+                      onChange={e => setEditingProduct({...editingProduct, category: e.target.value})}
+                      className="form-control"
+                      style={{ width: '100%', padding: '0.8rem', borderRadius: '4px', background: 'var(--surface-color)', color: 'var(--text-primary)' }}
+                    >
+                      <option value="Medicine">Medicine / Supplements</option>
+                      <option value="Hair Care">Hair Care</option>
+                      <option value="Skin Care">Skin Care</option>
+                      <option value="Pain Relief">Pain Relief Oils</option>
+                      <option value="Equipment">Medical Equipment</option>
+                    </select>
+                  </div>
+
+                  {/* Photos */}
+                  <div className="form-group">
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '0.6rem' }}>
+                      Product Photos
+                      <span style={{ fontSize: '0.73rem', fontWeight: '400', color: 'var(--text-muted)', background: 'rgba(76,175,80,0.1)', padding: '0.15rem 0.5rem', borderRadius: '999px' }}>Up to 4 photos</span>
+                    </label>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.6rem' }}>
+                      {[0, 1, 2, 3].map(slotIndex => {
+                        const imgUrl = editImages[slotIndex];
+                        const isUploading = editUploadingSlot === slotIndex;
+                        const isFirst = slotIndex === 0;
+                        return (
+                          <div key={slotIndex} style={{ position: 'relative', aspectRatio: '1', borderRadius: 'var(--radius-sm)', overflow: 'hidden' }}>
+                            {imgUrl ? (
+                              <>
+                                <img src={imgUrl} alt={`Photo ${slotIndex + 1}`} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                                {isFirst && <div style={{ position: 'absolute', top: 4, left: 4, background: 'var(--primary-color)', color: 'white', fontSize: '0.6rem', fontWeight: '700', padding: '0.1rem 0.35rem', borderRadius: '3px' }}>MAIN</div>}
+                                <button type="button" onClick={() => removeEditImage(slotIndex)} style={{ position: 'absolute', top: 4, right: 4, background: 'rgba(239,83,80,0.9)', color: 'white', border: 'none', borderRadius: '50%', width: '22px', height: '22px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', fontWeight: '700' }}>✕</button>
+                              </>
+                            ) : (
+                              <label style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', width: '100%', height: '100%', minHeight: '80px', background: isUploading ? 'rgba(76,175,80,0.08)' : 'rgba(255,255,255,0.04)', border: `2px dashed ${isFirst ? 'rgba(76,175,80,0.5)' : 'rgba(255,255,255,0.12)'}`, borderRadius: 'var(--radius-sm)', cursor: isUploading ? 'wait' : 'pointer', gap: '0.35rem' }}>
+                                {isUploading ? (
+                                  <><div className="spinner spinner-sm" style={{width:'20px',height:'20px'}}/><span style={{fontSize:'0.65rem',color:'var(--primary-color)'}}>Uploading...</span></>
+                                ) : (
+                                  <><span style={{ fontSize: '1.4rem', opacity: 0.5 }}>📷</span><span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', textAlign: 'center' }}>{isFirst ? 'Main Photo' : `Photo ${slotIndex + 1}`}</span></>
+                                )}
+                                <input type="file" accept="image/*" onChange={(e) => handleEditImageUpload(e, slotIndex)} disabled={isUploading || editUploadingSlot !== null} style={{ display: 'none' }} />
+                              </label>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                    <p style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '0.5rem' }}>Click any slot to replace. JPG, PNG, WEBP. Max 5MB each.</p>
+                  </div>
+
+                  {/* Description */}
+                  <div className="form-group">
+                    <label>Description (Optional)</label>
+                    <textarea
+                      placeholder="Product description..."
+                      value={editingProduct.description || ''}
+                      onChange={e => setEditingProduct({...editingProduct, description: e.target.value})}
+                      className="form-control"
+                      rows="3"
+                      style={{ width: '100%', padding: '0.8rem', borderRadius: '4px', background: 'var(--surface-color)', color: 'var(--text-primary)' }}
+                    ></textarea>
+                  </div>
+
+                  {/* Base Price */}
+                  <div className="form-group">
+                    <label>Your Selling Price (Base Price Rs.)</label>
+                    <input
+                      type="number"
+                      min="1"
+                      value={editingProduct.basePrice || ''}
+                      onChange={e => setEditingProduct({...editingProduct, basePrice: e.target.value})}
+                      required
+                      className="form-control"
+                      style={{ width: '100%', padding: '0.8rem', borderRadius: '4px', background: 'var(--surface-color)', color: 'var(--text-primary)' }}
+                    />
+                  </div>
+
+                  {editingProduct.basePrice > 0 && (
+                    <div style={{ padding: '1rem', background: 'rgba(212,175,55,0.1)', borderRadius: '8px', border: '1px dashed var(--primary-color)', fontSize: '0.9rem' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-secondary)', marginBottom: '0.4rem' }}>
+                        <span>Your Price:</span><span>Rs. {Number(editingProduct.basePrice)}</span>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--error-color)', marginBottom: '0.4rem' }}>
+                        <span>Commission:</span><span>+ Rs. {calculateSitePrice(editingProduct.basePrice) - Number(editingProduct.basePrice)}</span>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 'bold', color: 'var(--primary-color)', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '0.4rem' }}>
+                        <span>Final Site Price:</span><span>Rs. {calculateSitePrice(editingProduct.basePrice)}</span>
+                      </div>
+                    </div>
+                  )}
+
+                  <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
+                    <button disabled={savingEdit || editUploadingSlot !== null} type="submit" className="btn btn-primary" style={{ flex: 1 }}>
+                      {savingEdit ? 'Saving...' : '✓ Save Changes'}
+                    </button>
+                    <button type="button" onClick={() => setEditingProduct(null)} className="btn btn-outline" style={{ flex: 1 }}>Cancel</button>
                   </div>
                 </form>
               </div>
