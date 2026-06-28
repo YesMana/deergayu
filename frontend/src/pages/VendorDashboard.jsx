@@ -315,9 +315,11 @@ const VendorDashboard = () => {
   };
 
   const calculateSitePrice = (price) => {
-    if (price === 0) return 0;
-    const commission = Math.max(300, price * 0.10);
-    return price + commission;
+    const base = Number(price) || 0;
+    if (base === 0) return 0;
+    const commission = Math.max(300, base * 0.10);
+    // Return site price rounded to 1 decimal place
+    return Number((base + commission).toFixed(1));
   };
 
   // Upload product image for NEW product slot
@@ -998,7 +1000,7 @@ const VendorDashboard = () => {
                       </div>
                       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem', color: 'var(--error-color)', fontSize: '0.9rem' }}>
                         <span>Platform Commission:</span>
-                        <span>+ Rs. {calculateSitePrice(newProduct.basePrice) - Number(newProduct.basePrice)}</span>
+                        <span>+ Rs. {(calculateSitePrice(newProduct.basePrice) - Number(newProduct.basePrice)).toFixed(1)}</span>
                       </div>
                       <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 'bold', color: 'var(--primary-color)', fontSize: '1.1rem', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '0.5rem' }}>
                         <span>Final Site Price:</span>
@@ -1123,7 +1125,7 @@ const VendorDashboard = () => {
                         <span>Your Price:</span><span>Rs. {Number(editingProduct.basePrice)}</span>
                       </div>
                       <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--error-color)', marginBottom: '0.4rem' }}>
-                        <span>Commission:</span><span>+ Rs. {calculateSitePrice(editingProduct.basePrice) - Number(editingProduct.basePrice)}</span>
+                        <span>Commission:</span><span>+ Rs. {(calculateSitePrice(editingProduct.basePrice) - Number(editingProduct.basePrice)).toFixed(1)}</span>
                       </div>
                       <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 'bold', color: 'var(--primary-color)', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '0.4rem' }}>
                         <span>Final Site Price:</span><span>Rs. {calculateSitePrice(editingProduct.basePrice)}</span>
