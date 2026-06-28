@@ -14,70 +14,89 @@ const API_URL = import.meta.env.VITE_API_URL || '';
 // Fallback guarantees it resolves with the original file if anything fails
 const compressImage = (file, maxWidth = 800, maxHeight = 800, quality = 0.75) => {
   return new Promise((resolve) => {
+    let resolved = false;
+    
+    // Safety Timeout: resolve with original file if compression takes > 4 seconds
+    const timeout = setTimeout(() => {
+      if (!resolved) {
+        resolved = true;
+        console.warn('Compression timeout, using original file');
+        resolve(file);
+      }
+    }, 4000);
+
+    let objectUrl = null;
     try {
-      console.log(`Starting compression for: ${file.name} (${(file.size / 1024 / 1024).toFixed(2)} MB)`);
-      const reader = new FileReader();
-      reader.readAsDataURL(file);
-      reader.onload = (event) => {
-        const img = new Image();
-        img.src = event.target.result;
-        img.onload = () => {
-          try {
-            const canvas = document.createElement('canvas');
-            let width = img.width;
-            let height = img.height;
+      objectUrl = URL.createObjectURL(file);
+      const img = new Image();
+      img.src = objectUrl;
+      img.onload = () => {
+        try {
+          const canvas = document.createElement('canvas');
+          let width = img.width;
+          let height = img.height;
 
-            if (width > height) {
-              if (width > maxWidth) {
-                height = Math.round((height * maxWidth) / width);
-                width = maxWidth;
-              }
-            } else {
-              if (height > maxHeight) {
-                width = Math.round((width * maxHeight) / height);
-                height = maxHeight;
-              }
+          if (width > height) {
+            if (width > maxWidth) {
+              height = Math.round((height * maxWidth) / width);
+              width = maxWidth;
             }
+          } else {
+            if (height > maxHeight) {
+              width = Math.round((width * maxHeight) / height);
+              height = maxHeight;
+            }
+          }
 
-            canvas.width = width;
-            canvas.height = height;
-            const ctx = canvas.getContext('2d');
-            ctx.drawImage(img, 0, 0, width, height);
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, width, height);
 
-            canvas.toBlob(
-              (blob) => {
-                if (!blob) {
-                  console.warn('Canvas toBlob returned null, using original file');
-                  resolve(file);
-                  return;
-                }
-                const compressedFile = new File([blob], file.name.replace(/\.[^/.]+$/, "") + ".webp", {
-                  type: 'image/webp',
-                  lastModified: Date.now()
-                });
-                console.log(`Compression successful: ${compressedFile.name} (${(compressedFile.size / 1024).toFixed(1)} KB)`);
-                resolve(compressedFile);
-              },
-              'image/webp',
-              quality
-            );
-          } catch (e) {
-            console.error('Error during canvas compression, using original file:', e);
+          canvas.toBlob(
+            (blob) => {
+              if (objectUrl) URL.revokeObjectURL(objectUrl);
+              clearTimeout(timeout);
+              if (resolved) return;
+              resolved = true;
+
+              if (!blob) {
+                console.warn('Canvas toBlob returned null, using original file');
+                resolve(file);
+                return;
+              }
+              // Return raw Blob with type set to 'image/webp' for universal Firebase compatibility
+              const compressedBlob = new Blob([blob], { type: 'image/webp' });
+              console.log(`Compression successful: ${(compressedBlob.size / 1024).toFixed(1)} KB`);
+              resolve(compressedBlob);
+            },
+            'image/webp',
+            quality
+          );
+        } catch (e) {
+          if (objectUrl) URL.revokeObjectURL(objectUrl);
+          clearTimeout(timeout);
+          if (!resolved) {
+            resolved = true;
             resolve(file);
           }
-        };
-        img.onerror = () => {
-          console.warn('Failed to load image element, using original file');
-          resolve(file);
-        };
+        }
       };
-      reader.onerror = () => {
-        console.warn('FileReader failed, using original file');
-        resolve(file);
+      img.onerror = () => {
+        if (objectUrl) URL.revokeObjectURL(objectUrl);
+        clearTimeout(timeout);
+        if (!resolved) {
+          resolved = true;
+          resolve(file);
+        }
       };
     } catch (err) {
-      console.error('FileReader creation failed, using original file:', err);
-      resolve(file);
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+      clearTimeout(timeout);
+      if (!resolved) {
+        resolved = true;
+        resolve(file);
+      }
     }
   });
 };
@@ -164,7 +183,7 @@ const VendorDashboard = () => {
       success("Image uploaded successfully!");
     } catch (err) {
       console.error("Error uploading image:", err);
-      error("Failed to upload image");
+      error(`Upload failed: ${err.message || err}`);
     } finally {
       isSettings ? setSettingsUploadingImage(false) : setUploadingImage(false);
     }
@@ -346,7 +365,7 @@ const VendorDashboard = () => {
       success(`Photo ${slotIndex + 1} uploaded successfully!`);
     } catch (err) {
       console.error('Product image upload error:', err);
-      error('Failed to upload image. Please try again.');
+      error(`Upload failed: ${err.message || err}`);
     } finally {
       setUploadingSlot(null);
     }
@@ -380,7 +399,8 @@ const VendorDashboard = () => {
       setEditingProduct(prev => ({ ...prev, imageUrl: validUrls[0] || '', images: validUrls }));
       success(`Photo ${slotIndex + 1} updated successfully!`);
     } catch (err) {
-      error('Failed to upload image.');
+      console.error('Edit product image upload error:', err);
+      error(`Upload failed: ${err.message || err}`);
     } finally {
       setEditUploadingSlot(null);
     }
