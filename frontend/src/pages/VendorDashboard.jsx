@@ -409,6 +409,7 @@ const VendorDashboard = () => {
     if (!editingProduct) return;
     setSavingEdit(true);
     try {
+      const sitePrice = calculateSitePrice(editingProduct.basePrice);
       const { updateDoc, doc: firestoreDoc } = await import('firebase/firestore');
       await updateDoc(firestoreDoc(db, 'products', editingProduct.id), {
         name: editingProduct.name,
@@ -417,6 +418,7 @@ const VendorDashboard = () => {
         imageUrl: editingProduct.imageUrl || '',
         images: editingProduct.images || [],
         basePrice: Number(editingProduct.basePrice),
+        price: sitePrice, // Recalculate and update the site price shown to customers!
       });
       success('Product updated successfully!');
       setEditingProduct(null);
