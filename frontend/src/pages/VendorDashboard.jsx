@@ -11,54 +11,74 @@ import './AdminDashboard.css';
 const API_URL = import.meta.env.VITE_API_URL || '';
 
 // Client-side image compression utility to convert any image to lightweight WebP
+// Fallback guarantees it resolves with the original file if anything fails
 const compressImage = (file, maxWidth = 800, maxHeight = 800, quality = 0.75) => {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.readAsDataURL(file);
-    reader.onload = (event) => {
-      const img = new Image();
-      img.src = event.target.result;
-      img.onload = () => {
-        const canvas = document.createElement('canvas');
-        let width = img.width;
-        let height = img.height;
+  return new Promise((resolve) => {
+    try {
+      console.log(`Starting compression for: ${file.name} (${(file.size / 1024 / 1024).toFixed(2)} MB)`);
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = (event) => {
+        const img = new Image();
+        img.src = event.target.result;
+        img.onload = () => {
+          try {
+            const canvas = document.createElement('canvas');
+            let width = img.width;
+            let height = img.height;
 
-        if (width > height) {
-          if (width > maxWidth) {
-            height = Math.round((height * maxWidth) / width);
-            width = maxWidth;
-          }
-        } else {
-          if (height > maxHeight) {
-            width = Math.round((width * maxHeight) / height);
-            height = maxHeight;
-          }
-        }
-
-        canvas.width = width;
-        canvas.height = height;
-        const ctx = canvas.getContext('2d');
-        ctx.drawImage(img, 0, 0, width, height);
-
-        canvas.toBlob(
-          (blob) => {
-            if (!blob) {
-              reject(new Error('Canvas compression failed'));
-              return;
+            if (width > height) {
+              if (width > maxWidth) {
+                height = Math.round((height * maxWidth) / width);
+                width = maxWidth;
+              }
+            } else {
+              if (height > maxHeight) {
+                width = Math.round((width * maxHeight) / height);
+                height = maxHeight;
+              }
             }
-            const compressedFile = new File([blob], file.name.replace(/\.[^/.]+$/, "") + ".webp", {
-              type: 'image/webp',
-              lastModified: Date.now()
-            });
-            resolve(compressedFile);
-          },
-          'image/webp',
-          quality
-        );
+
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0, width, height);
+
+            canvas.toBlob(
+              (blob) => {
+                if (!blob) {
+                  console.warn('Canvas toBlob returned null, using original file');
+                  resolve(file);
+                  return;
+                }
+                const compressedFile = new File([blob], file.name.replace(/\.[^/.]+$/, "") + ".webp", {
+                  type: 'image/webp',
+                  lastModified: Date.now()
+                });
+                console.log(`Compression successful: ${compressedFile.name} (${(compressedFile.size / 1024).toFixed(1)} KB)`);
+                resolve(compressedFile);
+              },
+              'image/webp',
+              quality
+            );
+          } catch (e) {
+            console.error('Error during canvas compression, using original file:', e);
+            resolve(file);
+          }
+        };
+        img.onerror = () => {
+          console.warn('Failed to load image element, using original file');
+          resolve(file);
+        };
       };
-      img.onerror = (err) => reject(err);
-    };
-    reader.onerror = (err) => reject(err);
+      reader.onerror = () => {
+        console.warn('FileReader failed, using original file');
+        resolve(file);
+      };
+    } catch (err) {
+      console.error('FileReader creation failed, using original file:', err);
+      resolve(file);
+    }
   });
 };
 
