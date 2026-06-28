@@ -10,6 +10,58 @@ import './AdminDashboard.css';
 
 const API_URL = import.meta.env.VITE_API_URL || '';
 
+// Client-side image compression utility to convert any image to lightweight WebP
+const compressImage = (file, maxWidth = 800, maxHeight = 800, quality = 0.75) => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = (event) => {
+      const img = new Image();
+      img.src = event.target.result;
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        let width = img.width;
+        let height = img.height;
+
+        if (width > height) {
+          if (width > maxWidth) {
+            height = Math.round((height * maxWidth) / width);
+            width = maxWidth;
+          }
+        } else {
+          if (height > maxHeight) {
+            width = Math.round((width * maxHeight) / height);
+            height = maxHeight;
+          }
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, width, height);
+
+        canvas.toBlob(
+          (blob) => {
+            if (!blob) {
+              reject(new Error('Canvas compression failed'));
+              return;
+            }
+            const compressedFile = new File([blob], file.name.replace(/\.[^/.]+$/, "") + ".webp", {
+              type: 'image/webp',
+              lastModified: Date.now()
+            });
+            resolve(compressedFile);
+          },
+          'image/webp',
+          quality
+        );
+      };
+      img.onerror = (err) => reject(err);
+    };
+    reader.onerror = (err) => reject(err);
+  });
+};
+
 const VendorDashboard = () => {
   const { user, refreshUser } = useAuth();
   const { success, error } = useToast();
@@ -74,15 +126,14 @@ const VendorDashboard = () => {
       error('Please select a valid image file (JPG, PNG, WEBP, etc.)');
       return;
     }
-    if (file.size > 3 * 1024 * 1024) {
-      error('Image must be less than 3MB');
-      return;
-    }
 
     isSettings ? setSettingsUploadingImage(true) : setUploadingImage(true);
     try {
-      const storageRef = ref(storage, `profileImages/${user.uid}_${Date.now()}_${file.name}`);
-      const snapshot = await uploadBytes(storageRef, file);
+      // Compress image client-side to WebP (~100KB)
+      const compressedFile = await compressImage(file, 800, 800, 0.75);
+
+      const storageRef = ref(storage, `profileImages/${user.uid}_${Date.now()}_compressed.webp`);
+      const snapshot = await uploadBytes(storageRef, compressedFile);
       const downloadURL = await getDownloadURL(snapshot.ref);
       
       if (isSettings) {
@@ -257,24 +308,23 @@ const VendorDashboard = () => {
       error('Please select a valid image file (JPG, PNG, WEBP)');
       return;
     }
-    if (file.size > 5 * 1024 * 1024) {
-      error('Each image must be less than 5MB');
-      return;
-    }
     setUploadingSlot(slotIndex);
     try {
-      const storageRef = ref(storage, `productImages/${user.uid}_${Date.now()}_slot${slotIndex}_${file.name}`);
-      const snapshot = await uploadBytes(storageRef, file);
+      // Compress image client-side to WebP (~100KB) for ultra-fast upload
+      const compressedFile = await compressImage(file, 800, 800, 0.75);
+
+      const storageRef = ref(storage, `productImages/${user.uid}_${Date.now()}_slot${slotIndex}.webp`);
+      const snapshot = await uploadBytes(storageRef, compressedFile);
       const downloadURL = await getDownloadURL(snapshot.ref);
       const updated = [...productImages];
       updated[slotIndex] = downloadURL;
       setProductImages(updated);
       const validUrls = updated.filter(Boolean);
       setNewProduct(prev => ({ ...prev, imageUrl: validUrls[0] || '', images: validUrls }));
-      success(`Photo ${slotIndex + 1} uploaded!`);
+      success(`Photo ${slotIndex + 1} uploaded successfully!`);
     } catch (err) {
       console.error('Product image upload error:', err);
-      error('Failed to upload image. Check Firebase Storage rules.');
+      error('Failed to upload image. Please try again.');
     } finally {
       setUploadingSlot(null);
     }
@@ -293,18 +343,20 @@ const VendorDashboard = () => {
     const file = e.target.files[0];
     if (!file) return;
     if (!file.type.startsWith('image/')) { error('Please select a valid image file'); return; }
-    if (file.size > 5 * 1024 * 1024) { error('Each image must be less than 5MB'); return; }
     setEditUploadingSlot(slotIndex);
     try {
-      const storageRef = ref(storage, `productImages/${user.uid}_edit_${Date.now()}_slot${slotIndex}_${file.name}`);
-      const snapshot = await uploadBytes(storageRef, file);
+      // Compress image client-side to WebP (~100KB) for ultra-fast upload
+      const compressedFile = await compressImage(file, 800, 800, 0.75);
+
+      const storageRef = ref(storage, `productImages/${user.uid}_edit_${Date.now()}_slot${slotIndex}.webp`);
+      const snapshot = await uploadBytes(storageRef, compressedFile);
       const downloadURL = await getDownloadURL(snapshot.ref);
       const updated = [...editImages];
       updated[slotIndex] = downloadURL;
       setEditImages(updated);
       const validUrls = updated.filter(Boolean);
       setEditingProduct(prev => ({ ...prev, imageUrl: validUrls[0] || '', images: validUrls }));
-      success(`Photo ${slotIndex + 1} updated!`);
+      success(`Photo ${slotIndex + 1} updated successfully!`);
     } catch (err) {
       error('Failed to upload image.');
     } finally {
