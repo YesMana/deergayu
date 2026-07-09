@@ -104,7 +104,7 @@ const compressImage = (file, maxWidth = 800, maxHeight = 800, quality = 0.75) =>
 const VendorDashboard = () => {
   const { user, refreshUser } = useAuth();
   const { success, error } = useToast();
-  const [activeTab, setActiveTab] = useState('products');
+  const [activeTab, setActiveTab] = useState('overview');
   const [orders, setOrders] = useState([]);
   const [loadingOrders, setLoadingOrders] = useState(false);
   const [vendorProducts, setVendorProducts] = useState([]);
@@ -679,39 +679,199 @@ const VendorDashboard = () => {
     }
   }
 
+  // ── Derived revenue stats ──────────────────────────────────
+  const totalRevenue = orders.filter(o => o.status === 'delivered').reduce((s, o) => s + Number(o.totalPrice || 0), 0);
+  const monthRevenue = orders.filter(o => {
+    if (o.status !== 'delivered') return false;
+    const d = new Date(o.createdAt || 0);
+    const now = new Date();
+    return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+  }).reduce((s, o) => s + Number(o.totalPrice || 0), 0);
+  const pendingOrdersCount = orders.filter(o => ['pending', 'confirmed', 'processing'].includes(o.status)).length;
+  const todayAppts = appointments.filter(a => a.date === new Date().toISOString().split('T')[0]);
+  const upcomingAppts = appointments.filter(a => ['pending', 'accepted'].includes(a.status)).slice(0, 5);
+  const approvedProducts = vendorProducts.filter(p => p.status === 'approved').length;
+  const recentOrders = orders.slice(0, 5);
+
+  const fmtCurrency = (n) => `Rs. ${Number(n || 0).toLocaleString('en-LK')}`;
+  const fmtDate = (s) => s ? new Date(s).toLocaleDateString('en-LK', { day: '2-digit', month: 'short' }) : '—';
+
+  const StatusPill = ({ status }) => {
+    const cfg = {
+      pending:    { bg: 'rgba(255,167,38,0.15)',  color: '#ffa726' },
+      confirmed:  { bg: 'rgba(41,182,246,0.15)',  color: '#29b6f6' },
+      processing: { bg: 'rgba(171,71,188,0.15)',  color: '#ab47bc' },
+      shipped:    { bg: 'rgba(38,198,218,0.15)',  color: '#26c6da' },
+      delivered:  { bg: 'rgba(76,175,80,0.15)',   color: '#4caf50' },
+      cancelled:  { bg: 'rgba(239,83,80,0.15)',   color: '#ef5350' },
+      accepted:   { bg: 'rgba(76,175,80,0.15)',   color: '#4caf50' },
+      rejected:   { bg: 'rgba(239,83,80,0.15)',   color: '#ef5350' },
+    }[status] || { bg: 'rgba(255,255,255,0.1)', color: '#aaa' };
+    return <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', padding: '0.22rem 0.65rem', borderRadius: '999px', fontSize: '0.72rem', fontWeight: '600', background: cfg.bg, color: cfg.color }}>{status || '—'}</span>;
+  };
+
   return (
-    <div className="admin-container animate-fade-in">
-      <aside className="admin-sidebar glass-panel">
+    <div className="admin-layout animate-fade-in">
+      {/* ── Premium Sidebar ── */}
+      <aside className="admin-sidebar">
         <div className="admin-brand">
-          <h2>Vendor Panel</h2>
-          <p style={{fontSize: '0.8rem', color: 'var(--text-secondary)'}}>{user?.displayName || user?.name}</p>
+          <div className="admin-brand-icon">🌿</div>
+          <div className="admin-brand-text">
+            <h2>{user?.displayName || user?.name || 'Vendor'}</h2>
+            <span>Vendor Panel</span>
+          </div>
         </div>
         <ul className="admin-nav">
+          <li className="admin-nav-section-title">Main</li>
+          <li className={activeTab === 'overview' ? 'active' : ''} onClick={() => setActiveTab('overview')}>
+            <Settings size={17} /> Overview
+          </li>
+          <li className="admin-nav-section-title">Manage</li>
           <li className={activeTab === 'products' ? 'active' : ''} onClick={() => setActiveTab('products')}>
-            <Package size={20} /> My Products
+            <Package size={17} /> My Products
           </li>
           <li className={activeTab === 'orders' ? 'active' : ''} onClick={() => setActiveTab('orders')}>
-            <ShoppingBag size={20} /> Customer Orders
+            <ShoppingBag size={17} /> Customer Orders
+            {pendingOrdersCount > 0 && <span style={{ marginLeft: 'auto', background: '#ef5350', color: 'white', borderRadius: '999px', padding: '0.1rem 0.45rem', fontSize: '0.68rem', fontWeight: '700' }}>{pendingOrdersCount}</span>}
           </li>
           <li className={activeTab === 'appointments' ? 'active' : ''} onClick={() => setActiveTab('appointments')}>
-            <Calendar size={20} /> Appointments
+            <Calendar size={17} /> Appointments
+            {upcomingAppts.length > 0 && <span style={{ marginLeft: 'auto', background: '#ffa726', color: 'white', borderRadius: '999px', padding: '0.1rem 0.45rem', fontSize: '0.68rem', fontWeight: '700' }}>{upcomingAppts.length}</span>}
           </li>
+          <li className="admin-nav-section-title">Profile</li>
           <li className={activeTab === 'schedule' ? 'active' : ''} onClick={() => setActiveTab('schedule')}>
-            <Clock size={20} /> My Schedule
+            <Clock size={17} /> My Schedule
           </li>
           <li className={activeTab === 'settings' ? 'active' : ''} onClick={() => setActiveTab('settings')}>
-            <Settings size={20} /> Settings
+            <Settings size={17} /> Settings
           </li>
         </ul>
       </aside>
 
       <main className="admin-main">
-        <header className="admin-header">
-          <h1>{activeTab === 'products' ? 'Manage My Products' : activeTab === 'orders' ? 'Customer Orders' : activeTab === 'appointments' ? 'Appointments' : 'Vendor Panel'}</h1>
-          {activeTab === 'products' && <button onClick={() => setShowAddProductModal(true)} className="btn btn-primary">+ Add New Product</button>}
-        </header>
+        {/* ── Page Header ── */}
+        <div className="admin-page-header">
+          <div>
+            <h1 style={{ fontSize: '1.65rem', fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>
+              {activeTab === 'overview' ? 'Dashboard Overview' :
+               activeTab === 'products' ? 'My Products' :
+               activeTab === 'orders' ? 'Customer Orders' :
+               activeTab === 'appointments' ? 'Appointments' :
+               activeTab === 'schedule' ? 'My Schedule' : 'Settings'}
+            </h1>
+            <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', margin: '0.3rem 0 0' }}>
+              {activeTab === 'overview' ? `Welcome back, ${user?.displayName || user?.name || 'Vendor'}` :
+               activeTab === 'products' ? `${vendorProducts.length} products · ${approvedProducts} live` :
+               activeTab === 'orders' ? `${orders.length} total orders` :
+               activeTab === 'appointments' ? `${appointments.length} total appointments` : ''}
+            </p>
+          </div>
+          {activeTab === 'products' && (
+            <button onClick={() => setShowAddProductModal(true)} className="btn btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+              + Add New Product
+            </button>
+          )}
+        </div>
 
         <div className="admin-content">
+
+        {/* ══════════════════════ OVERVIEW TAB ══════════════════════ */}
+        {activeTab === 'overview' && (
+          <>
+            {/* KPI Cards */}
+            <div className="kpi-grid" style={{ marginBottom: '1.5rem' }}>
+              {[
+                { label: 'Total Revenue', value: fmtCurrency(totalRevenue), color: '#4caf50', icon: '💰', sub: 'Delivered orders' },
+                { label: 'This Month', value: fmtCurrency(monthRevenue), color: '#29b6f6', icon: '📅', sub: 'Monthly earnings' },
+                { label: 'Active Products', value: approvedProducts, color: '#ab47bc', icon: '📦', sub: `of ${vendorProducts.length} total` },
+                { label: 'Pending Orders', value: pendingOrdersCount, color: '#ffa726', icon: '🛒', sub: 'Need processing' },
+                { label: 'Appointments', value: appointments.length, color: '#26c6da', icon: '📅', sub: `${upcomingAppts.length} upcoming` },
+                { label: "Today's Appts", value: todayAppts.length, color: '#d4af37', icon: '🗓️', sub: 'Scheduled today' },
+              ].map(({ label, value, color, icon, sub }) => (
+                <div key={label} className="kpi-card" style={{ '--kpi-accent': color }}>
+                  <div className="kpi-card-header">
+                    <div style={{ fontSize: '1.5rem' }}>{icon}</div>
+                    <span className="kpi-trend" style={{ background: 'transparent', color: 'var(--text-secondary)', fontSize: '0.7rem' }}>{sub}</span>
+                  </div>
+                  <div className="kpi-value" style={{ color }}>{value}</div>
+                  <div className="kpi-label">{label}</div>
+                </div>
+              ))}
+            </div>
+
+            {/* 2-col activity */}
+            <div className="two-col">
+              {/* Recent Orders */}
+              <div className="dash-section">
+                <div className="dash-section-header">
+                  <h3><ShoppingBag size={15} /> Recent Orders</h3>
+                  <span className="view-all" onClick={() => setActiveTab('orders')}>View all →</span>
+                </div>
+                <div>
+                  {recentOrders.length === 0 ? (
+                    <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-secondary)' }}>No orders yet 🛒</div>
+                  ) : recentOrders.map(o => (
+                    <div key={o.id} className="activity-item">
+                      <div className="activity-avatar" style={{ background: 'linear-gradient(135deg,#26c6da,#00838f)' }}>
+                        {(o.customerName || 'C').charAt(0).toUpperCase()}
+                      </div>
+                      <div className="activity-info">
+                        <div className="title">{o.customerName || '—'}</div>
+                        <div className="subtitle">{(o.items || []).map(i => i.name).join(', ').slice(0, 40) || '—'}</div>
+                      </div>
+                      <div className="activity-meta">
+                        <div className="amount">{fmtCurrency(o.totalPrice)}</div>
+                        <StatusPill status={o.status} />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Upcoming Appointments */}
+              <div className="dash-section">
+                <div className="dash-section-header">
+                  <h3><Calendar size={15} /> Upcoming Appointments</h3>
+                  <span className="view-all" onClick={() => setActiveTab('appointments')}>View all →</span>
+                </div>
+                <div>
+                  {upcomingAppts.length === 0 ? (
+                    <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-secondary)' }}>No upcoming appointments 📅</div>
+                  ) : upcomingAppts.map(a => (
+                    <div key={a.id} className="appt-mini-item">
+                      <div className="appt-mini-info">
+                        <div className="name">{a.customerName || '—'}</div>
+                        <div className="meta">{a.date} · {a.time}</div>
+                      </div>
+                      <div className="appt-mini-time">
+                        <StatusPill status={a.status} />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Quick actions */}
+            <div className="dash-section">
+              <div className="dash-section-header"><h3>🚀 Quick Actions</h3></div>
+              <div style={{ padding: '1rem 1.5rem', display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+                <button className="btn btn-primary" onClick={() => setShowAddProductModal(true)} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                  <Package size={15} /> Add New Product
+                </button>
+                <button className="btn btn-outline" onClick={() => setActiveTab('orders')} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                  <ShoppingBag size={15} /> View Orders
+                </button>
+                <button className="btn btn-outline" onClick={() => setActiveTab('appointments')} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                  <Calendar size={15} /> Manage Appointments
+                </button>
+                <button className="btn btn-outline" onClick={() => setActiveTab('schedule')} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                  <Clock size={15} /> Update Schedule
+                </button>
+              </div>
+            </div>
+          </>
+        )}
           {activeTab === 'schedule' && (
             <div className="glass-panel" style={{ padding: '2rem' }}>
               <h2 style={{ color: 'var(--secondary-color)', marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>

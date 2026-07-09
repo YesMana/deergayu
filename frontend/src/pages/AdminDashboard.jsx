@@ -1,5 +1,10 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Users, LayoutDashboard, Settings, Search, Filter, ShieldAlert, ChevronLeft, ChevronRight, Loader } from 'lucide-react';
+import {
+  Users, LayoutDashboard, Settings, Search, ShieldAlert,
+  ChevronLeft, ChevronRight, Package, ShoppingBag, Calendar,
+  TrendingUp, CheckCircle, Clock, XCircle, DollarSign, Activity,
+  Eye, EyeOff, Trash2, RefreshCw, AlertTriangle
+} from 'lucide-react';
 import { collection, getDocs, doc, deleteDoc, query, orderBy, limit, startAfter, getCountFromServer, where } from 'firebase/firestore';
 import { db, auth } from '../firebase';
 import { useToast } from '../context/ToastContext';
@@ -7,118 +12,128 @@ import './AdminDashboard.css';
 
 const API_URL = import.meta.env.VITE_API_URL || '';
 
-const sriLankaData = {
-  "Western": ["Colombo", "Gampaha", "Kalutara"],
-  "Central": ["Kandy", "Matale", "Nuwara Eliya"],
-  "Southern": ["Galle", "Matara", "Hambantota"],
-  "Northern": ["Jaffna", "Kilinochchi", "Mannar", "Mullaitivu", "Vavuniya"],
-  "Eastern": ["Trincomalee", "Batticaloa", "Ampara"],
-  "North Western": ["Kurunegala", "Puttalam"],
-  "North Central": ["Anuradhapura", "Polonnaruwa"],
-  "Uva": ["Badulla", "Monaragala"],
-  "Sabaragamuwa": ["Ratnapura", "Kegalle"],
-  "Online": ["Online"]
+// ─── Helpers ────────────────────────────────────────────────
+const fmtCurrency = (n) => `Rs. ${Number(n || 0).toLocaleString('en-LK')}`;
+const fmtDate = (s) => s ? new Date(s).toLocaleDateString('en-LK', { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
+const fmtDateShort = (s) => s ? new Date(s).toLocaleDateString('en-LK', { day: '2-digit', month: 'short' }) : '—';
+const userInitials = (u) => (u?.name || u?.email || 'U').slice(0, 2).toUpperCase();
+
+const STATUS_COLORS = {
+  pending:    { bg: 'rgba(255,167,38,0.15)',  color: '#ffa726' },
+  confirmed:  { bg: 'rgba(41,182,246,0.15)',  color: '#29b6f6' },
+  processing: { bg: 'rgba(171,71,188,0.15)',  color: '#ab47bc' },
+  shipped:    { bg: 'rgba(38,198,218,0.15)',   color: '#26c6da' },
+  delivered:  { bg: 'rgba(76,175,80,0.15)',    color: '#4caf50' },
+  cancelled:  { bg: 'rgba(239,83,80,0.15)',    color: '#ef5350' },
+  approved:   { bg: 'rgba(76,175,80,0.15)',    color: '#4caf50' },
+  hidden:     { bg: 'rgba(144,164,174,0.15)', color: '#90a4ae' },
+  rejected:   { bg: 'rgba(239,83,80,0.15)',   color: '#ef5350' },
+  accepted:   { bg: 'rgba(76,175,80,0.15)',    color: '#4caf50' },
+  completed:  { bg: 'rgba(38,198,218,0.15)',   color: '#26c6da' },
+  active:     { bg: 'rgba(76,175,80,0.15)',    color: '#4caf50' },
 };
 
-const specialtiesList = ["Sarwanga Roga (General)", "Kadum Bindum (Orthopedic)", "Sarpa Visha (Toxicology)", "Yantra & Mantra", "Vastu Shastra"];
+const StatusPill = ({ status }) => {
+  const cfg = STATUS_COLORS[status] || { bg: 'rgba(255,255,255,0.1)', color: '#aaa' };
+  return (
+    <span className="status-pill" style={{ background: cfg.bg, color: cfg.color }}>
+      {status || '—'}
+    </span>
+  );
+};
 
+// ─── Main Component ──────────────────────────────────────────
 const AdminDashboard = () => {
   const { success, error } = useToast();
-  const [providers, setProviders] = useState([]);
-  const [products, setProducts] = useState([]);
-  const [orders, setOrders] = useState([]);
-  const [settings, setSettings] = useState({ commissionPercent: 10, autoApproveExperts: false, autoApproveProducts: false });
-  const [filterVendor, setFilterVendor] = useState('All');
   const [activeTab, setActiveTab] = useState('dashboard');
-  
-  const [platformUsers, setPlatformUsers] = useState([]);
-  const [loadingUsers, setLoadingUsers] = useState(false);
-  const [userSearch, setUserSearch] = useState('');
-  const [userRoleFilter, setUserRoleFilter] = useState('all');
-  const [loadingProviders, setLoadingProviders] = useState(false);
-  const [loadingOrders, setLoadingOrders] = useState(false);
 
-  // Pagination state
+  // Data states
+  const [providers, setProviders] = useState([]);
+  const [products, setProducts]   = useState([]);
+  const [orders, setOrders]       = useState([]);
+  const [appointments, setAppointments] = useState([]);
+  const [settings, setSettings]   = useState({ commissionPercent: 10, autoApproveExperts: false, autoApproveProducts: false });
+  const [platformUsers, setPlatformUsers] = useState([]);
+
+  // Loading states
+  const [loadingProviders, setLoadingProviders]       = useState(false);
+  const [loadingProducts, setLoadingProducts]         = useState(false);
+  const [loadingOrders, setLoadingOrders]             = useState(false);
+  const [loadingAppointments, setLoadingAppointments] = useState(false);
+  const [loadingUsers, setLoadingUsers]               = useState(false);
+  const [savingSettings, setSavingSettings]           = useState(false);
+
+  // Filters
+  const [filterVendor, setFilterVendor]     = useState('All');
+  const [filterProduct, setFilterProduct]   = useState('All');
+  const [userSearch, setUserSearch]         = useState('');
+  const [userRoleFilter, setUserRoleFilter] = useState('all');
+  const [providerSearch, setProviderSearch] = useState('');
+  const [productSearch, setProductSearch]   = useState('');
+  const [orderSearch, setOrderSearch]       = useState('');
+  const [apptSearch, setApptSearch]         = useState('');
+
+  // Pagination
   const PAGE_SIZE = 20;
-  const [currentPage, setCurrentPage] = useState(1);
-  const [totalUsers, setTotalUsers] = useState(0);
-  const [pagesCursors, setPagesCursors] = useState([null]); // index 0 = first page (no cursor)
+  const [currentPage, setCurrentPage]     = useState(1);
+  const [totalUsers, setTotalUsers]       = useState(0);
+  const [pagesCursors, setPagesCursors]   = useState([null]);
   const searchDebounceRef = useRef(null);
 
-  useEffect(() => {
-    if (activeTab === 'users') {
-      setCurrentPage(1);
-      setPagesCursors([null]);
-      fetchUsers(null);
-    }
-    if (activeTab === 'products') fetchProducts();
-    if (activeTab === 'providers') fetchProviders();
-    if (activeTab === 'orders') fetchOrders();
-    if (activeTab === 'settings') fetchSettings();
-    if (activeTab === 'dashboard') {
-      fetchProviders();
-      fetchProducts();
-      fetchOrders();
-    }
-  }, [activeTab]);
+  // ── Data Fetching ──────────────────────────────────────────
+  const getToken = () => auth.currentUser?.getIdToken();
 
-  // Re-fetch when role filter changes
-  useEffect(() => {
-    if (activeTab !== 'users') return;
-    setCurrentPage(1);
-    setPagesCursors([null]);
-    fetchUsers(null);
-  }, [userRoleFilter]);
-
-  // Debounced search
-  useEffect(() => {
-    if (activeTab !== 'users') return;
-    if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
-    searchDebounceRef.current = setTimeout(() => {
-      setCurrentPage(1);
-      setPagesCursors([null]);
-      fetchUsers(null);
-    }, 400);
-    return () => clearTimeout(searchDebounceRef.current);
-  }, [userSearch]);
-
-  const fetchProviders = async () => {
+  const fetchProviders = useCallback(async () => {
     setLoadingProviders(true);
     try {
-      const usersCol = collection(db, 'users');
-      const userSnapshot = await getDocs(usersCol);
-      const experts = userSnapshot.docs
-        .map(doc => ({ id: doc.id, ...doc.data() }))
+      const snap = await getDocs(collection(db, 'users'));
+      const experts = snap.docs
+        .map(d => ({ id: d.id, ...d.data() }))
         .filter(u => u.role !== 'user' && u.role !== 'admin');
       setProviders(experts);
-    } catch (err) {
-      console.error("Error fetching providers:", err);
-    } finally {
-      setLoadingProviders(false);
-    }
-  };
+    } finally { setLoadingProviders(false); }
+  }, []);
 
-  const fetchProducts = async () => {
+  const fetchProducts = useCallback(async () => {
+    setLoadingProducts(true);
     try {
-      const productsCol = collection(db, 'products');
-      const productSnapshot = await getDocs(productsCol);
-      const productList = productSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      setProducts(productList);
-    } catch (err) {
-      console.error("Error fetching products:", err);
-    }
-  };
+      const snap = await getDocs(collection(db, 'products'));
+      setProducts(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    } finally { setLoadingProducts(false); }
+  }, []);
 
-  const fetchUsers = async (startCursor) => {
+  const fetchOrders = useCallback(async () => {
+    setLoadingOrders(true);
+    try {
+      const token = await getToken();
+      const res = await fetch(`${API_URL}/api/orders`, { headers: { Authorization: `Bearer ${token}` } });
+      if (res.ok) setOrders(await res.json());
+    } catch (e) { console.error(e); } finally { setLoadingOrders(false); }
+  }, []);
+
+  const fetchAppointments = useCallback(async () => {
+    setLoadingAppointments(true);
+    try {
+      const token = await getToken();
+      const res = await fetch(`${API_URL}/api/appointments`, { headers: { Authorization: `Bearer ${token}` } });
+      if (res.ok) setAppointments(await res.json());
+    } catch (e) { console.error(e); } finally { setLoadingAppointments(false); }
+  }, []);
+
+  const fetchSettings = useCallback(async () => {
+    try {
+      const token = await getToken();
+      const res = await fetch(`${API_URL}/api/settings`, { headers: { Authorization: `Bearer ${token}` } });
+      if (res.ok) setSettings(await res.json());
+    } catch (e) { console.error(e); }
+  }, []);
+
+  const fetchUsers = useCallback(async (startCursor) => {
     setLoadingUsers(true);
     try {
       const usersCol = collection(db, 'users');
-
-      // Build base query constraints
       const constraints = [orderBy('createdAt', 'desc')];
-      if (userRoleFilter !== 'all') {
-        constraints.unshift(where('role', '==', userRoleFilter));
-      }
+      if (userRoleFilter !== 'all') constraints.unshift(where('role', '==', userRoleFilter));
       constraints.push(limit(PAGE_SIZE));
       if (startCursor) constraints.push(startAfter(startCursor));
 
@@ -126,643 +141,700 @@ const AdminDashboard = () => {
       const snap = await getDocs(q);
       let userList = snap.docs.map(d => ({ id: d.id, ...d.data() }));
 
-      // Client-side search filter (search is fast with pagination)
       if (userSearch.trim()) {
         const term = userSearch.toLowerCase();
-        userList = userList.filter(u =>
-          u.name?.toLowerCase().includes(term) ||
-          u.email?.toLowerCase().includes(term)
-        );
+        userList = userList.filter(u => u.name?.toLowerCase().includes(term) || u.email?.toLowerCase().includes(term));
       }
 
-      // Store the last doc as cursor for next page
       const lastDoc = snap.docs[snap.docs.length - 1];
-      setPagesCursors(prev => {
-        const updated = [...prev];
-        updated[currentPage] = lastDoc || null;
-        return updated;
-      });
-
+      setPagesCursors(prev => { const u = [...prev]; u[currentPage] = lastDoc || null; return u; });
       setPlatformUsers(userList);
 
-      // Get total count (only on first load or filter change)
       if (!startCursor) {
         try {
-          const countConstraints = userRoleFilter !== 'all'
-            ? [where('role', '==', userRoleFilter)]
-            : [];
-          const countSnap = await getCountFromServer(query(usersCol, ...countConstraints));
+          const countQ = userRoleFilter !== 'all'
+            ? query(usersCol, where('role', '==', userRoleFilter))
+            : query(usersCol);
+          const countSnap = await getCountFromServer(countQ);
           setTotalUsers(countSnap.data().count);
         } catch { setTotalUsers(0); }
       }
-    } catch (err) {
-      console.error('Error fetching users:', err);
-    } finally {
-      setLoadingUsers(false);
-    }
+    } catch (e) { console.error(e); } finally { setLoadingUsers(false); }
+  }, [userRoleFilter, userSearch, currentPage]);
+
+  // Tab switching
+  useEffect(() => {
+    if (activeTab === 'dashboard') { fetchProviders(); fetchProducts(); fetchOrders(); fetchAppointments(); }
+    if (activeTab === 'providers')     fetchProviders();
+    if (activeTab === 'products')      fetchProducts();
+    if (activeTab === 'orders')        fetchOrders();
+    if (activeTab === 'appointments')  fetchAppointments();
+    if (activeTab === 'settings')      fetchSettings();
+    if (activeTab === 'users')         { setCurrentPage(1); setPagesCursors([null]); }
+  }, [activeTab]);
+
+  useEffect(() => {
+    if (activeTab !== 'users') return;
+    setCurrentPage(1); setPagesCursors([null]); fetchUsers(null);
+  }, [userRoleFilter]);
+
+  useEffect(() => {
+    if (activeTab !== 'users') return;
+    if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
+    searchDebounceRef.current = setTimeout(() => { setCurrentPage(1); setPagesCursors([null]); fetchUsers(null); }, 400);
+    return () => clearTimeout(searchDebounceRef.current);
+  }, [userSearch]);
+
+  // ── Actions ────────────────────────────────────────────────
+  const handleApproveUser = async (uid) => {
+    if (!window.confirm('Approve this expert?')) return;
+    try {
+      const token = await getToken();
+      const res = await fetch(`${API_URL}/api/users/${uid}/status`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ status: 'approved' })
+      });
+      if (res.ok) { success('Expert approved!'); fetchProviders(); fetchUsers(null); }
+      else error('Failed to approve');
+    } catch (e) { error(e.message); }
+  };
+
+  const handleUpdateRole = async (uid, newRole) => {
+    try {
+      const token = await getToken();
+      const res = await fetch(`${API_URL}/api/users/${uid}/role`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ role: newRole })
+      });
+      if (res.ok) { success('Role updated!'); fetchUsers(null); }
+      else error('Failed to update role');
+    } catch (e) { error(e.message); }
+  };
+
+  const handleDeleteUser = async (uid, name) => {
+    if (!window.confirm(`Delete ${name || 'this user'}? This cannot be undone.`)) return;
+    try {
+      await deleteDoc(doc(db, 'users', uid));
+      setPlatformUsers(prev => prev.filter(u => u.id !== uid));
+      success('User deleted.');
+      try {
+        const token = await getToken();
+        await fetch(`${API_URL}/api/users/${uid}/delete`, { method: 'POST', headers: { Authorization: `Bearer ${token}` } });
+      } catch {}
+    } catch (e) { error(`Error: ${e.message}`); }
+  };
+
+  const handleProductAction = async (id, action) => {
+    const newStatus = action === 'approve' ? 'approved' : action === 'hide' ? 'hidden' : 'rejected';
+    try {
+      const token = await getToken();
+      const res = await fetch(`${API_URL}/api/products/${id}/status`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ status: newStatus })
+      });
+      if (res.ok) { success(`Product ${action}d!`); fetchProducts(); }
+      else { setProducts(prev => prev.map(p => p.id === id ? { ...p, status: newStatus } : p)); }
+    } catch (e) { error('Error updating product'); }
+  };
+
+  const handleOrderStatus = async (id, status) => {
+    try {
+      const token = await getToken();
+      const res = await fetch(`${API_URL}/api/orders/${id}/status`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ status })
+      });
+      if (res.ok) { success('Order status updated!'); setOrders(prev => prev.map(o => o.id === id ? { ...o, status } : o)); }
+      else error('Failed to update order');
+    } catch (e) { error(e.message); }
+  };
+
+  const handleSaveSettings = async () => {
+    setSavingSettings(true);
+    try {
+      const token = await getToken();
+      const res = await fetch(`${API_URL}/api/settings`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify(settings)
+      });
+      if (res.ok) success('Settings saved!');
+      else error('Failed to save');
+    } catch (e) { error(e.message); } finally { setSavingSettings(false); }
   };
 
   const handleNextPage = () => {
     const cursor = pagesCursors[currentPage];
     if (!cursor) return;
-    const nextPage = currentPage + 1;
-    setCurrentPage(nextPage);
+    const next = currentPage + 1;
+    setCurrentPage(next);
     fetchUsers(cursor);
   };
 
   const handlePrevPage = () => {
     if (currentPage <= 1) return;
-    const prevPage = currentPage - 1;
-    setCurrentPage(prevPage);
-    fetchUsers(pagesCursors[prevPage - 1] || null);
+    const prev = currentPage - 1;
+    setCurrentPage(prev);
+    fetchUsers(pagesCursors[prev - 1] || null);
   };
 
-  const fetchOrders = async () => {
-    setLoadingOrders(true);
-    try {
-      const token = await auth.currentUser.getIdToken();
-      const res = await fetch(`${API_URL}/api/orders`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setOrders(data);
-      }
-    } catch (err) {
-      console.error("Error fetching orders:", err);
-    } finally {
-      setLoadingOrders(false);
-    }
-  };
+  // ── Derived Stats ──────────────────────────────────────────
+  const pendingProducts  = products.filter(p => p.status === 'pending').length;
+  const pendingExperts   = providers.filter(p => p.status === 'pending').length;
+  const pendingOrders    = orders.filter(o => o.status === 'pending').length;
+  const totalRevenue     = orders
+    .filter(o => o.status === 'delivered')
+    .reduce((sum, o) => sum + Number(o.totalPrice || 0), 0);
+  const commissionRevenue = Math.round(totalRevenue * (settings.commissionPercent || 10) / 100);
+  const thisWeekAppts = appointments.filter(a => {
+    const d = new Date(a.createdAt || a.date);
+    const now = new Date();
+    return (now - d) < 7 * 24 * 60 * 60 * 1000;
+  }).length;
 
-  const fetchSettings = async () => {
-    try {
-      const token = await auth.currentUser.getIdToken();
-      const res = await fetch(`${API_URL}/api/settings`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setSettings(data);
-      }
-    } catch (err) {
-      console.error("Error fetching settings:", err);
-    }
-  };
+  // ── Filter helpers ─────────────────────────────────────────
+  const filteredProviders = providers.filter(p => {
+    const s = providerSearch.toLowerCase();
+    return !s || p.name?.toLowerCase().includes(s) || p.email?.toLowerCase().includes(s);
+  });
 
-  const handleSaveSettings = async () => {
-    try {
-      const token = await auth.currentUser.getIdToken();
-      const res = await fetch(`${API_URL}/api/settings`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify(settings)
-      });
-      if (res.ok) {
-        success("Settings saved successfully!");
-      } else {
-        error("Failed to save settings");
-      }
-    } catch (err) {
-      error(`Network Error: ${err.message}`);
-    }
-  };
+  const filteredProducts = products.filter(p => {
+    const s = productSearch.toLowerCase();
+    const matchSearch = !s || p.name?.toLowerCase().includes(s) || p.vendorName?.toLowerCase().includes(s);
+    const matchStatus = filterProduct === 'All' || p.status === filterProduct;
+    return matchSearch && matchStatus;
+  });
 
-  const handleUpdateRole = async (uid, newRole) => {
-    try {
-      const token = await auth.currentUser.getIdToken();
-      const res = await fetch(`${API_URL}/api/users/${uid}/role`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({ role: newRole })
-      });
-      if (res.ok) {
-        success("Role updated successfully!");
-        fetchUsers();
-      } else {
-        const text = await res.text();
-        try {
-          const data = JSON.parse(text);
-          error(`Failed: ${data.error}`);
-        } catch (e) {
-          error(`Server Error: ${res.status} - ${text.substring(0, 50)}`);
-        }
-      }
-    } catch (err) {
-      error(`Network Error: ${err.message}`);
-    }
-  };
+  const filteredOrders = orders.filter(o => {
+    const s = orderSearch.toLowerCase();
+    return !s || o.customerName?.toLowerCase().includes(s) || o.id?.toLowerCase().includes(s) || o.vendorName?.toLowerCase().includes(s);
+  });
 
-  const handleApproveUser = async (uid) => {
-    if (!window.confirm("Approve this expert?")) return;
-    try {
-      const token = await auth.currentUser.getIdToken();
-      const res = await fetch(`${API_URL}/api/users/${uid}/status`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({ status: 'approved' })
-      });
-      if (res.ok) {
-        success("Expert approved successfully!");
-        fetchUsers();
-        fetchProviders();
-      } else {
-        const text = await res.text();
-        try {
-          const data = JSON.parse(text);
-          error(`Failed: ${data.error}`);
-        } catch (e) {
-          error(`Server Error: ${res.status} - ${text.substring(0, 50)}`);
-        }
-      }
-    } catch (err) {
-      error(`Network Error: ${err.message}`);
-    }
-  };
+  const filteredAppts = appointments.filter(a => {
+    const s = apptSearch.toLowerCase();
+    return !s || a.customerName?.toLowerCase().includes(s) || a.providerName?.toLowerCase().includes(s);
+  });
 
-  const handleDeleteUser = async (uid) => {
-    if (!window.confirm("Are you sure you want to completely delete this user? This cannot be undone.")) return;
-    
-    try {
-      // Direct Firestore Deletion (Frontend Bypass)
-      await deleteDoc(doc(db, 'users', uid));
-      setPlatformUsers(platformUsers.filter(u => u.id !== uid));
-      success("User deleted successfully!");
-      
-      // Attempt backend deletion for Auth cleanup (silently fail if backend is down)
-      try {
-        const token = await auth.currentUser.getIdToken();
-        await fetch(`${API_URL}/api/users/${uid}/delete`, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
-        });
-      } catch (e) {
-        console.warn("Backend auth deletion failed, but Firestore doc removed.");
-      }
-    } catch (err) {
-      error(`Error deleting user: ${err.message}`);
-    }
-  };
-  
-  const pendingCount = products.filter(p => p.status === 'pending').length;
-  const pendingExpertCount = providers.filter(p => p.status === 'pending').length;
+  const recentOrders = [...orders].slice(0, 5);
+  const recentAppts  = [...appointments].slice(0, 5);
 
-  const handleProductAction = async (id, action) => {
-    try {
-      const newStatus = action === 'approve' ? 'approved' : action === 'hide' ? 'hidden' : 'rejected';
-      
-      const token = await auth.currentUser.getIdToken();
-      const res = await fetch(`${API_URL}/api/products/${id}/status`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({ status: newStatus })
-      });
-      
-      if (res.ok) {
-        success(`Product ${action}d successfully!`);
-        fetchProducts();
-      } else {
-        // Fallback to local state if API isn't ready
-        setProducts(products.map(p => {
-          if (p.id === id) {
-            if (action === 'approve') return { ...p, status: 'approved' };
-            if (action === 'hide') return { ...p, status: 'hidden' };
-            if (action === 'delete') return null;
-          }
-          return p;
-        }).filter(Boolean));
-      }
-    } catch (err) {
-      error(`Error updating product status`);
-    }
-  };
+  // ── Nav items ──────────────────────────────────────────────
+  const navItems = [
+    { id: 'dashboard',    label: 'Overview',         Icon: LayoutDashboard },
+    { id: 'providers',    label: 'Manage Experts',   Icon: Users,           badge: pendingExperts },
+    { id: 'users',        label: 'All Users',         Icon: ShieldAlert },
+    { id: 'products',     label: 'Product Approvals', Icon: Package,         badge: pendingProducts },
+    { id: 'orders',       label: 'All Orders',        Icon: ShoppingBag,     badge: pendingOrders },
+    { id: 'appointments', label: 'Appointments',      Icon: Calendar },
+    { id: 'settings',     label: 'Settings',          Icon: Settings },
+  ];
 
+  // ─────────────────────────────────────────────────────────────
+  // RENDER
+  // ─────────────────────────────────────────────────────────────
   return (
     <div className="admin-layout animate-fade-in">
-      <aside className="admin-sidebar glass-panel">
+      {/* ── Sidebar ── */}
+      <aside className="admin-sidebar">
         <div className="admin-brand">
-          <h2>Admin Panel</h2>
+          <div className="admin-brand-icon">🌿</div>
+          <div className="admin-brand-text">
+            <h2>Deergayu</h2>
+            <span>Admin Console</span>
+          </div>
         </div>
+
         <ul className="admin-nav">
-          <li className={activeTab === 'dashboard' ? 'active' : ''} onClick={() => setActiveTab('dashboard')}>
-            <LayoutDashboard size={20} /> Dashboard
-          </li>
-          <li className={activeTab === 'providers' ? 'active' : ''} onClick={() => setActiveTab('providers')} style={{position: 'relative'}}>
-            <Users size={20} /> Manage Experts
-            {pendingExpertCount > 0 && (
-              <span style={{
-                position: 'absolute', right: '15px', top: '15px', background: 'var(--error-color)', color: 'white', 
-                borderRadius: '50%', width: '20px', height: '20px', display: 'flex', alignItems: 'center', 
-                justifyContent: 'center', fontSize: '0.7rem', fontWeight: 'bold'
-              }}>
-                {pendingExpertCount}
-              </span>
-            )}
-          </li>
-          <li className={activeTab === 'users' ? 'active' : ''} onClick={() => setActiveTab('users')}>
-            <ShieldAlert size={20} /> All Users
-          </li>
-          <li className={activeTab === 'products' ? 'active' : ''} onClick={() => setActiveTab('products')} style={{position: 'relative'}}>
-            <LayoutDashboard size={20} /> Product Approvals
-            {pendingCount > 0 && (
-              <span style={{
-                position: 'absolute', right: '15px', top: '15px', background: 'var(--error-color)', color: 'white', 
-                borderRadius: '50%', width: '20px', height: '20px', display: 'flex', alignItems: 'center', 
-                justifyContent: 'center', fontSize: '0.7rem', fontWeight: 'bold'
-              }}>
-                {pendingCount}
-              </span>
-            )}
-          </li>
-          <li className={activeTab === 'orders' ? 'active' : ''} onClick={() => setActiveTab('orders')}>
-            <LayoutDashboard size={20} /> All Orders
-          </li>
-          <li className={activeTab === 'settings' ? 'active' : ''} onClick={() => setActiveTab('settings')}>
-            <Settings size={20} /> Settings
-          </li>
+          <li className="admin-nav-section-title">Main</li>
+          {navItems.slice(0, 1).map(({ id, label, Icon, badge }) => (
+            <li key={id} className={activeTab === id ? 'active' : ''} onClick={() => setActiveTab(id)}>
+              <Icon size={17} /> {label}
+              {badge > 0 && <span className="nav-badge">{badge}</span>}
+            </li>
+          ))}
+          <li className="admin-nav-section-title">Management</li>
+          {navItems.slice(1, 6).map(({ id, label, Icon, badge }) => (
+            <li key={id} className={activeTab === id ? 'active' : ''} onClick={() => setActiveTab(id)}>
+              <Icon size={17} /> {label}
+              {badge > 0 && <span className="nav-badge">{badge}</span>}
+            </li>
+          ))}
+          <li className="admin-nav-section-title">System</li>
+          {navItems.slice(6).map(({ id, label, Icon }) => (
+            <li key={id} className={activeTab === id ? 'active' : ''} onClick={() => setActiveTab(id)}>
+              <Icon size={17} /> {label}
+            </li>
+          ))}
         </ul>
       </aside>
 
+      {/* ── Main ── */}
       <main className="admin-main">
-        <header className="admin-header">
-          <h1>{activeTab === 'providers' ? 'Manage Experts' : activeTab === 'users' ? 'User Management' : activeTab === 'products' ? 'Product Approvals' : activeTab === 'orders' ? 'All Platform Orders' : activeTab === 'settings' ? 'Settings' : 'Admin Panel'}</h1>
-        </header>
 
-        <div className="admin-content">
-          {activeTab === 'dashboard' && (
-            <div className="dashboard-overview" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
-              <div className="glass-panel stat-card" onClick={() => setActiveTab('providers')} style={{ padding: '1.5rem', textAlign: 'center', cursor: 'pointer', transition: 'transform 0.2s' }}>
-                <h3 style={{ color: 'var(--text-secondary)' }}>Total Experts</h3>
-                <p style={{ fontSize: '2rem', fontWeight: 'bold', color: 'var(--primary-color)', margin: '0.5rem 0' }}>{providers.length}</p>
+        {/* ══════════════════════ DASHBOARD OVERVIEW ══════════════════════ */}
+        {activeTab === 'dashboard' && (
+          <>
+            <div className="admin-page-header">
+              <div>
+                <h1>Platform Overview</h1>
+                <p className="page-subtitle">Real-time analytics and key metrics</p>
               </div>
-              <div className="glass-panel stat-card" onClick={() => setActiveTab('products')} style={{ padding: '1.5rem', textAlign: 'center', cursor: 'pointer', transition: 'transform 0.2s' }}>
-                <h3 style={{ color: 'var(--text-secondary)' }}>Pending Products</h3>
-                <p style={{ fontSize: '2rem', fontWeight: 'bold', color: '#856404', margin: '0.5rem 0' }}>{pendingCount}</p>
-              </div>
-              <div className="glass-panel stat-card" onClick={() => setActiveTab('orders')} style={{ padding: '1.5rem', textAlign: 'center', cursor: 'pointer', transition: 'transform 0.2s' }}>
-                <h3 style={{ color: 'var(--text-secondary)' }}>Total Orders</h3>
-                <p style={{ fontSize: '2rem', fontWeight: 'bold', color: 'var(--text-primary)', margin: '0.5rem 0' }}>{orders.length}</p>
-              </div>
+              <button
+                className="btn btn-ghost btn-sm"
+                onClick={() => { fetchProviders(); fetchProducts(); fetchOrders(); fetchAppointments(); }}
+                style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.82rem' }}
+              >
+                <RefreshCw size={14} /> Refresh
+              </button>
             </div>
-          )}
 
-          {activeTab === 'providers' && (
-            <div className="glass-panel table-container">
-              <p className="admin-hint">Review and approve expert profiles on the platform.</p>
-              {loadingProviders ? <p style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-secondary)' }}>Loading experts...</p> : (
-                <table className="admin-table">
-                  <thead>
-                    <tr>
-                      <th>Name</th>
-                      <th>Role</th>
-                      <th>Specialty/Type</th>
-                      <th>Email</th>
-                      <th>Phone</th>
-                      <th>Location</th>
-                      <th>Status</th>
-                      <th>Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {providers.map((provider) => (
-                      <tr key={provider.id}>
-                        <td className="fw-bold">{provider.name || 'N/A'}</td>
-                        <td style={{ textTransform: 'capitalize' }}>{provider.role}</td>
-                        <td>{provider.profileDetails?.specialty || provider.profileDetails?.doctorType || provider.profileDetails?.category || 'N/A'}</td>
-                        <td>
-                          {provider.email ? (
-                            <a
-                              href={`mailto:${provider.email}`}
-                              style={{ color: 'var(--primary-color)', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '4px' }}
-                              title={`Email ${provider.name}`}
-                            >
-                              ✉️ {provider.email}
-                            </a>
-                          ) : 'N/A'}
-                        </td>
-                        <td>
-                          {(provider.profileDetails?.phone || provider.profileDetails?.telephone) ? (
-                            <a
-                              href={`tel:${provider.profileDetails.phone || provider.profileDetails.telephone}`}
-                              style={{ color: 'var(--secondary-color)', textDecoration: 'none' }}
-                            >
-                              📞 {provider.profileDetails.phone || provider.profileDetails.telephone}
-                            </a>
-                          ) : 'N/A'}
-                        </td>
-                        <td>{provider.profileDetails?.address || 'N/A'}</td>
-                        <td>
-                          {provider.status === 'pending' ? (
-                            <span className="type-badge astrologer" style={{background: '#fff3cd', color: '#856404'}}>Pending</span>
-                          ) : (
-                            <span className="type-badge doctor" style={{background: '#d4edda', color: '#155724'}}>Approved</span>
-                          )}
-                        </td>
-                        <td>
-                          {provider.status === 'pending' && (
-                            <button onClick={() => handleApproveUser(provider.id)} className="btn btn-primary" style={{padding: '0.25rem 0.75rem', fontSize: '0.85rem', background: 'var(--success-color)'}}>Approve</button>
-                          )}
-                        </td>
-                      </tr>
-                    ))}
-                    {providers.length === 0 && (
-                      <tr><td colSpan="8" style={{textAlign: 'center', padding: '2rem'}}>No experts found.</td></tr>
-                    )}
-                  </tbody>
-                </table>
-              )}
-            </div>
-          )}
-
-          {activeTab === 'products' && (
-            <div className="glass-panel table-container">
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-                <p className="admin-hint" style={{ margin: 0 }}>Review products added by Vendors before they go live.</p>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  <Filter size={16} color="var(--text-secondary)" />
-                  <select 
-                    style={{ padding: '0.5rem', borderRadius: 'var(--radius-sm)', border: '1px solid rgba(212, 175, 55, 0.3)', background: 'var(--surface-color)', color: 'var(--text-primary)' }}
-                    value={filterVendor}
-                    onChange={(e) => setFilterVendor(e.target.value)}
-                  >
-                    <option value="All">All Vendors</option>
-                    {[...new Set(products.map(p => p.vendorName || p.vendorId))].map(vendor => (
-                      <option key={vendor} value={vendor}>{vendor}</option>
-                    ))}
-                  </select>
+            {/* KPI Grid */}
+            <div className="kpi-grid">
+              {[
+                {
+                  label: 'Total Experts',
+                  value: providers.length,
+                  Icon: Users,
+                  color: '#29b6f6',
+                  iconBg: 'rgba(41,182,246,0.12)',
+                  accent: 'linear-gradient(90deg,#29b6f6,#0288d1)',
+                  trend: `${pendingExperts} pending`,
+                  trendType: pendingExperts > 0 ? 'warn' : '',
+                  onClick: () => setActiveTab('providers'),
+                },
+                {
+                  label: 'Total Products',
+                  value: products.length,
+                  Icon: Package,
+                  color: '#ab47bc',
+                  iconBg: 'rgba(171,71,188,0.12)',
+                  accent: 'linear-gradient(90deg,#ab47bc,#7b1fa2)',
+                  trend: `${pendingProducts} pending`,
+                  trendType: pendingProducts > 0 ? 'warn' : '',
+                  onClick: () => setActiveTab('products'),
+                },
+                {
+                  label: 'Total Orders',
+                  value: orders.length,
+                  Icon: ShoppingBag,
+                  color: '#26c6da',
+                  iconBg: 'rgba(38,198,218,0.12)',
+                  accent: 'linear-gradient(90deg,#26c6da,#00838f)',
+                  trend: `${pendingOrders} pending`,
+                  trendType: pendingOrders > 0 ? 'warn' : '',
+                  onClick: () => setActiveTab('orders'),
+                },
+                {
+                  label: 'Platform Revenue',
+                  value: fmtCurrency(totalRevenue),
+                  Icon: TrendingUp,
+                  color: '#4caf50',
+                  iconBg: 'rgba(76,175,80,0.12)',
+                  accent: 'linear-gradient(90deg,#4caf50,#2e7d32)',
+                  trend: `${fmtCurrency(commissionRevenue)} commission`,
+                  trendType: '',
+                  onClick: () => setActiveTab('orders'),
+                },
+                {
+                  label: 'Total Appointments',
+                  value: appointments.length,
+                  Icon: Calendar,
+                  color: '#ffa726',
+                  iconBg: 'rgba(255,167,38,0.12)',
+                  accent: 'linear-gradient(90deg,#ffa726,#e65100)',
+                  trend: `${thisWeekAppts} this week`,
+                  trendType: '',
+                  onClick: () => setActiveTab('appointments'),
+                },
+                {
+                  label: 'Approved Products',
+                  value: products.filter(p => p.status === 'approved').length,
+                  Icon: CheckCircle,
+                  color: '#d4af37',
+                  iconBg: 'rgba(212,175,55,0.12)',
+                  accent: 'linear-gradient(90deg,#d4af37,#a67c00)',
+                  trend: `of ${products.length} total`,
+                  trendType: '',
+                  onClick: () => setActiveTab('products'),
+                },
+              ].map(({ label, value, Icon, color, iconBg, accent, trend, trendType, onClick }) => (
+                <div
+                  key={label}
+                  className="kpi-card"
+                  style={{ '--kpi-accent': accent, '--kpi-icon-bg': iconBg, cursor: 'pointer' }}
+                  onClick={onClick}
+                >
+                  <div className="kpi-card-header">
+                    <div className="kpi-icon-box">
+                      <Icon size={20} color={color} />
+                    </div>
+                    <span className={`kpi-trend ${trendType}`}>{trend}</span>
+                  </div>
+                  <div className="kpi-value">{value}</div>
+                  <div className="kpi-label">{label}</div>
                 </div>
-              </div>
-              
-              <table className="admin-table">
-                <thead>
-                  <tr>
-                    <th>Product</th>
-                    <th>Vendor</th>
-                    <th>Category</th>
-                    <th>Price</th>
-                    <th>Status</th>
-                    <th>Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {products
-                    .filter(p => filterVendor === 'All' || p.vendorName === filterVendor || p.vendorId === filterVendor)
-                    .map(product => (
-                    <tr key={product.id}>
-                      <td className="fw-bold">{product.name}</td>
-                      <td>{product.vendorName || product.vendorId}</td>
-                      <td>{product.category}</td>
-                      <td>Rs. {product.price}</td>
-                      <td>
-                        {product.status === 'pending' && <span className="type-badge astrologer" style={{background: '#fff3cd', color: '#856404'}}>Pending</span>}
-                        {product.status === 'approved' && <span className="type-badge doctor" style={{background: '#d4edda', color: '#155724'}}>Approved</span>}
-                        {product.status === 'hidden' && <span className="type-badge" style={{background: '#e2e3e5', color: '#383d41'}}>Hidden</span>}
-                      </td>
-                      <td>
-                        <div style={{display: 'flex', gap: '0.5rem'}}>
-                          {product.status === 'pending' && (
-                            <button onClick={() => handleProductAction(product.id, 'approve')} className="btn btn-primary" style={{padding: '0.25rem 0.75rem', fontSize: '0.85rem', background: 'var(--success-color)'}}>Approve</button>
-                          )}
-                          {product.status === 'approved' && (
-                            <button onClick={() => handleProductAction(product.id, 'hide')} className="btn btn-outline" style={{padding: '0.25rem 0.75rem', fontSize: '0.85rem'}}>Hide</button>
-                          )}
-                          {product.status === 'hidden' && (
-                            <button onClick={() => handleProductAction(product.id, 'approve')} className="btn btn-primary" style={{padding: '0.25rem 0.75rem', fontSize: '0.85rem', background: 'var(--success-color)'}}>Re-Approve</button>
-                          )}
-                          <button onClick={() => handleProductAction(product.id, 'delete')} className="btn btn-outline" style={{padding: '0.25rem 0.75rem', fontSize: '0.85rem', color: 'var(--error-color)', borderColor: 'var(--error-color)'}}>Delete</button>
-                        </div>
-                      </td>
-                    </tr>
+              ))}
+            </div>
+
+            {/* Recent Activity */}
+            <div className="two-col">
+              {/* Recent Orders */}
+              <div className="dash-section">
+                <div className="dash-section-header">
+                  <h3><ShoppingBag size={15} /> Recent Orders</h3>
+                  <span className="view-all" onClick={() => setActiveTab('orders')}>View all →</span>
+                </div>
+                <div className="dash-section-body">
+                  {recentOrders.length === 0 ? (
+                    <div className="empty-state" style={{ padding: '2rem' }}>
+                      <div className="icon">🛒</div>
+                      <p>No orders yet</p>
+                    </div>
+                  ) : recentOrders.map(o => (
+                    <div key={o.id} className="activity-item">
+                      <div className="activity-avatar">
+                        {(o.customerName || 'U').charAt(0).toUpperCase()}
+                      </div>
+                      <div className="activity-info">
+                        <div className="title">{o.customerName || 'Customer'}</div>
+                        <div className="subtitle">{o.vendorName || '—'} · {fmtDateShort(o.createdAt)}</div>
+                      </div>
+                      <div className="activity-meta">
+                        <div className="amount">{fmtCurrency(o.totalPrice)}</div>
+                        <StatusPill status={o.status} />
+                      </div>
+                    </div>
                   ))}
-                  {products.filter(p => filterVendor === 'All' || p.vendorName === filterVendor || p.vendorId === filterVendor).length === 0 && (
-                    <tr><td colSpan="6" style={{textAlign: 'center', padding: '2rem'}}>No products found.</td></tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          )}
-          {activeTab === 'orders' && (
-            <div className="glass-panel table-container">
-              <p className="admin-hint">View all orders placed across the platform. You can monitor the status here.</p>
-              {loadingOrders ? <p style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-secondary)' }}>Loading orders...</p> : (
-                <table className="admin-table">
-                  <thead>
-                    <tr>
-                      <th>Order ID</th>
-                      <th>Customer</th>
-                      <th>Vendor</th>
-                      <th>Total Price</th>
-                      <th>Status</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {orders.map(order => (
-                      <tr key={order.id}>
-                        <td className="fw-bold">{order.id}</td>
-                        <td>{order.customerName}</td>
-                        <td>{order.vendorName}</td>
-                        <td>Rs. {order.totalPrice}</td>
-                        <td>
-                          {order.status === 'pending' && <span className="type-badge astrologer" style={{background: '#fff3cd', color: '#856404'}}>Pending</span>}
-                          {order.status === 'confirmed' && <span className="type-badge doctor" style={{background: '#cce5ff', color: '#004085'}}>Confirmed</span>}
-                          {order.status === 'processing' && <span className="type-badge astrologer" style={{background: '#e2d9f3', color: '#553c9a'}}>Processing</span>}
-                          {order.status === 'shipped' && <span className="type-badge doctor" style={{background: '#d4edda', color: '#155724'}}>Shipped</span>}
-                          {order.status === 'delivered' && <span className="type-badge" style={{background: '#cce5ff', color: '#004085'}}>Delivered</span>}
-                          {order.status === 'cancelled' && <span className="type-badge" style={{background: '#f8d7da', color: '#721c24'}}>Cancelled</span>}
-                        </td>
-                      </tr>
-                    ))}
-                    {orders.length === 0 && (
-                      <tr><td colSpan="5" style={{textAlign: 'center', padding: '2rem'}}>No orders found.</td></tr>
-                    )}
-                  </tbody>
-                </table>
-              )}
-            </div>
-          )}
-
-          {activeTab === 'settings' && (
-            <div className="glass-panel" style={{ padding: '2rem' }}>
-              <h2>Admin Settings</h2>
-              <p className="admin-hint">Configure platform settings here.</p>
-              
-              <div className="form-group" style={{ maxWidth: '400px', marginTop: '2rem' }}>
-                <label>Platform Commission (%)</label>
-                <input 
-                  type="number" 
-                  value={settings.commissionPercent} 
-                  onChange={e => setSettings({...settings, commissionPercent: Number(e.target.value)})}
-                  className="form-control" 
-                />
-              </div>
-              
-              <div className="form-group" style={{ maxWidth: '400px', marginTop: '1rem' }}>
-                <label>Auto-approve Verified Clinics</label>
-                <div style={{ display: 'flex', gap: '1rem', marginTop: '0.5rem' }}>
-                  <label>
-                    <input 
-                      type="radio" 
-                      name="auto_approve_experts" 
-                      checked={settings.autoApproveExperts === true} 
-                      onChange={() => setSettings({...settings, autoApproveExperts: true})}
-                    /> Yes
-                  </label>
-                  <label>
-                    <input 
-                      type="radio" 
-                      name="auto_approve_experts" 
-                      checked={settings.autoApproveExperts === false} 
-                      onChange={() => setSettings({...settings, autoApproveExperts: false})}
-                    /> No
-                  </label>
-                </div>
-              </div>
-              
-              <div className="form-group" style={{ maxWidth: '400px', marginTop: '1rem' }}>
-                <label>Auto-approve Products</label>
-                <div style={{ display: 'flex', gap: '1rem', marginTop: '0.5rem' }}>
-                  <label>
-                    <input 
-                      type="radio" 
-                      name="auto_approve_products" 
-                      checked={settings.autoApproveProducts === true} 
-                      onChange={() => setSettings({...settings, autoApproveProducts: true})}
-                    /> Yes
-                  </label>
-                  <label>
-                    <input 
-                      type="radio" 
-                      name="auto_approve_products" 
-                      checked={settings.autoApproveProducts === false} 
-                      onChange={() => setSettings({...settings, autoApproveProducts: false})}
-                    /> No
-                  </label>
                 </div>
               </div>
 
-              <button className="btn btn-primary" onClick={handleSaveSettings} style={{ marginTop: '2rem' }}>Save Settings</button>
-            </div>
-          )}
-
-          {activeTab === 'users' && (
-            <div className="glass-panel table-container">
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem', flexWrap: 'wrap', gap: '0.5rem' }}>
-                <p className="admin-hint" style={{ margin: 0 }}>Manage all registered users. Showing {PAGE_SIZE} per page — handles 100,000+ users efficiently.</p>
-                <span style={{ color: 'var(--text-secondary)', fontSize: '0.82rem', whiteSpace: 'nowrap' }}>
-                  {totalUsers > 0 && `Total: ${totalUsers.toLocaleString()} users`}
-                </span>
-              </div>
-
-              {/* Search & Filter Bar */}
-              <div style={{ display: 'flex', gap: '0.75rem', marginBottom: '1.25rem', flexWrap: 'wrap', alignItems: 'center' }}>
-                <div style={{ position: 'relative', flex: 1, minWidth: '220px' }}>
-                  <Search size={15} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-secondary)' }} />
-                  <input
-                    type="text"
-                    placeholder="Search name or email on this page..."
-                    value={userSearch}
-                    onChange={e => setUserSearch(e.target.value)}
-                    style={{ width: '100%', padding: '0.55rem 0.8rem 0.55rem 2rem', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.15)', background: 'var(--surface-color)', color: 'var(--text-primary)', fontSize: '0.88rem', boxSizing: 'border-box' }}
-                  />
+              {/* Recent Appointments */}
+              <div className="dash-section">
+                <div className="dash-section-header">
+                  <h3><Calendar size={15} /> Recent Appointments</h3>
+                  <span className="view-all" onClick={() => setActiveTab('appointments')}>View all →</span>
                 </div>
-                <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
-                  {['all','user','doctor','clinic','organization','vendor'].map(role => (
+                <div className="dash-section-body">
+                  {recentAppts.length === 0 ? (
+                    <div className="empty-state" style={{ padding: '2rem' }}>
+                      <div className="icon">📅</div>
+                      <p>No appointments yet</p>
+                    </div>
+                  ) : recentAppts.map(a => (
+                    <div key={a.id} className="appt-mini-item">
+                      <div className="appt-mini-info">
+                        <div className="name">{a.customerName || '—'}</div>
+                        <div className="meta">{a.providerName || '—'}</div>
+                      </div>
+                      <div className="appt-mini-time">
+                        <div>{a.date}</div>
+                        <StatusPill status={a.status} />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Pending Alerts */}
+            {(pendingExperts > 0 || pendingProducts > 0) && (
+              <div className="dash-section" style={{ borderColor: 'rgba(255,167,38,0.25)' }}>
+                <div className="dash-section-header">
+                  <h3><AlertTriangle size={15} color="#ffa726" /> Action Required</h3>
+                </div>
+                <div style={{ padding: '1rem 1.5rem', display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
+                  {pendingExperts > 0 && (
                     <button
-                      key={role}
-                      onClick={() => setUserRoleFilter(role)}
-                      style={{
-                        padding: '0.35rem 0.8rem', borderRadius: '20px', border: '1px solid',
-                        borderColor: userRoleFilter === role ? 'var(--primary-color)' : 'rgba(255,255,255,0.2)',
-                        background: userRoleFilter === role ? 'var(--primary-color)' : 'transparent',
-                        color: userRoleFilter === role ? '#000' : 'var(--text-secondary)',
-                        cursor: 'pointer', fontSize: '0.8rem',
-                        fontWeight: userRoleFilter === role ? '700' : 'normal',
-                        textTransform: 'capitalize', transition: 'all 0.2s'
-                      }}
+                      className="btn btn-outline"
+                      onClick={() => setActiveTab('providers')}
+                      style={{ borderColor: '#ffa726', color: '#ffa726', display: 'flex', alignItems: 'center', gap: '0.5rem' }}
                     >
-                      {role === 'all' ? 'All Users' : role.charAt(0).toUpperCase() + role.slice(1)}
+                      <Users size={15} /> {pendingExperts} Expert{pendingExperts > 1 ? 's' : ''} Awaiting Approval
                     </button>
-                  ))}
+                  )}
+                  {pendingProducts > 0 && (
+                    <button
+                      className="btn btn-outline"
+                      onClick={() => setActiveTab('products')}
+                      style={{ borderColor: '#ffa726', color: '#ffa726', display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+                    >
+                      <Package size={15} /> {pendingProducts} Product{pendingProducts > 1 ? 's' : ''} Awaiting Approval
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
+          </>
+        )}
+
+        {/* ══════════════════════ EXPERTS ══════════════════════ */}
+        {activeTab === 'providers' && (
+          <>
+            <div className="admin-page-header">
+              <div><h1>Manage Experts</h1><p className="page-subtitle">Approve and manage doctors, clinics, and organizations</p></div>
+              <button className="btn btn-ghost btn-sm" onClick={fetchProviders} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.82rem' }}>
+                <RefreshCw size={14} /> Refresh
+              </button>
+            </div>
+            <div className="table-container">
+              <div className="table-toolbar">
+                <span className="table-title"><Users size={16} /> {filteredProviders.length} Experts</span>
+                <div className="table-controls">
+                  <div className="search-box" style={{ minWidth: '220px' }}>
+                    <Search size={14} />
+                    <input placeholder="Search name or email…" value={providerSearch} onChange={e => setProviderSearch(e.target.value)} />
+                  </div>
+                </div>
+              </div>
+
+              {loadingProviders ? (
+                <div className="loading-state"><div className="spinner spinner-sm" /> Loading experts…</div>
+              ) : filteredProviders.length === 0 ? (
+                <div className="empty-state"><div className="icon">👤</div><h4>No experts found</h4></div>
+              ) : (
+                <div style={{ overflowX: 'auto' }}>
+                  <table className="admin-table">
+                    <thead><tr>
+                      <th>Expert</th><th>Role</th><th>Specialty</th><th>Location</th><th>Status</th><th>Actions</th>
+                    </tr></thead>
+                    <tbody>
+                      {filteredProviders.map(p => (
+                        <tr key={p.id}>
+                          <td>
+                            <div className="user-cell">
+                              <div className="user-avatar">
+                                {p.profileDetails?.profileImageUrl
+                                  ? <img src={p.profileDetails.profileImageUrl} alt={p.name} />
+                                  : userInitials(p)}
+                              </div>
+                              <div>
+                                <div className="name">{p.name || '—'}</div>
+                                <div className="email">{p.email}</div>
+                              </div>
+                            </div>
+                          </td>
+                          <td style={{ textTransform: 'capitalize' }}>{p.role}</td>
+                          <td>{p.profileDetails?.specialty || p.profileDetails?.category || '—'}</td>
+                          <td>{p.profileDetails?.address || '—'}</td>
+                          <td><StatusPill status={p.status === 'pending' ? 'pending' : 'approved'} /></td>
+                          <td>
+                            <div className="action-btns">
+                              {p.status === 'pending' && (
+                                <button className="btn-xs approve" onClick={() => handleApproveUser(p.id)}>
+                                  Approve
+                                </button>
+                              )}
+                              <a href={`mailto:${p.email}`} className="btn-xs edit-btn" style={{ textDecoration: 'none' }}>
+                                Email
+                              </a>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          </>
+        )}
+
+        {/* ══════════════════════ ALL USERS ══════════════════════ */}
+        {activeTab === 'users' && (
+          <>
+            <div className="admin-page-header">
+              <div>
+                <h1>User Management</h1>
+                <p className="page-subtitle">
+                  {totalUsers > 0 ? `${totalUsers.toLocaleString()} registered users` : 'All platform users'}
+                </p>
+              </div>
+            </div>
+            <div className="table-container">
+              <div className="table-toolbar">
+                <span className="table-title"><ShieldAlert size={16} /> Users</span>
+                <div className="table-controls">
+                  <div className="search-box">
+                    <Search size={14} />
+                    <input placeholder="Search name or email…" value={userSearch} onChange={e => setUserSearch(e.target.value)} />
+                  </div>
+                  <div className="filter-chips">
+                    {['all','user','doctor','clinic','organization','vendor'].map(r => (
+                      <button key={r} className={`filter-chip ${userRoleFilter === r ? 'active' : ''}`} onClick={() => setUserRoleFilter(r)}>
+                        {r === 'all' ? 'All' : r.charAt(0).toUpperCase() + r.slice(1)}
+                      </button>
+                    ))}
+                  </div>
                 </div>
               </div>
 
               {loadingUsers ? (
-                <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '3rem', gap: '0.75rem', color: 'var(--text-secondary)' }}>
-                  <div className="spinner spinner-sm" />
-                  <span>Loading users...</span>
-                </div>
+                <div className="loading-state"><div className="spinner spinner-sm" /> Loading users…</div>
               ) : (
                 <>
-                  <table className="admin-table">
-                    <thead>
-                      <tr>
-                        <th>#</th>
-                        <th>Name</th>
-                        <th>Email</th>
-                        <th>Role</th>
-                        <th>Status</th>
-                        <th>Joined</th>
-                        <th>Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {platformUsers.length === 0 ? (
-                        <tr><td colSpan="7" style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>No users found for this filter.</td></tr>
-                      ) : platformUsers.map((u, idx) => (
-                        <tr key={u.id}>
-                          <td style={{ color: 'var(--text-muted)', fontSize: '0.78rem' }}>{(currentPage - 1) * PAGE_SIZE + idx + 1}</td>
-                          <td className="fw-bold">{u.name || 'N/A'}</td>
-                          <td style={{ fontSize: '0.82rem' }}>{u.email}</td>
-                          <td>
-                            <select
-                              value={u.role || 'user'}
-                              onChange={(e) => handleUpdateRole(u.id, e.target.value)}
-                              style={{ padding: '0.3rem 0.5rem', borderRadius: '4px', border: '1px solid var(--glass-border)', background: 'var(--surface-color)', color: 'var(--text-primary)', fontSize: '0.82rem' }}
-                              disabled={u.email === 'yes.manujaya@gmail.com'}
-                            >
-                              <option value="user">User</option>
-                              <option value="doctor">Doctor</option>
-                              <option value="clinic">Clinic</option>
-                              <option value="organization">Organization</option>
-                              <option value="vendor">Vendor</option>
-                              {u.email === 'yes.manujaya@gmail.com' && <option value="admin">Admin</option>}
-                            </select>
-                          </td>
-                          <td>
-                            <span style={{
-                              padding: '0.2rem 0.6rem', borderRadius: '999px', fontSize: '0.73rem', fontWeight: '700',
-                              background: u.status === 'pending' ? 'rgba(255,167,38,0.15)' : 'rgba(76,175,80,0.15)',
-                              color: u.status === 'pending' ? '#ffa726' : 'var(--success-color)'
-                            }}>
-                              {u.status === 'pending' ? 'Pending' : 'Active'}
-                            </span>
-                          </td>
-                          <td style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>{u.createdAt ? new Date(u.createdAt).toLocaleDateString() : 'N/A'}</td>
-                          <td>
-                            <div style={{ display: 'flex', gap: '0.4rem' }}>
-                              {u.status === 'pending' && (
-                                <button onClick={() => handleApproveUser(u.id)} className="btn btn-primary" style={{ padding: '0.25rem 0.5rem', fontSize: '0.78rem' }}>Approve</button>
-                              )}
-                              <button
-                                className="btn btn-danger btn-sm"
-                                onClick={() => handleDeleteUser(u.id)}
+                  <div style={{ overflowX: 'auto' }}>
+                    <table className="admin-table">
+                      <thead><tr>
+                        <th>#</th><th>User</th><th>Role</th><th>Status</th><th>Joined</th><th>Actions</th>
+                      </tr></thead>
+                      <tbody>
+                        {platformUsers.length === 0 ? (
+                          <tr><td colSpan="6"><div className="empty-state"><div className="icon">👤</div><p>No users found</p></div></td></tr>
+                        ) : platformUsers.map((u, idx) => (
+                          <tr key={u.id}>
+                            <td style={{ color: 'var(--text-secondary)', fontSize: '0.78rem' }}>
+                              {(currentPage - 1) * PAGE_SIZE + idx + 1}
+                            </td>
+                            <td>
+                              <div className="user-cell">
+                                <div className="user-avatar">{userInitials(u)}</div>
+                                <div>
+                                  <div className="name">{u.name || '—'}</div>
+                                  <div className="email">{u.email}</div>
+                                </div>
+                              </div>
+                            </td>
+                            <td>
+                              <select
+                                className="role-select"
+                                value={u.role || 'user'}
+                                onChange={e => handleUpdateRole(u.id, e.target.value)}
                                 disabled={u.email === 'yes.manujaya@gmail.com'}
                               >
-                                Delete
+                                {['user','doctor','clinic','organization','vendor'].map(r => (
+                                  <option key={r} value={r}>{r.charAt(0).toUpperCase() + r.slice(1)}</option>
+                                ))}
+                                {u.email === 'yes.manujaya@gmail.com' && <option value="admin">Admin</option>}
+                              </select>
+                            </td>
+                            <td><StatusPill status={u.status === 'pending' ? 'pending' : 'active'} /></td>
+                            <td style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>{fmtDate(u.createdAt)}</td>
+                            <td>
+                              <div className="action-btns">
+                                {u.status === 'pending' && (
+                                  <button className="btn-xs approve" onClick={() => handleApproveUser(u.id)}>Approve</button>
+                                )}
+                                <button
+                                  className="btn-xs delete-btn"
+                                  onClick={() => handleDeleteUser(u.id, u.name)}
+                                  disabled={u.email === 'yes.manujaya@gmail.com'}
+                                >
+                                  Delete
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  <div className="users-pagination">
+                    <button className="btn btn-ghost btn-sm" onClick={handlePrevPage} disabled={currentPage <= 1 || loadingUsers}>
+                      <ChevronLeft size={16} /> Previous
+                    </button>
+                    <span className="page-info">
+                      Page <strong>{currentPage}</strong>
+                      {totalUsers > 0 && ` of ${Math.ceil(totalUsers / PAGE_SIZE)}`}
+                      {totalUsers > 0 && <span style={{ color: 'var(--text-secondary)', marginLeft: '0.5rem' }}>({totalUsers.toLocaleString()} total)</span>}
+                    </span>
+                    <button className="btn btn-ghost btn-sm" onClick={handleNextPage} disabled={!pagesCursors[currentPage] || loadingUsers}>
+                      Next <ChevronRight size={16} />
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+          </>
+        )}
+
+        {/* ══════════════════════ PRODUCTS ══════════════════════ */}
+        {activeTab === 'products' && (
+          <>
+            <div className="admin-page-header">
+              <div><h1>Product Approvals</h1><p className="page-subtitle">Review vendor products before they go live</p></div>
+              <button className="btn btn-ghost btn-sm" onClick={fetchProducts} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.82rem' }}>
+                <RefreshCw size={14} /> Refresh
+              </button>
+            </div>
+            <div className="table-container">
+              <div className="table-toolbar">
+                <span className="table-title"><Package size={16} /> {filteredProducts.length} products</span>
+                <div className="table-controls">
+                  <div className="search-box">
+                    <Search size={14} />
+                    <input placeholder="Search product or vendor…" value={productSearch} onChange={e => setProductSearch(e.target.value)} />
+                  </div>
+                  <div className="filter-chips">
+                    {['All','pending','approved','hidden','rejected'].map(s => (
+                      <button key={s} className={`filter-chip ${filterProduct === s ? 'active' : ''}`} onClick={() => setFilterProduct(s)}>
+                        {s.charAt(0).toUpperCase() + s.slice(1)}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {loadingProducts ? (
+                <div className="loading-state"><div className="spinner spinner-sm" /> Loading products…</div>
+              ) : filteredProducts.length === 0 ? (
+                <div className="empty-state"><div className="icon">📦</div><h4>No products found</h4></div>
+              ) : (
+                <div style={{ overflowX: 'auto' }}>
+                  <table className="admin-table">
+                    <thead><tr>
+                      <th>Product</th><th>Vendor</th><th>Category</th><th>Price</th><th>Stock</th><th>Status</th><th>Actions</th>
+                    </tr></thead>
+                    <tbody>
+                      {filteredProducts.map(p => (
+                        <tr key={p.id}>
+                          <td>
+                            <div className="product-cell">
+                              {(p.imageUrl || (p.images && p.images[0])) ? (
+                                <img
+                                  src={p.imageUrl || p.images[0]}
+                                  alt={p.name}
+                                  className="product-thumb"
+                                  onError={e => { e.target.style.display = 'none'; }}
+                                />
+                              ) : (
+                                <div className="product-thumb" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.2rem' }}>📦</div>
+                              )}
+                              <div>
+                                <div className="name">{p.name}</div>
+                                <div className="desc">{p.description || '—'}</div>
+                              </div>
+                            </div>
+                          </td>
+                          <td>{p.vendorName || p.vendorId?.slice(0, 8) || '—'}</td>
+                          <td>{p.category || '—'}</td>
+                          <td style={{ fontWeight: 600 }}>{fmtCurrency(p.price || p.basePrice)}</td>
+                          <td>{p.stock ?? '—'}</td>
+                          <td><StatusPill status={p.status} /></td>
+                          <td>
+                            <div className="action-btns">
+                              {p.status === 'pending' && (
+                                <button className="btn-xs approve" onClick={() => handleProductAction(p.id, 'approve')}>Approve</button>
+                              )}
+                              {p.status === 'approved' && (
+                                <button className="btn-xs hide-btn" onClick={() => handleProductAction(p.id, 'hide')}>
+                                  <EyeOff size={12} style={{ display: 'inline', marginRight: '3px' }} />Hide
+                                </button>
+                              )}
+                              {(p.status === 'hidden' || p.status === 'rejected') && (
+                                <button className="btn-xs approve" onClick={() => handleProductAction(p.id, 'approve')}>
+                                  <Eye size={12} style={{ display: 'inline', marginRight: '3px' }} />Re-Approve
+                                </button>
+                              )}
+                              {p.status === 'pending' && (
+                                <button className="btn-xs reject" onClick={() => handleProductAction(p.id, 'reject')}>Reject</button>
+                              )}
+                              <button className="btn-xs delete-btn" onClick={() => handleProductAction(p.id, 'delete')}>
+                                <Trash2 size={12} style={{ display: 'inline', marginRight: '3px' }} />Del
                               </button>
                             </div>
                           </td>
@@ -770,34 +842,256 @@ const AdminDashboard = () => {
                       ))}
                     </tbody>
                   </table>
-
-                  {/* Pagination Controls */}
-                  <div className="users-pagination">
-                    <button
-                      className="btn btn-ghost btn-sm"
-                      onClick={handlePrevPage}
-                      disabled={currentPage <= 1 || loadingUsers}
-                    >
-                      <ChevronLeft size={16} /> Previous
-                    </button>
-                    <span className="page-info">
-                      Page <strong>{currentPage}</strong>
-                      {totalUsers > 0 && ` of ${Math.ceil(totalUsers / PAGE_SIZE)}`}
-                      {totalUsers > 0 && <span style={{ color: 'var(--text-muted)', marginLeft: '0.5rem' }}>({totalUsers.toLocaleString()} total)</span>}
-                    </span>
-                    <button
-                      className="btn btn-ghost btn-sm"
-                      onClick={handleNextPage}
-                      disabled={!pagesCursors[currentPage] || loadingUsers}
-                    >
-                      Next <ChevronRight size={16} />
-                    </button>
-                  </div>
-                </>
+                </div>
               )}
             </div>
-          )}
-        </div>
+          </>
+        )}
+
+        {/* ══════════════════════ ORDERS ══════════════════════ */}
+        {activeTab === 'orders' && (
+          <>
+            <div className="admin-page-header">
+              <div>
+                <h1>All Orders</h1>
+                <p className="page-subtitle">
+                  {orders.length} orders · Total GMV: {fmtCurrency(orders.reduce((s, o) => s + Number(o.totalPrice || 0), 0))} · Commission: {fmtCurrency(commissionRevenue)}
+                </p>
+              </div>
+              <button className="btn btn-ghost btn-sm" onClick={fetchOrders} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.82rem' }}>
+                <RefreshCw size={14} /> Refresh
+              </button>
+            </div>
+            <div className="table-container">
+              <div className="table-toolbar">
+                <span className="table-title"><ShoppingBag size={16} /> {filteredOrders.length} orders</span>
+                <div className="table-controls">
+                  <div className="search-box">
+                    <Search size={14} />
+                    <input placeholder="Search customer, vendor, ID…" value={orderSearch} onChange={e => setOrderSearch(e.target.value)} />
+                  </div>
+                </div>
+              </div>
+
+              {loadingOrders ? (
+                <div className="loading-state"><div className="spinner spinner-sm" /> Loading orders…</div>
+              ) : filteredOrders.length === 0 ? (
+                <div className="empty-state"><div className="icon">🛒</div><h4>No orders found</h4></div>
+              ) : (
+                <div style={{ overflowX: 'auto' }}>
+                  <table className="admin-table">
+                    <thead><tr>
+                      <th>Order ID</th><th>Customer</th><th>Vendor</th><th>Total</th><th>Date</th><th>Status</th><th>Update Status</th>
+                    </tr></thead>
+                    <tbody>
+                      {filteredOrders.map(o => (
+                        <tr key={o.id}>
+                          <td style={{ fontFamily: 'monospace', fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
+                            #{o.id?.slice(-8).toUpperCase()}
+                          </td>
+                          <td>
+                            <div className="user-cell">
+                              <div className="user-avatar" style={{ width: '28px', height: '28px', fontSize: '0.72rem' }}>
+                                {(o.customerName || 'C').charAt(0).toUpperCase()}
+                              </div>
+                              <div>
+                                <div className="name">{o.customerName || '—'}</div>
+                                <div className="email">{o.customerEmail || ''}</div>
+                              </div>
+                            </div>
+                          </td>
+                          <td>{o.vendorName || '—'}</td>
+                          <td style={{ fontWeight: 700, color: '#4caf50' }}>{fmtCurrency(o.totalPrice)}</td>
+                          <td style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>{fmtDate(o.createdAt)}</td>
+                          <td><StatusPill status={o.status} /></td>
+                          <td>
+                            <select
+                              className="status-select"
+                              value={o.status || 'pending'}
+                              onChange={e => handleOrderStatus(o.id, e.target.value)}
+                            >
+                              {['pending','confirmed','processing','shipped','delivered','cancelled'].map(s => (
+                                <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>
+                              ))}
+                            </select>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          </>
+        )}
+
+        {/* ══════════════════════ APPOINTMENTS ══════════════════════ */}
+        {activeTab === 'appointments' && (
+          <>
+            <div className="admin-page-header">
+              <div><h1>All Appointments</h1><p className="page-subtitle">{appointments.length} total appointments across the platform</p></div>
+              <button className="btn btn-ghost btn-sm" onClick={fetchAppointments} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.82rem' }}>
+                <RefreshCw size={14} /> Refresh
+              </button>
+            </div>
+
+            {/* Mini stats */}
+            <div className="kpi-grid" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', marginBottom: '1.25rem' }}>
+              {[
+                { label: 'Pending',   val: appointments.filter(a => a.status === 'pending').length,   color: '#ffa726' },
+                { label: 'Accepted',  val: appointments.filter(a => a.status === 'accepted').length,  color: '#4caf50' },
+                { label: 'Completed', val: appointments.filter(a => a.status === 'completed').length, color: '#26c6da' },
+                { label: 'Cancelled', val: appointments.filter(a => a.status === 'cancelled').length, color: '#ef5350' },
+              ].map(({ label, val, color }) => (
+                <div key={label} className="kpi-card" style={{ '--kpi-accent': color, padding: '1rem 1.25rem' }}>
+                  <div className="kpi-value" style={{ fontSize: '1.6rem', color }}>{val}</div>
+                  <div className="kpi-label">{label}</div>
+                </div>
+              ))}
+            </div>
+
+            <div className="table-container">
+              <div className="table-toolbar">
+                <span className="table-title"><Calendar size={16} /> {filteredAppts.length} appointments</span>
+                <div className="table-controls">
+                  <div className="search-box">
+                    <Search size={14} />
+                    <input placeholder="Search patient or doctor…" value={apptSearch} onChange={e => setApptSearch(e.target.value)} />
+                  </div>
+                </div>
+              </div>
+
+              {loadingAppointments ? (
+                <div className="loading-state"><div className="spinner spinner-sm" /> Loading appointments…</div>
+              ) : filteredAppts.length === 0 ? (
+                <div className="empty-state"><div className="icon">📅</div><h4>No appointments found</h4></div>
+              ) : (
+                <div style={{ overflowX: 'auto' }}>
+                  <table className="admin-table">
+                    <thead><tr>
+                      <th>Patient</th><th>Doctor / Provider</th><th>Date</th><th>Time</th><th>Notes</th><th>Status</th>
+                    </tr></thead>
+                    <tbody>
+                      {filteredAppts.map(a => (
+                        <tr key={a.id}>
+                          <td>
+                            <div className="user-cell">
+                              <div className="user-avatar" style={{ width: '28px', height: '28px', fontSize: '0.72rem' }}>
+                                {(a.customerName || 'P').charAt(0).toUpperCase()}
+                              </div>
+                              <div>
+                                <div className="name">{a.customerName || '—'}</div>
+                                <div className="email">{a.customerEmail || ''}</div>
+                              </div>
+                            </div>
+                          </td>
+                          <td style={{ fontWeight: 600 }}>{a.providerName || '—'}</td>
+                          <td>{a.date || '—'}</td>
+                          <td>{a.time || '—'}</td>
+                          <td style={{ maxWidth: '160px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: 'var(--text-secondary)', fontSize: '0.78rem' }}>
+                            {a.notes || '—'}
+                          </td>
+                          <td><StatusPill status={a.status} /></td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          </>
+        )}
+
+        {/* ══════════════════════ SETTINGS ══════════════════════ */}
+        {activeTab === 'settings' && (
+          <>
+            <div className="admin-page-header">
+              <div><h1>Platform Settings</h1><p className="page-subtitle">Configure global platform behavior</p></div>
+            </div>
+
+            <div className="dash-section">
+              <div className="dash-section-header">
+                <h3><DollarSign size={15} /> Revenue & Commission</h3>
+              </div>
+              <div className="settings-grid">
+                <div className="settings-card">
+                  <h4>Platform Commission Rate</h4>
+                  <p>Percentage taken from each vendor sale</p>
+                  <div className="form-group">
+                    <input
+                      type="number"
+                      min="0"
+                      max="50"
+                      value={settings.commissionPercent}
+                      onChange={e => setSettings({ ...settings, commissionPercent: Number(e.target.value) })}
+                      className="form-control"
+                      style={{ maxWidth: '120px' }}
+                    />
+                  </div>
+                  <div className="commission-preview">
+                    <span>On a Rs. 1,000 sale:</span>
+                    <span className="highlight">Rs. {Math.round(1000 * settings.commissionPercent / 100)} commission</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="dash-section">
+              <div className="dash-section-header">
+                <h3><Activity size={15} /> Auto-Approval Rules</h3>
+              </div>
+              <div className="settings-grid">
+                <div className="settings-card">
+                  <h4>Auto-Approve Verified Clinics</h4>
+                  <p>Instantly approve new clinic/doctor registrations without manual review</p>
+                  <div className="toggle-group">
+                    <div
+                      className={`toggle-option ${settings.autoApproveExperts ? 'active' : ''}`}
+                      onClick={() => setSettings({ ...settings, autoApproveExperts: true })}
+                    >
+                      ✓ Yes, Auto-Approve
+                    </div>
+                    <div
+                      className={`toggle-option ${!settings.autoApproveExperts ? 'active' : ''}`}
+                      onClick={() => setSettings({ ...settings, autoApproveExperts: false })}
+                    >
+                      ✗ Manual Review
+                    </div>
+                  </div>
+                </div>
+                <div className="settings-card">
+                  <h4>Auto-Approve Products</h4>
+                  <p>Instantly approve new vendor products without manual review</p>
+                  <div className="toggle-group">
+                    <div
+                      className={`toggle-option ${settings.autoApproveProducts ? 'active' : ''}`}
+                      onClick={() => setSettings({ ...settings, autoApproveProducts: true })}
+                    >
+                      ✓ Yes, Auto-Approve
+                    </div>
+                    <div
+                      className={`toggle-option ${!settings.autoApproveProducts ? 'active' : ''}`}
+                      onClick={() => setSettings({ ...settings, autoApproveProducts: false })}
+                    >
+                      ✗ Manual Review
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div style={{ padding: '1rem 1.5rem', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+                <button
+                  className="btn btn-primary"
+                  onClick={handleSaveSettings}
+                  disabled={savingSettings}
+                  style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+                >
+                  {savingSettings ? <><div className="spinner spinner-sm" /> Saving…</> : '💾 Save Settings'}
+                </button>
+              </div>
+            </div>
+          </>
+        )}
+
       </main>
     </div>
   );
