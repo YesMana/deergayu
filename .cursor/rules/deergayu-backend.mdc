@@ -1,0 +1,56 @@
+---
+description: Deergayu backend architecture standards (modular monolith, Firebase, Express)
+globs: backend/**/*
+alwaysApply: false
+---
+
+# Deergayu Backend Standards
+
+Based on professional backend architecture patterns. Follow these when editing the API.
+
+## Architecture
+
+- **Pattern**: Modular monolith — routes → services → Firebase/Firestore
+- **Entry**: `server.js` → `src/app.js` → `src/routes/`
+- **Do NOT** put business logic in route handlers — extract to `src/services/`
+- **Do NOT** add new code to a monolithic file — use the existing module structure
+
+## Folder Structure
+
+```
+backend/src/
+├── config/       # env, firebase, cors
+├── constants/    # roles, statuses (single source of truth)
+├── middleware/   # auth, errorHandler, requestId
+├── routes/       # health, public, admin, vendor, user
+├── services/     # email, ai, domain logic
+└── utils/        # asyncHandler, response helpers
+```
+
+## Security
+
+- Auth: Firebase ID tokens via `Authorization: Bearer <token>`
+- Admin: `ADMIN_EMAILS` env var (never hardcode emails)
+- Never expose API keys in frontend code
+- Validate all user input before Firestore writes
+
+## API Conventions
+
+- All routes mounted under `/api`
+- Errors: `{ error, code, requestId }`
+- Use `asyncHandler()` for async route handlers
+- Use constants from `src/constants/` for roles and statuses
+- Fire-and-forget emails: `.catch()` on sendEmail, never block response
+
+## Adding New Endpoints
+
+1. Pick the correct route file (public/admin/vendor/user)
+2. Use existing middleware (`verifyUser`, `verifyAdmin`, `verifyVendor`)
+3. Add new statuses/roles to `src/constants/index.js`
+4. Extract reusable logic to `src/services/`
+
+## Deployment
+
+- cPanel Node.js app runs `server.js` or `index.js`
+- Set env vars in cPanel (not in code)
+- After dependency changes: `npm install` + restart app

@@ -1,2 +1,2 @@
-// Fail-safe entry point for cPanel Node.js Selector
+// cPanel Node.js Selector entry point
 require('./server.js');
