@@ -171,9 +171,20 @@ const VendorDashboard = () => {
       // Compress image client-side to WebP (~100KB)
       const compressedFile = await compressImage(file, 800, 800, 0.75);
 
-      const storageRef = ref(storage, `profileImages/${user.uid}_${Date.now()}_compressed.webp`);
-      const snapshot = await uploadBytes(storageRef, compressedFile);
-      const downloadURL = await getDownloadURL(snapshot.ref);
+      // Upload to backend API
+      const formData = new FormData();
+      formData.append('image', compressedFile, `${user.uid}_profile.webp`);
+      
+      const token = await user.getIdToken();
+      const res = await fetch(`${API_URL}/api/upload`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+        body: formData
+      });
+      
+      if (!res.ok) throw new Error("Server upload failed");
+      const uploadData = await res.json();
+      const downloadURL = uploadData.url;
       
       if (isSettings) {
         setSettingsData(prev => ({ ...prev, profileImageUrl: downloadURL }));
@@ -348,9 +359,21 @@ const VendorDashboard = () => {
       // Compress image client-side to WebP (~100KB) for ultra-fast upload
       const compressedFile = await compressImage(file, 800, 800, 0.75);
 
-      const storageRef = ref(storage, `productImages/${user.uid}_${Date.now()}_slot${slotIndex}.webp`);
-      const snapshot = await uploadBytes(storageRef, compressedFile);
-      const downloadURL = await getDownloadURL(snapshot.ref);
+      // Upload to backend API
+      const formData = new FormData();
+      formData.append('image', compressedFile, `${user.uid}_product_${slotIndex}.webp`);
+
+      const token = await user.getIdToken();
+      const res = await fetch(`${API_URL}/api/upload`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+        body: formData
+      });
+
+      if (!res.ok) throw new Error("Server upload failed");
+      const uploadData = await res.json();
+      const downloadURL = uploadData.url;
+
       const updated = [...productImages];
       updated[slotIndex] = downloadURL;
       setProductImages(updated);
@@ -383,9 +406,21 @@ const VendorDashboard = () => {
       // Compress image client-side to WebP (~100KB) for ultra-fast upload
       const compressedFile = await compressImage(file, 800, 800, 0.75);
 
-      const storageRef = ref(storage, `productImages/${user.uid}_edit_${Date.now()}_slot${slotIndex}.webp`);
-      const snapshot = await uploadBytes(storageRef, compressedFile);
-      const downloadURL = await getDownloadURL(snapshot.ref);
+      // Upload to backend API
+      const formData = new FormData();
+      formData.append('image', compressedFile, `${user.uid}_edit_product_${slotIndex}.webp`);
+
+      const token = await user.getIdToken();
+      const res = await fetch(`${API_URL}/api/upload`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+        body: formData
+      });
+
+      if (!res.ok) throw new Error("Server upload failed");
+      const uploadData = await res.json();
+      const downloadURL = uploadData.url;
+
       const updated = [...editImages];
       updated[slotIndex] = downloadURL;
       setEditImages(updated);

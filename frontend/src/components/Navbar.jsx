@@ -108,6 +108,7 @@ const Navbar = () => {
           <li><Link to="/shop" className={location.pathname.startsWith('/shop') ? 'active' : ''}>{t('nav_shop')}</Link></li>
           <li><Link to="/channeling" className={location.pathname === '/channeling' ? 'active' : ''}>{t('nav_channeling')}</Link></li>
           <li><Link to="/symptom-checker" className={location.pathname === '/symptom-checker' ? 'active' : ''}>{t('nav_symptoms')}</Link></li>
+          <li><Link to="/videos" className={location.pathname === '/videos' ? 'active' : ''}>{t('nav_videos')}</Link></li>
         </ul>
 
         {/* Nav Actions */}
@@ -227,6 +228,7 @@ const Navbar = () => {
           <li><Link to="/shop">{t('nav_shop')}</Link></li>
           <li><Link to="/channeling">{t('nav_channeling')}</Link></li>
           <li><Link to="/symptom-checker">{t('nav_symptoms')}</Link></li>
+          <li><Link to="/videos">{t('nav_videos')}</Link></li>
           {user && (
             <>
               <li><Link to={getDashboardLink()}>
