@@ -1385,15 +1385,6 @@ app.all('{*path}', (req, res) => {
 });
 
 const PORT = process.env.PORT || 3000;
-// TEMP ROUTE TO SET ENV VARS (Added for easy cPanel setup)
-app.get('/api/setup-env-temp', (req, res) => {
-  if (!req.query.pass) return res.send('Please provide password like: /api/setup-env-temp?pass=YOUR_EMAIL_PASSWORD');
-  const fs = require('fs');
-  const envContent = `\nSMTP_HOST=deergayu.com\nSMTP_PORT=465\nSMTP_USER=info@deergayu.com\nSMTP_PASS=${req.query.pass}\n`;
-  fs.appendFileSync('.env', envContent);
-  res.send('<h1>Success! Environment variables added.</h1><p>Now go to cPanel, click RESTART for the Node.js App. Then you can close this window.</p>');
-});
-
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
