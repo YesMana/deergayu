@@ -55,6 +55,12 @@ const AdminDashboard = () => {
   const [settings, setSettings]   = useState({ commissionPercent: 10, autoApproveExperts: false, autoApproveProducts: false });
   const [platformUsers, setPlatformUsers] = useState([]);
 
+  // Selected Doctor Details Modal states
+  const [selectedDoctor, setSelectedDoctor] = useState(null);
+  const [doctorAppts, setDoctorAppts] = useState([]);
+  const [loadingDoctorAppts, setLoadingDoctorAppts] = useState(false);
+  const [modalTab, setModalTab] = useState('profile'); // 'profile' or 'appointments'
+
   // Loading states
   const [loadingProviders, setLoadingProviders]       = useState(false);
   const [loadingProducts, setLoadingProducts]         = useState(false);
@@ -73,26 +79,77 @@ const AdminDashboard = () => {
   const [orderSearch, setOrderSearch]       = useState('');
   const [apptSearch, setApptSearch]         = useState('');
 
-  // Pagination
+  // Pagination (All Users)
   const PAGE_SIZE = 20;
   const [currentPage, setCurrentPage]     = useState(1);
   const [totalUsers, setTotalUsers]       = useState(0);
   const [pagesCursors, setPagesCursors]   = useState([null]);
+
+  // Pagination (Manage Providers/Experts)
+  const [currentPageProviders, setCurrentPageProviders] = useState(1);
+  const [providersCursors, setProvidersCursors] = useState([null]);
+  const [totalProviders, setTotalProviders] = useState(0);
+
   const searchDebounceRef = useRef(null);
 
   // ── Data Fetching ──────────────────────────────────────────
   const getToken = () => auth.currentUser?.getIdToken();
 
-  const fetchProviders = useCallback(async () => {
+  const fetchProviders = useCallback(async (startCursor) => {
     setLoadingProviders(true);
     try {
-      const snap = await getDocs(collection(db, 'users'));
-      const experts = snap.docs
-        .map(d => ({ id: d.id, ...d.data() }))
-        .filter(u => u.role !== 'user' && u.role !== 'admin');
+      const usersCol = collection(db, 'users');
+      const constraints = [
+        where('role', 'in', ['doctor', 'clinic', 'organization', 'vendor']),
+        orderBy('createdAt', 'desc'),
+        limit(PAGE_SIZE)
+      ];
+      if (startCursor) constraints.push(startAfter(startCursor));
+
+      const q = query(usersCol, ...constraints);
+      const snap = await getDocs(q);
+      let experts = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+      if (providerSearch.trim()) {
+        const term = providerSearch.toLowerCase();
+        experts = experts.filter(u => u.name?.toLowerCase().includes(term) || u.email?.toLowerCase().includes(term));
+      }
+
+      const lastDoc = snap.docs[snap.docs.length - 1];
+      setProvidersCursors(prev => { const u = [...prev]; u[currentPageProviders] = lastDoc || null; return u; });
       setProviders(experts);
-    } finally { setLoadingProviders(false); }
-  }, []);
+
+      if (!startCursor) {
+        try {
+          const countQ = query(usersCol, where('role', 'in', ['doctor', 'clinic', 'organization', 'vendor']));
+          const countSnap = await getCountFromServer(countQ);
+          setTotalProviders(countSnap.data().count);
+        } catch { setTotalProviders(0); }
+      }
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoadingProviders(false);
+    }
+  }, [providerSearch, currentPageProviders]);
+
+  const fetchDoctorAppointments = async (doctorId) => {
+    setLoadingDoctorAppts(true);
+    try {
+      const q = query(
+        collection(db, 'appointments'),
+        where('providerId', '==', doctorId)
+      );
+      const snap = await getDocs(q);
+      const list = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      list.sort((a, b) => new Date(b.createdAt || b.date) - new Date(a.createdAt || a.date));
+      setDoctorAppts(list.slice(0, 50)); // Show last 50
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoadingDoctorAppts(false);
+    }
+  };
 
   const fetchProducts = useCallback(async () => {
     setLoadingProducts(true);
@@ -164,13 +221,13 @@ const AdminDashboard = () => {
 
   // Tab switching
   useEffect(() => {
-    if (activeTab === 'dashboard') { fetchProviders(); fetchProducts(); fetchOrders(); fetchAppointments(); }
-    if (activeTab === 'providers')     fetchProviders();
-    if (activeTab === 'products')      fetchProducts();
-    if (activeTab === 'orders')        fetchOrders();
-    if (activeTab === 'appointments')  fetchAppointments();
-    if (activeTab === 'settings')      fetchSettings();
-    if (activeTab === 'users')         { setCurrentPage(1); setPagesCursors([null]); }
+    if (activeTab === 'dashboard') { fetchProviders(null); fetchProducts(); fetchOrders(); fetchAppointments(); }
+    if (activeTab === 'providers')   { setCurrentPageProviders(1); setProvidersCursors([null]); fetchProviders(null); }
+    if (activeTab === 'products')    fetchProducts();
+    if (activeTab === 'orders')      fetchOrders();
+    if (activeTab === 'appointments') fetchAppointments();
+    if (activeTab === 'settings')    fetchSettings();
+    if (activeTab === 'users')       { setCurrentPage(1); setPagesCursors([null]); }
   }, [activeTab]);
 
   useEffect(() => {
@@ -184,6 +241,13 @@ const AdminDashboard = () => {
     searchDebounceRef.current = setTimeout(() => { setCurrentPage(1); setPagesCursors([null]); fetchUsers(null); }, 400);
     return () => clearTimeout(searchDebounceRef.current);
   }, [userSearch]);
+
+  useEffect(() => {
+    if (activeTab !== 'providers') return;
+    if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
+    searchDebounceRef.current = setTimeout(() => { setCurrentPageProviders(1); setProvidersCursors([null]); fetchProviders(null); }, 400);
+    return () => clearTimeout(searchDebounceRef.current);
+  }, [providerSearch]);
 
   // ── Actions ────────────────────────────────────────────────
   const handleApproveUser = async (uid) => {
@@ -318,6 +382,21 @@ const AdminDashboard = () => {
     const prev = currentPage - 1;
     setCurrentPage(prev);
     fetchUsers(pagesCursors[prev - 1] || null);
+  };
+
+  const handleNextPageProviders = () => {
+    const cursor = providersCursors[currentPageProviders];
+    if (!cursor) return;
+    const next = currentPageProviders + 1;
+    setCurrentPageProviders(next);
+    fetchProviders(cursor);
+  };
+
+  const handlePrevPageProviders = () => {
+    if (currentPageProviders <= 1) return;
+    const prev = currentPageProviders - 1;
+    setCurrentPageProviders(prev);
+    fetchProviders(providersCursors[prev - 1] || null);
   };
 
   // ── Derived Stats ──────────────────────────────────────────
@@ -614,13 +693,13 @@ const AdminDashboard = () => {
           <>
             <div className="admin-page-header">
               <div><h1>Manage Experts</h1><p className="page-subtitle">Approve and manage doctors, clinics, and organizations</p></div>
-              <button className="btn btn-ghost btn-sm" onClick={fetchProviders} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.82rem' }}>
+              <button className="btn btn-ghost btn-sm" onClick={() => fetchProviders(null)} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.82rem' }}>
                 <RefreshCw size={14} /> Refresh
               </button>
             </div>
             <div className="table-container">
               <div className="table-toolbar">
-                <span className="table-title"><Users size={16} /> {filteredProviders.length} Experts</span>
+                <span className="table-title"><Users size={16} /> Experts</span>
                 <div className="table-controls">
                   <div className="search-box" style={{ minWidth: '220px' }}>
                     <Search size={14} />
@@ -631,51 +710,77 @@ const AdminDashboard = () => {
 
               {loadingProviders ? (
                 <div className="loading-state"><div className="spinner spinner-sm" /> Loading experts…</div>
-              ) : filteredProviders.length === 0 ? (
+              ) : providers.length === 0 ? (
                 <div className="empty-state"><div className="icon">👤</div><h4>No experts found</h4></div>
               ) : (
-                <div style={{ overflowX: 'auto' }}>
-                  <table className="admin-table">
-                    <thead><tr>
-                      <th>Expert</th><th>Role</th><th>Specialty</th><th>Location</th><th>Status</th><th>Actions</th>
-                    </tr></thead>
-                    <tbody>
-                      {filteredProviders.map(p => (
-                        <tr key={p.id}>
-                          <td>
-                            <div className="user-cell">
-                              <div className="user-avatar">
-                                {p.profileDetails?.profileImageUrl
-                                  ? <img src={p.profileDetails.profileImageUrl} alt={p.name} />
-                                  : userInitials(p)}
+                <>
+                  <div style={{ overflowX: 'auto' }}>
+                    <table className="admin-table">
+                      <thead><tr>
+                        <th>Expert</th><th>Role</th><th>Specialty</th><th>Location</th><th>Status</th><th>Actions</th>
+                      </tr></thead>
+                      <tbody>
+                        {providers.map(p => (
+                          <tr key={p.id}>
+                            <td>
+                              <div className="user-cell">
+                                <div className="user-avatar">
+                                  {p.profileDetails?.profileImageUrl
+                                    ? <img src={p.profileDetails.profileImageUrl} alt={p.name} />
+                                    : userInitials(p)}
+                                </div>
+                                <div>
+                                  <div className="name">{p.name || '—'}</div>
+                                  <div className="email">{p.email}</div>
+                                </div>
                               </div>
-                              <div>
-                                <div className="name">{p.name || '—'}</div>
-                                <div className="email">{p.email}</div>
-                              </div>
-                            </div>
-                          </td>
-                          <td style={{ textTransform: 'capitalize' }}>{p.role}</td>
-                          <td>{p.profileDetails?.specialty || p.profileDetails?.category || '—'}</td>
-                          <td>{p.profileDetails?.address || '—'}</td>
-                          <td><StatusPill status={p.status === 'pending' ? 'pending' : 'approved'} /></td>
-                          <td>
-                            <div className="action-btns">
-                              {p.status === 'pending' && (
-                                <button className="btn-xs approve" onClick={() => handleApproveUser(p.id)}>
-                                  Approve
+                            </td>
+                            <td style={{ textTransform: 'capitalize' }}>{p.role}</td>
+                            <td>{p.profileDetails?.specialty || p.profileDetails?.category || '—'}</td>
+                            <td>{p.profileDetails?.address || '—'}</td>
+                            <td><StatusPill status={p.status === 'pending' ? 'pending' : 'approved'} /></td>
+                            <td>
+                              <div className="action-btns">
+                                {p.status === 'pending' && (
+                                  <button className="btn-xs approve" onClick={() => handleApproveUser(p.id)}>
+                                    Approve
+                                  </button>
+                                )}
+                                <button
+                                  className="btn-xs edit-btn"
+                                  onClick={() => {
+                                    setSelectedDoctor(p);
+                                    fetchDoctorAppointments(p.id);
+                                  }}
+                                  style={{ background: 'var(--primary-color)', color: 'white' }}
+                                >
+                                  View Details
                                 </button>
-                              )}
-                              <a href={`mailto:${p.email}`} className="btn-xs edit-btn" style={{ textDecoration: 'none' }}>
-                                Email
-                              </a>
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                                <a href={`mailto:${p.email}`} className="btn-xs edit-btn" style={{ textDecoration: 'none' }}>
+                                  Email
+                                </a>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  <div className="users-pagination">
+                    <button className="btn btn-ghost btn-sm" onClick={handlePrevPageProviders} disabled={currentPageProviders <= 1 || loadingProviders}>
+                      <ChevronLeft size={16} /> Previous
+                    </button>
+                    <span className="page-info">
+                      Page <strong>{currentPageProviders}</strong>
+                      {totalProviders > 0 && ` of ${Math.ceil(totalProviders / PAGE_SIZE)}`}
+                      {totalProviders > 0 && <span style={{ color: 'var(--text-secondary)', marginLeft: '0.5rem' }}>({totalProviders.toLocaleString()} total)</span>}
+                    </span>
+                    <button className="btn btn-ghost btn-sm" onClick={handleNextPageProviders} disabled={!providersCursors[currentPageProviders] || loadingProviders}>
+                      Next <ChevronRight size={16} />
+                    </button>
+                  </div>
+                </>
               )}
             </div>
           </>
@@ -1162,6 +1267,144 @@ const AdminDashboard = () => {
               </div>
             </div>
           </>
+        )}
+
+        {/* Selected Doctor / Expert Details Modal */}
+        {selectedDoctor && (
+          <div className="modal-overlay" style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, backdropFilter: 'blur(4px)' }}>
+            <div className="glass-panel" style={{ width: '90%', maxWidth: '650px', maxHeight: '85vh', display: 'flex', flexDirection: 'column', overflow: 'hidden', padding: '1.75rem', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '12px' }}>
+              
+              {/* Header */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.25rem' }}>
+                <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+                  <div className="user-avatar" style={{ width: '48px', height: '48px', fontSize: '1.2rem', overflow: 'hidden', borderRadius: '50%' }}>
+                    {selectedDoctor.profileDetails?.profileImageUrl ? (
+                      <img src={selectedDoctor.profileDetails.profileImageUrl} alt={selectedDoctor.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    ) : (
+                      userInitials(selectedDoctor)
+                    )}
+                  </div>
+                  <div>
+                    <h2 style={{ fontSize: '1.3rem', fontWeight: 700, margin: 0 }}>{selectedDoctor.name}</h2>
+                    <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', textTransform: 'capitalize' }}>
+                      💼 {selectedDoctor.role} · {selectedDoctor.profileDetails?.specialty || selectedDoctor.profileDetails?.category || 'General Ayurveda'}
+                    </span>
+                  </div>
+                </div>
+                <button className="btn btn-ghost btn-sm" onClick={() => setSelectedDoctor(null)} style={{ fontSize: '1.5rem', padding: '0.2rem 0.5rem', background: 'none', border: 'none', color: 'var(--text-primary)', cursor: 'pointer' }}>×</button>
+              </div>
+
+              {/* Modal Tabs */}
+              <div style={{ display: 'flex', gap: '0.5rem', borderBottom: '1px solid rgba(255,255,255,0.08)', marginBottom: '1.25rem' }}>
+                <button
+                  className={`dashboard-tab ${modalTab === 'profile' ? 'active' : ''}`}
+                  onClick={() => setModalTab('profile')}
+                  style={{ background: 'none', border: 'none', color: modalTab === 'profile' ? 'var(--primary-color)' : 'var(--text-secondary)', borderBottom: modalTab === 'profile' ? '2px solid var(--primary-color)' : 'none', padding: '0.5rem 1rem', cursor: 'pointer', fontWeight: 600, fontSize: '0.88rem' }}
+                >
+                  Profile & Schedule
+                </button>
+                <button
+                  className={`dashboard-tab ${modalTab === 'appointments' ? 'active' : ''}`}
+                  onClick={() => setModalTab('appointments')}
+                  style={{ background: 'none', border: 'none', color: modalTab === 'appointments' ? 'var(--primary-color)' : 'var(--text-secondary)', borderBottom: modalTab === 'appointments' ? '2px solid var(--primary-color)' : 'none', padding: '0.5rem 1rem', cursor: 'pointer', fontWeight: 600, fontSize: '0.88rem' }}
+                >
+                  Appointments History ({doctorAppts.length})
+                </button>
+              </div>
+
+              {/* Modal Content */}
+              <div style={{ flex: 1, overflowY: 'auto', paddingRight: '0.25rem' }}>
+                {modalTab === 'profile' && (
+                  <div>
+                    {/* Basic Info */}
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1.5rem', fontSize: '0.85rem' }}>
+                      <div>
+                        <strong style={{ color: 'var(--text-secondary)' }}>Email:</strong>
+                        <div style={{ marginTop: '0.2rem' }}>
+                          <a href={`mailto:${selectedDoctor.email}`} style={{ color: 'var(--primary-color)', textDecoration: 'none' }}>{selectedDoctor.email}</a>
+                        </div>
+                      </div>
+                      <div>
+                        <strong style={{ color: 'var(--text-secondary)' }}>Phone:</strong>
+                        <div style={{ marginTop: '0.2rem' }}>
+                          <a href={`tel:${selectedDoctor.profileDetails?.phone}`} style={{ color: 'var(--text-primary)', textDecoration: 'none' }}>{selectedDoctor.profileDetails?.phone || '—'}</a>
+                        </div>
+                      </div>
+                      <div style={{ gridColumn: 'span 2' }}>
+                        <strong style={{ color: 'var(--text-secondary)' }}>Location/Address:</strong>
+                        <div style={{ marginTop: '0.2rem' }}>📍 {selectedDoctor.profileDetails?.address || '—'}</div>
+                      </div>
+                    </div>
+
+                    {/* Weekly Schedule */}
+                    <h3 style={{ fontSize: '0.95rem', fontWeight: 700, borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '0.4rem', margin: '1rem 0 0.5rem' }}>
+                      🗓️ Weekly Time Slots & Schedule
+                    </h3>
+                    {selectedDoctor.profileDetails?.schedule ? (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '0.75rem' }}>
+                        <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', margin: '0 0 0.5rem' }}>
+                          ⏱️ Appointment Slot Duration: <strong>{selectedDoctor.profileDetails.schedule.slotDuration || 30} minutes</strong>
+                        </p>
+                        {selectedDoctor.profileDetails.schedule.workingDays && Object.keys(selectedDoctor.profileDetails.schedule.workingDays).map(day => {
+                          const info = selectedDoctor.profileDetails.schedule.workingDays[day];
+                          return (
+                            <div key={day} style={{ display: 'flex', justifyContent: 'space-between', background: 'rgba(255,255,255,0.02)', padding: '0.5rem 0.8rem', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.04)', fontSize: '0.82rem' }}>
+                              <span style={{ fontWeight: 600 }}>{day}</span>
+                              <span style={{ color: info.active ? '#4caf50' : 'var(--text-muted)' }}>
+                                {info.active ? `${info.start || '09:00'} - ${info.end || '17:00'}` : 'Closed'}
+                              </span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <p style={{ color: 'var(--text-secondary)', fontStyle: 'italic', fontSize: '0.85rem' }}>No working schedule set by provider.</p>
+                    )}
+                  </div>
+                )}
+
+                {modalTab === 'appointments' && (
+                  <div>
+                    <h3 style={{ fontSize: '0.95rem', fontWeight: 700, borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '0.4rem', margin: '0 0 0.75rem' }}>
+                      Appointments History (Last 50 bookings)
+                    </h3>
+                    {loadingDoctorAppts ? (
+                      <div className="loading-state"><div className="spinner spinner-sm" /> Loading appointments…</div>
+                    ) : doctorAppts.length === 0 ? (
+                      <p style={{ color: 'var(--text-secondary)', fontStyle: 'italic', fontSize: '0.85rem', padding: '1rem 0' }}>No appointments booked with this doctor yet.</p>
+                    ) : (
+                      <div style={{ overflowX: 'auto' }}>
+                        <table className="admin-table" style={{ fontSize: '0.78rem' }}>
+                          <thead><tr>
+                            <th>Patient</th><th>Contact</th><th>Date/Time</th><th>Status</th>
+                          </tr></thead>
+                          <tbody>
+                            {doctorAppts.map(a => (
+                              <tr key={a.id}>
+                                <td><strong>{a.customerName || 'Patient'}</strong></td>
+                                <td>
+                                  <div>{a.customerPhone || '—'}</div>
+                                  <div style={{ color: 'var(--text-secondary)', fontSize: '0.72rem' }}>{a.customerEmail || ''}</div>
+                                </td>
+                                <td>{a.date} at {a.time}</td>
+                                <td><StatusPill status={a.status} /></td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+              
+              {/* Footer */}
+              <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '1.25rem', paddingTop: '1rem', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
+                <button className="btn btn-outline" onClick={() => setSelectedDoctor(null)}>Close</button>
+              </div>
+
+            </div>
+          </div>
         )}
 
       </main>
