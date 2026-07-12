@@ -437,6 +437,64 @@ apiRouter.get('/appointments', verifyAdmin, async (req, res) => {
   }
 });
 
+// Update appointment status (admin)
+apiRouter.post('/appointments/:id/status', verifyAdmin, async (req, res) => {
+  const { id } = req.params;
+  const { status } = req.body;
+  
+  const validStatuses = ['pending', 'accepted', 'rejected', 'confirmed', 'completed', 'cancelled'];
+  if (!validStatuses.includes(status)) {
+    return res.status(400).json({ error: 'Invalid status' });
+  }
+
+  try {
+    const apptDoc = await db.collection('appointments').doc(id).get();
+    if (!apptDoc.exists) return res.status(404).json({ error: 'Appointment not found' });
+    
+    await db.collection('appointments').doc(id).update({ status, updatedAt: new Date().toISOString() });
+    
+    // Send email to customer
+    try {
+      const apptData = apptDoc.data();
+      if (apptData.customerEmail) {
+        const statusText = status === 'accepted' ? '✅ Confirmed' : status === 'rejected' ? '❌ Declined' : status;
+        const htmlBody = `
+          <div style="font-family: Arial, sans-serif; padding: 20px; color: #333;">
+            <h2 style="color: ${status === 'accepted' ? '#2e7d32' : '#c62828'};">Appointment Status Updated by Admin</h2>
+            <p>Hello ${apptData.customerName || 'Patient'},</p>
+            <p>Your appointment request with <strong>${apptData.providerName}</strong> has been updated to <strong>${status}</strong> by the system administrator.</p>
+            <div style="background: #f5f5f5; padding: 15px; border-radius: 8px; margin: 20px 0;">
+              <p style="margin: 5px 0;"><strong>Date:</strong> ${apptData.date}</p>
+              <p style="margin: 5px 0;"><strong>Time:</strong> ${apptData.time}</p>
+            </div>
+            <p>Thank you for using Deergayu!</p>
+          </div>
+        `;
+        await sendEmail(apptData.customerEmail, `Appointment Status Updated - Deergayu`, htmlBody);
+      }
+    } catch (e) {
+      console.error('Failed to send email to customer:', e);
+    }
+
+    res.json({ message: 'Appointment status updated successfully' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Delete appointment (admin)
+apiRouter.delete('/appointments/:id', verifyAdmin, async (req, res) => {
+  const { id } = req.params;
+  try {
+    const apptDoc = await db.collection('appointments').doc(id).get();
+    if (!apptDoc.exists) return res.status(404).json({ error: 'Appointment not found' });
+    await db.collection('appointments').doc(id).delete();
+    res.json({ message: 'Appointment deleted successfully' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Get admin settings
 apiRouter.get('/settings', verifyAdmin, async (req, res) => {
   try {

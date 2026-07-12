@@ -189,10 +189,11 @@ const VendorDashboard = () => {
     }
   };
 
-  // Fetch vendor's products & schedule
+  // Fetch vendor's products, orders & schedule on initialization
   useEffect(() => {
     if (user) {
-      if (activeTab === 'products') fetchProducts();
+      fetchProducts();
+      fetchOrders();
       if (user.profileDetails?.schedule) {
         setSchedule(user.profileDetails.schedule);
       }
@@ -202,14 +203,7 @@ const VendorDashboard = () => {
         profileImageUrl: user.profileDetails?.profileImageUrl || ''
       }));
     }
-  }, [activeTab, user]);
-
-  // Fetch vendor's orders
-  useEffect(() => {
-    if (activeTab === 'orders' && user) {
-      fetchOrders();
-    }
-  }, [activeTab, user]);
+  }, [user]);
 
   // Listen to vendor's appointments in real-time
   useEffect(() => {
@@ -710,6 +704,8 @@ const VendorDashboard = () => {
     return <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', padding: '0.22rem 0.65rem', borderRadius: '999px', fontSize: '0.72rem', fontWeight: '600', background: cfg.bg, color: cfg.color }}>{status || '—'}</span>;
   };
 
+  const isDoctor = ['doctor', 'clinic', 'organization'].includes(user?.role);
+
   return (
     <div className="admin-layout animate-fade-in">
       {/* ── Premium Sidebar ── */}
@@ -717,31 +713,39 @@ const VendorDashboard = () => {
         <div className="admin-brand">
           <div className="admin-brand-icon">🌿</div>
           <div className="admin-brand-text">
-            <h2>{user?.displayName || user?.name || 'Vendor'}</h2>
-            <span>Vendor Panel</span>
+            <h2>{user?.displayName || user?.name || 'User'}</h2>
+            <span>{isDoctor ? 'Doctor Console' : 'Vendor Panel'}</span>
           </div>
         </div>
         <ul className="admin-nav">
           <li className="admin-nav-section-title">Main</li>
-          <li className={activeTab === 'overview' ? 'active' : ''} onClick={() => setActiveTab('overview')}>
+          <li className={activeTab === 'overview' ? 'active' : ''} onClick={() => { setActiveTab('overview'); }}>
             <Settings size={17} /> Overview
           </li>
           <li className="admin-nav-section-title">Manage</li>
-          <li className={activeTab === 'products' ? 'active' : ''} onClick={() => setActiveTab('products')}>
-            <Package size={17} /> My Products
-          </li>
-          <li className={activeTab === 'orders' ? 'active' : ''} onClick={() => setActiveTab('orders')}>
-            <ShoppingBag size={17} /> Customer Orders
-            {pendingOrdersCount > 0 && <span style={{ marginLeft: 'auto', background: '#ef5350', color: 'white', borderRadius: '999px', padding: '0.1rem 0.45rem', fontSize: '0.68rem', fontWeight: '700' }}>{pendingOrdersCount}</span>}
-          </li>
-          <li className={activeTab === 'appointments' ? 'active' : ''} onClick={() => setActiveTab('appointments')}>
-            <Calendar size={17} /> Appointments
-            {upcomingAppts.length > 0 && <span style={{ marginLeft: 'auto', background: '#ffa726', color: 'white', borderRadius: '999px', padding: '0.1rem 0.45rem', fontSize: '0.68rem', fontWeight: '700' }}>{upcomingAppts.length}</span>}
-          </li>
+          {!isDoctor && (
+            <>
+              <li className={activeTab === 'products' ? 'active' : ''} onClick={() => setActiveTab('products')}>
+                <Package size={17} /> My Products
+              </li>
+              <li className={activeTab === 'orders' ? 'active' : ''} onClick={() => setActiveTab('orders')}>
+                <ShoppingBag size={17} /> Customer Orders
+                {pendingOrdersCount > 0 && <span style={{ marginLeft: 'auto', background: '#ef5350', color: 'white', borderRadius: '999px', padding: '0.1rem 0.45rem', fontSize: '0.68rem', fontWeight: '700' }}>{pendingOrdersCount}</span>}
+              </li>
+            </>
+          )}
+          {isDoctor && (
+            <li className={activeTab === 'appointments' ? 'active' : ''} onClick={() => setActiveTab('appointments')}>
+              <Calendar size={17} /> Appointments
+              {upcomingAppts.length > 0 && <span style={{ marginLeft: 'auto', background: '#ffa726', color: 'white', borderRadius: '999px', padding: '0.1rem 0.45rem', fontSize: '0.68rem', fontWeight: '700' }}>{upcomingAppts.length}</span>}
+            </li>
+          )}
           <li className="admin-nav-section-title">Profile</li>
-          <li className={activeTab === 'schedule' ? 'active' : ''} onClick={() => setActiveTab('schedule')}>
-            <Clock size={17} /> My Schedule
-          </li>
+          {isDoctor && (
+            <li className={activeTab === 'schedule' ? 'active' : ''} onClick={() => setActiveTab('schedule')}>
+              <Clock size={17} /> My Schedule
+            </li>
+          )}
           <li className={activeTab === 'settings' ? 'active' : ''} onClick={() => setActiveTab('settings')}>
             <Settings size={17} /> Settings
           </li>
@@ -760,13 +764,13 @@ const VendorDashboard = () => {
                activeTab === 'schedule' ? 'My Schedule' : 'Settings'}
             </h1>
             <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', margin: '0.3rem 0 0' }}>
-              {activeTab === 'overview' ? `Welcome back, ${user?.displayName || user?.name || 'Vendor'}` :
+              {activeTab === 'overview' ? `Welcome back, ${user?.displayName || user?.name || 'User'}` :
                activeTab === 'products' ? `${vendorProducts.length} products · ${approvedProducts} live` :
                activeTab === 'orders' ? `${orders.length} total orders` :
                activeTab === 'appointments' ? `${appointments.length} total appointments` : ''}
             </p>
           </div>
-          {activeTab === 'products' && (
+          {activeTab === 'products' && !isDoctor && (
             <button onClick={() => setShowAddProductModal(true)} className="btn btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
               + Add New Product
             </button>
@@ -780,94 +784,173 @@ const VendorDashboard = () => {
           <>
             {/* KPI Cards */}
             <div className="kpi-grid" style={{ marginBottom: '1.5rem' }}>
-              {[
-                { label: 'Total Revenue', value: fmtCurrency(totalRevenue), color: '#4caf50', icon: '💰', sub: 'Delivered orders' },
-                { label: 'This Month', value: fmtCurrency(monthRevenue), color: '#29b6f6', icon: '📅', sub: 'Monthly earnings' },
-                { label: 'Active Products', value: approvedProducts, color: '#ab47bc', icon: '📦', sub: `of ${vendorProducts.length} total` },
-                { label: 'Pending Orders', value: pendingOrdersCount, color: '#ffa726', icon: '🛒', sub: 'Need processing' },
-                { label: 'Appointments', value: appointments.length, color: '#26c6da', icon: '📅', sub: `${upcomingAppts.length} upcoming` },
-                { label: "Today's Appts", value: todayAppts.length, color: '#d4af37', icon: '🗓️', sub: 'Scheduled today' },
-              ].map(({ label, value, color, icon, sub }) => (
-                <div key={label} className="kpi-card" style={{ '--kpi-accent': color }}>
-                  <div className="kpi-card-header">
-                    <div style={{ fontSize: '1.5rem' }}>{icon}</div>
-                    <span className="kpi-trend" style={{ background: 'transparent', color: 'var(--text-secondary)', fontSize: '0.7rem' }}>{sub}</span>
+              {isDoctor ? (
+                // Doctor KPI cards
+                [
+                  { label: "Today's Appts", value: todayAppts.length, color: '#d4af37', icon: '🗓️', sub: 'Scheduled today' },
+                  { label: 'Upcoming Appts', value: upcomingAppts.length, color: '#ffa726', icon: '⏰', sub: 'Awaiting session' },
+                  { label: 'Total Appointments', value: appointments.length, color: '#26c6da', icon: '📅', sub: 'All requests' },
+                  { label: 'Completed Appts', value: appointments.filter(a => a.status === 'completed').length, color: '#4caf50', icon: '✅', sub: 'Successfully met' },
+                ].map(({ label, value, color, icon, sub }) => (
+                  <div key={label} className="kpi-card" style={{ '--kpi-accent': color }}>
+                    <div className="kpi-card-header">
+                      <div style={{ fontSize: '1.5rem' }}>{icon}</div>
+                      <span className="kpi-trend" style={{ background: 'transparent', color: 'var(--text-secondary)', fontSize: '0.7rem' }}>{sub}</span>
+                    </div>
+                    <div className="kpi-value" style={{ color }}>{value}</div>
+                    <div className="kpi-label">{label}</div>
                   </div>
-                  <div className="kpi-value" style={{ color }}>{value}</div>
-                  <div className="kpi-label">{label}</div>
-                </div>
-              ))}
+                ))
+              ) : (
+                // Vendor KPI cards
+                [
+                  { label: 'Total Revenue', value: fmtCurrency(totalRevenue), color: '#4caf50', icon: '💰', sub: 'Delivered orders' },
+                  { label: 'This Month', value: fmtCurrency(monthRevenue), color: '#29b6f6', icon: '📅', sub: 'Monthly earnings' },
+                  { label: 'Active Products', value: approvedProducts, color: '#ab47bc', icon: '📦', sub: `of ${vendorProducts.length} total` },
+                  { label: 'Pending Orders', value: pendingOrdersCount, color: '#ffa726', icon: '🛒', sub: 'Need processing' },
+                ].map(({ label, value, color, icon, sub }) => (
+                  <div key={label} className="kpi-card" style={{ '--kpi-accent': color }}>
+                    <div className="kpi-card-header">
+                      <div style={{ fontSize: '1.5rem' }}>{icon}</div>
+                      <span className="kpi-trend" style={{ background: 'transparent', color: 'var(--text-secondary)', fontSize: '0.7rem' }}>{sub}</span>
+                    </div>
+                    <div className="kpi-value" style={{ color }}>{value}</div>
+                    <div className="kpi-label">{label}</div>
+                  </div>
+                ))
+              )}
             </div>
 
             {/* 2-col activity */}
             <div className="two-col">
-              {/* Recent Orders */}
-              <div className="dash-section">
-                <div className="dash-section-header">
-                  <h3><ShoppingBag size={15} /> Recent Orders</h3>
-                  <span className="view-all" onClick={() => setActiveTab('orders')}>View all →</span>
+              {/* Left Column: Recent Orders (Vendors) / Upcoming Appointments List (Doctors) */}
+              {!isDoctor ? (
+                <div className="dash-section">
+                  <div className="dash-section-header">
+                    <h3><ShoppingBag size={15} /> Recent Orders</h3>
+                    <span className="view-all" onClick={() => setActiveTab('orders')}>View all →</span>
+                  </div>
+                  <div>
+                    {recentOrders.length === 0 ? (
+                      <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-secondary)' }}>No orders yet 🛒</div>
+                    ) : recentOrders.map(o => (
+                      <div key={o.id} className="activity-item">
+                        <div className="activity-avatar" style={{ background: 'linear-gradient(135deg,#26c6da,#00838f)' }}>
+                          {(o.customerName || 'C').charAt(0).toUpperCase()}
+                        </div>
+                        <div className="activity-info">
+                          <div className="title">{o.customerName || '—'}</div>
+                          <div className="subtitle">{(o.items || []).map(i => i.name).join(', ').slice(0, 40) || '—'}</div>
+                        </div>
+                        <div className="activity-meta">
+                          <div className="amount">{fmtCurrency(o.totalPrice)}</div>
+                          <StatusPill status={o.status} />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 </div>
-                <div>
-                  {recentOrders.length === 0 ? (
-                    <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-secondary)' }}>No orders yet 🛒</div>
-                  ) : recentOrders.map(o => (
-                    <div key={o.id} className="activity-item">
-                      <div className="activity-avatar" style={{ background: 'linear-gradient(135deg,#26c6da,#00838f)' }}>
-                        {(o.customerName || 'C').charAt(0).toUpperCase()}
+              ) : (
+                <div className="dash-section">
+                  <div className="dash-section-header">
+                    <h3><Calendar size={15} /> Today's Sessions</h3>
+                  </div>
+                  <div>
+                    {todayAppts.length === 0 ? (
+                      <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-secondary)' }}>No sessions scheduled for today 🗓️</div>
+                    ) : todayAppts.map(a => (
+                      <div key={a.id} className="activity-item">
+                        <div className="activity-avatar" style={{ background: 'linear-gradient(135deg,#ffa726,#e65100)' }}>
+                          {(a.customerName || 'P').charAt(0).toUpperCase()}
+                        </div>
+                        <div className="activity-info">
+                          <div className="title">{a.customerName || '—'}</div>
+                          <div className="subtitle">Time: {a.time} {a.notes && `· Notes: ${a.notes}`}</div>
+                        </div>
+                        <div className="activity-meta">
+                          <StatusPill status={a.status} />
+                        </div>
                       </div>
-                      <div className="activity-info">
-                        <div className="title">{o.customerName || '—'}</div>
-                        <div className="subtitle">{(o.items || []).map(i => i.name).join(', ').slice(0, 40) || '—'}</div>
-                      </div>
-                      <div className="activity-meta">
-                        <div className="amount">{fmtCurrency(o.totalPrice)}</div>
-                        <StatusPill status={o.status} />
-                      </div>
-                    </div>
-                  ))}
+                    ))}
+                  </div>
                 </div>
-              </div>
+              )}
 
-              {/* Upcoming Appointments */}
-              <div className="dash-section">
-                <div className="dash-section-header">
-                  <h3><Calendar size={15} /> Upcoming Appointments</h3>
-                  <span className="view-all" onClick={() => setActiveTab('appointments')}>View all →</span>
-                </div>
-                <div>
-                  {upcomingAppts.length === 0 ? (
-                    <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-secondary)' }}>No upcoming appointments 📅</div>
-                  ) : upcomingAppts.map(a => (
-                    <div key={a.id} className="appt-mini-item">
-                      <div className="appt-mini-info">
-                        <div className="name">{a.customerName || '—'}</div>
-                        <div className="meta">{a.date} · {a.time}</div>
+              {/* Right Column: Upcoming Appointments (always useful for Doctor, but can show stock alert for Vendor) */}
+              {isDoctor ? (
+                <div className="dash-section">
+                  <div className="dash-section-header">
+                    <h3><Calendar size={15} /> Upcoming Appointments</h3>
+                    <span className="view-all" onClick={() => setActiveTab('appointments')}>View all →</span>
+                  </div>
+                  <div>
+                    {upcomingAppts.length === 0 ? (
+                      <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-secondary)' }}>No upcoming appointments 📅</div>
+                    ) : upcomingAppts.map(a => (
+                      <div key={a.id} className="appt-mini-item">
+                        <div className="appt-mini-info">
+                          <div className="name">{a.customerName || '—'}</div>
+                          <div className="meta">{a.date} · {a.time}</div>
+                        </div>
+                        <div className="appt-mini-time">
+                          <StatusPill status={a.status} />
+                        </div>
                       </div>
-                      <div className="appt-mini-time">
-                        <StatusPill status={a.status} />
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <div className="dash-section">
+                  <div className="dash-section-header">
+                    <h3>📢 Platform Notifications</h3>
+                  </div>
+                  <div style={{ padding: '1.5rem', color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
+                    <div style={{ display: 'flex', gap: '0.8rem', alignItems: 'flex-start', marginBottom: '1rem' }}>
+                      <span style={{ fontSize: '1.2rem' }}>📦</span>
+                      <div>
+                        <strong>Keep stock updated:</strong> Out-of-stock products will automatically display an "Out of Stock" overlay to customers.
                       </div>
                     </div>
-                  ))}
+                    <div style={{ display: 'flex', gap: '0.8rem', alignItems: 'flex-start' }}>
+                      <span style={{ fontSize: '1.2rem' }}>💬</span>
+                      <div>
+                        <strong>WhatsApp Integration:</strong> Click the WhatsApp icon next to any order status to communicate directly with the customer.
+                      </div>
+                    </div>
+                  </div>
                 </div>
-              </div>
+              )}
             </div>
 
             {/* Quick actions */}
             <div className="dash-section">
               <div className="dash-section-header"><h3>🚀 Quick Actions</h3></div>
               <div style={{ padding: '1rem 1.5rem', display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
-                <button className="btn btn-primary" onClick={() => setShowAddProductModal(true)} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                  <Package size={15} /> Add New Product
-                </button>
-                <button className="btn btn-outline" onClick={() => setActiveTab('orders')} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                  <ShoppingBag size={15} /> View Orders
-                </button>
-                <button className="btn btn-outline" onClick={() => setActiveTab('appointments')} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                  <Calendar size={15} /> Manage Appointments
-                </button>
-                <button className="btn btn-outline" onClick={() => setActiveTab('schedule')} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                  <Clock size={15} /> Update Schedule
-                </button>
+                {isDoctor ? (
+                  <>
+                    <button className="btn btn-primary" onClick={() => setActiveTab('appointments')} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                      <Calendar size={15} /> Manage Appointments
+                    </button>
+                    <button className="btn btn-outline" onClick={() => setActiveTab('schedule')} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                      <Clock size={15} /> Update Schedule
+                    </button>
+                    <button className="btn btn-outline" onClick={() => setActiveTab('settings')} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                      <Settings size={15} /> Profile Settings
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <button className="btn btn-primary" onClick={() => setShowAddProductModal(true)} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                      <Package size={15} /> Add New Product
+                    </button>
+                    <button className="btn btn-outline" onClick={() => setActiveTab('orders')} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                      <ShoppingBag size={15} /> View Orders
+                    </button>
+                    <button className="btn btn-outline" onClick={() => setActiveTab('settings')} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                      <Settings size={15} /> Shop Settings
+                    </button>
+                  </>
+                )}
               </div>
             </div>
           </>

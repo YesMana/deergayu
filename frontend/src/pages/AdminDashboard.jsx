@@ -253,6 +253,44 @@ const AdminDashboard = () => {
     } catch (e) { error(e.message); }
   };
 
+  const handleUpdateAppointmentStatus = async (id, status) => {
+    try {
+      const token = await getToken();
+      const res = await fetch(`${API_URL}/api/appointments/${id}/status`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ status })
+      });
+      if (res.ok) {
+        success('Appointment status updated!');
+        setAppointments(prev => prev.map(a => a.id === id ? { ...a, status } : a));
+      } else {
+        error('Failed to update appointment status');
+      }
+    } catch (e) {
+      error(e.message);
+    }
+  };
+
+  const handleDeleteAppointment = async (id) => {
+    if (!window.confirm('Delete this appointment? This cannot be undone.')) return;
+    try {
+      const token = await getToken();
+      const res = await fetch(`${API_URL}/api/appointments/${id}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.ok) {
+        success('Appointment deleted!');
+        setAppointments(prev => prev.filter(a => a.id !== id));
+      } else {
+        error('Failed to delete appointment');
+      }
+    } catch (e) {
+      error(e.message);
+    }
+  };
+
   const handleSaveSettings = async () => {
     setSavingSettings(true);
     try {
@@ -969,7 +1007,7 @@ const AdminDashboard = () => {
                 <div style={{ overflowX: 'auto' }}>
                   <table className="admin-table">
                     <thead><tr>
-                      <th>Patient</th><th>Doctor / Provider</th><th>Date</th><th>Time</th><th>Notes</th><th>Status</th>
+                      <th>Patient</th><th>Contact</th><th>Doctor / Provider</th><th>Date/Time</th><th>Notes</th><th>Status</th><th>Actions</th>
                     </tr></thead>
                     <tbody>
                       {filteredAppts.map(a => (
@@ -981,17 +1019,51 @@ const AdminDashboard = () => {
                               </div>
                               <div>
                                 <div className="name">{a.customerName || '—'}</div>
-                                <div className="email">{a.customerEmail || ''}</div>
                               </div>
                             </div>
                           </td>
+                          <td>
+                            {a.customerPhone && (
+                              <div style={{ marginBottom: '0.2rem' }}>
+                                <a href={`tel:${a.customerPhone}`} style={{ color: 'var(--text-primary)', textDecoration: 'none', fontSize: '0.8rem' }}>📞 {a.customerPhone}</a>
+                              </div>
+                            )}
+                            {a.customerEmail ? (
+                              <div style={{ marginBottom: '0.2rem' }}>
+                                <a href={`mailto:${a.customerEmail}`} style={{ color: 'var(--primary-color)', textDecoration: 'none', fontSize: '0.8rem' }}>✉️ {a.customerEmail}</a>
+                              </div>
+                            ) : <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>No Email</span>}
+                          </td>
                           <td style={{ fontWeight: 600 }}>{a.providerName || '—'}</td>
-                          <td>{a.date || '—'}</td>
-                          <td>{a.time || '—'}</td>
+                          <td>
+                            <div style={{ fontWeight: 600 }}>{a.date || '—'}</div>
+                            <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>🕒 {a.time || '—'}</div>
+                          </td>
                           <td style={{ maxWidth: '160px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: 'var(--text-secondary)', fontSize: '0.78rem' }}>
                             {a.notes || '—'}
                           </td>
                           <td><StatusPill status={a.status} /></td>
+                          <td>
+                            <div className="action-btns" style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
+                              <select
+                                className="status-select"
+                                value={a.status || 'pending'}
+                                onChange={e => handleUpdateAppointmentStatus(a.id, e.target.value)}
+                                style={{ padding: '0.2rem 0.5rem', fontSize: '0.8rem' }}
+                              >
+                                {['pending','accepted','rejected','confirmed','completed','cancelled'].map(s => (
+                                  <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>
+                                ))}
+                              </select>
+                              <button
+                                className="btn-xs delete-btn"
+                                onClick={() => handleDeleteAppointment(a.id)}
+                                style={{ padding: '0.25rem 0.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                              >
+                                <Trash2 size={13} />
+                              </button>
+                            </div>
+                          </td>
                         </tr>
                       ))}
                     </tbody>
