@@ -134,6 +134,40 @@ apiRouter.get('/health', (req, res) => {
 });
 
 // ============================================================
+// AUTHENTICATION APIs
+// ============================================================
+apiRouter.post('/auth/reset-password', async (req, res) => {
+  const { email } = req.body;
+  if (!email) return res.status(400).json({ error: 'Email is required' });
+  
+  try {
+    const link = await admin.auth().generatePasswordResetLink(email);
+    const html = `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 8px;">
+        <h2 style="color: #4CAF50; text-align: center;">Password Reset Request</h2>
+        <p style="font-size: 16px; color: #333;">Hello,</p>
+        <p style="font-size: 16px; color: #333;">We received a request to reset your password for your Deergayu account. Click the button below to set a new password:</p>
+        <div style="text-align: center; margin: 30px 0;">
+          <a href="${link}" style="background-color: #4CAF50; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; font-weight: bold; font-size: 16px;">Reset Password</a>
+        </div>
+        <p style="font-size: 14px; color: #666;">If you didn't request a password reset, you can safely ignore this email. Your password will not change.</p>
+        <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;" />
+        <p style="font-size: 12px; color: #999; text-align: center;">Deergayu Platform &copy; ${new Date().getFullYear()}</p>
+      </div>
+    `;
+    
+    await sendEmail(email, 'Reset your Deergayu password', 'Password Reset Link', html);
+    res.json({ message: 'Password reset email sent successfully' });
+  } catch (error) {
+    console.error('Error generating password reset link:', error);
+    if (error.code === 'auth/user-not-found') {
+      return res.status(404).json({ error: 'User with this email not found' });
+    }
+    res.status(500).json({ error: 'Failed to process password reset request' });
+  }
+});
+
+// ============================================================
 // PUBLIC SMART APIs (Home Page, Symptom Checker, etc.)
 // ============================================================
 

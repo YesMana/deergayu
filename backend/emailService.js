@@ -6,7 +6,9 @@ async function createTransporter() {
   if (process.env.SMTP_USER && process.env.SMTP_PASS) {
     // Use real SMTP if provided
     transporter = nodemailer.createTransport({
-      service: 'gmail', // or your SMTP host
+      host: process.env.SMTP_HOST || 'smtp.gmail.com', // default to gmail if host is not provided
+      port: process.env.SMTP_PORT || 465, // default to 465 (secure)
+      secure: process.env.SMTP_PORT == 465 || process.env.SMTP_PORT == null, // true for 465, false for other ports
       auth: {
         user: process.env.SMTP_USER,
         pass: process.env.SMTP_PASS
