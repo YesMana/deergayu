@@ -197,3 +197,83 @@
   50% { transform: scale(1.2); opacity: 0.7; }
   100% { transform: scale(1); opacity: 1; }
 }
+
+/* Language selection button styles */
+.ayurbot-lang-container {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+
+.ayurbot-lang-btn {
+  background: rgba(212, 175, 55, 0.15);
+  border: 1px solid rgba(212, 175, 55, 0.4);
+  color: var(--secondary-color);
+  padding: 0.5rem;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: all 0.2s ease;
+  text-align: center;
+}
+
+.ayurbot-lang-btn:hover {
+  background: var(--secondary-color);
+  color: white;
+}
+
+/* Option Chip styles */
+.ayurbot-options-container {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  margin-top: 0.5rem;
+}
+
+.ayurbot-option-chip {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: var(--text-primary);
+  padding: 0.5rem 0.75rem;
+  border-radius: 20px;
+  cursor: pointer;
+  font-size: 0.82rem;
+  text-align: left;
+  transition: all 0.2s ease;
+}
+
+.ayurbot-option-chip:hover {
+  background: rgba(212, 175, 55, 0.15);
+  border-color: var(--secondary-color);
+  color: var(--secondary-color);
+}
+
+/* Styled navigation card inside chat bubble */
+.ayurbot-nav-card {
+  background: rgba(0, 0, 0, 0.2);
+  border: 1px solid rgba(212, 175, 55, 0.2);
+  border-radius: 8px;
+  padding: 0.75rem;
+  margin-top: 0.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.ayurbot-nav-link {
+  background: var(--secondary-color);
+  color: white !important;
+  text-align: center;
+  padding: 0.4rem;
+  border-radius: 6px;
+  text-decoration: none;
+  font-weight: 600;
+  font-size: 0.82rem;
+  display: block;
+  transition: opacity 0.2s;
+}
+
+.ayurbot-nav-link:hover {
+  opacity: 0.9;
+}
