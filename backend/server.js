@@ -1196,33 +1196,102 @@ apiRouter.get('/appointments/available/:providerId', async (req, res) => {
 });
 
 // ============================================================
-// AI Chatbot Route (Gemini)
+// AI Chatbot Route (Gemini with Rule-based fallback)
 // ============================================================
+function getAyurvedicFallback(message, lang) {
+  const msg = (message || '').toLowerCase();
+  
+  const remedies = {
+    english: {
+      cough: "For cough and cold, try drinking warm ginger tea with honey 2-3 times a day. You can also inhale steam with eucalyptus oil or take a teaspoon of turmeric mixed with warm milk.",
+      fever: "For mild fever, drink coriander seed tea (dhania) or pathpadagam. Ensure you rest and stay hydrated. If fever exceeds 101°F, please consult a doctor via our 'Channeling' page.",
+      headache: "For headache, apply a paste of ginger powder and water to your forehead. Resting in a quiet, dark room and drinking warm herbal tea also helps.",
+      stomach: "For stomach ache or indigestion, try drinking warm water with a pinch of roasted cumin (jeera) and fennel seeds (saunf). Avoid heavy foods.",
+      joint: "For joint pain, gently massage the area with warm sesame oil or Mahanarayana oil. Apply a warm compress afterwards.",
+      skin: "For minor skin irritations or rash, apply fresh Aloe Vera gel or a paste of neem leaves and turmeric to the affected area.",
+      stress: "For stress and anxiety, drink warm chamomile or ashwagandha tea before bedtime. Practice deep breathing (Pranayama) for 10 minutes daily.",
+      default: "Ayubowan! I am AyurBot. I recommend maintaining a balanced diet with warm, freshly cooked meals. Please let me know your symptoms (e.g., cough, headache, fever) so I can suggest a specific Ayurvedic remedy, or consult a professional via our 'Channeling' page."
+    },
+    sinhala: {
+      cough: "කැස්ස සහ සෙම්ප්‍රතිශ්‍යාව සඳහා, මී පැණි සමඟ ඉඟුරු තේ දිනකට 2-3 වතාවක් පානය කරන්න. කොහොඹ කොළ තම්බා හුමාලය ඇල්ලීමද ඉතා සුදුසුය.",
+      fever: "සුළු උණ තත්ත්වයන් සඳහා, කොත්තමල්ලි සහ වෙනිවැල්ගැට තම්බා පානය කරන්න. හොඳින් විවේක ගන්න. උණ දිගටම පවතී නම්, කරුණාකර අපගේ 'Channeling' පිටුව හරහා වෛද්‍යවරයකු හමුවන්න.",
+      headache: "හිසරදය සඳහා, ඉඟුරු කුඩු ස්වල්පයක් වතුරෙන් අනා නළලෙහි ආලේප කරන්න. නිශ්ශබ්ද කාමරයක විවේක ගැනීමද උපකාරී වේ.",
+      stomach: "බඩේ කැක්කුම හෝ අජීර්ණය සඳහා, බැදපු සූදුරු සහ මහදුරු දැමූ උණුසුම් ජලය පානය කරන්න. බර ආහාර ගැනීමෙන් වළකින්න.",
+      joint: "හන්දිපත් රුදාව සඳහා, උණුසුම් තල තෙල් හෝ මහානාරායන තෙල් ගල්වා මෘදුව සම්බාහනය කරන්න. පසුව මඳ උණුසුම් වතුරෙන් තවන්න.",
+      skin: "සමේ පළු දැමීම හෝ සුළු කැසීම් සඳහා, කෝමාරිකා සාරය හෝ කොහොඹ කොළ සහ කහ මිශ්‍ර ආලේපය ගල්වන්න.",
+      stress: "මානසික ආතතිය සහ නින්ද නොයාම සඳහා, නින්දට පෙර අශ්වගන්ධ තේ පානය කරන්න. දිනපතා විනාඩි 10ක් ප්‍රාණයාම ශ්වසන අභ්‍යාස කරන්න.",
+      default: "ආයුබෝවන්! මම AyurBot. සමබර ආහාර වේලක් ලබා ගැනීමටත්, උණුසුම්ව පිළියෙළ කළ නැවුම් ආහාර ගැනීමටත් උත්සාහ කරන්න. ඔබේ රෝග ලක්ෂණ (කැස්ස, හිසරදය, උණ ආදී) පවසන්න, එවිට මට නිවැරදි අත් බෙහෙත් යෝජනා කළ හැක."
+    },
+    ta: {
+      cough: "இருமல் மற்றும் சளிக்கு, இஞ்சி தேநீரில் தேன் கலந்து குடிக்கவும். யூக்கலிப்டஸ் எண்ணெய் சேர்த்து ஆவி பிடிக்கலாம்.",
+      fever: "லேசான காய்ச்சலுக்கு, கொத்தமல்லி அல்லது துளசி தேநீர் குடிக்கவும். காய்ச்சல் நீடித்தால், தயவுசெய்து எங்களது Channeling பக்கத்தின் மூலம் மருத்துவரை அணுகவும்.",
+      headache: "தலைவலிக்கு, இஞ்சிப் பொடியை தண்ணீரில் குழைத்து நெற்றியில் பற்று போடவும். அமைதியான அறையில் ஓய்வெடுக்கவும்.",
+      stomach: "வயிற்று வலிக்கு, வறுத்த சீரகம் மற்றும் பெருஞ்சீரகம் கலந்த வெதுவெதுப்பான நீரைக் குடிக்கவும். கனமான உணவுகளைத் தவிர்க்கவும்.",
+      joint: "மூட்டு வலிக்கு, வெதுவெதுப்பான நல்லெண்ணெய் அல்லது மகாநாராயண எண்ணெய் கொண்டு மசாஜ் செய்யவும்.",
+      skin: "சரும அரிப்புகளுக்கு, கற்றாழை ஜெல் அல்லது வேப்பிலை மற்றும் மஞ்சள் விழுதை தடவவும்.",
+      stress: "மன அழுத்தத்திற்கு, அஸ்வகந்தா தேநீர் அருந்தவும் மற்றும் தியானம் செய்யவும்.",
+      default: "வணக்கம்! நான் ஆயுர்பாட். உங்கள் அறிகுறிகளைக் குறிப்பிடுங்கள் (இருமல், தலைவலி, காய்ச்சல் போன்றவை), நான் அதற்கான ஆயுர்வேத வீட்டு வைத்தியத்தை பரிந்துரைக்கிறேன்."
+    }
+  };
+
+  const currentRemedies = remedies[lang] || remedies.english;
+  
+  if (msg.includes('cough') || msg.includes('cold') || msg.includes('flu') || msg.includes('කැස්ස') || msg.includes('සෙම') || msg.includes('இருமல்') || msg.includes('சளி')) {
+    return currentRemedies.cough;
+  }
+  if (msg.includes('fever') || msg.includes('temperature') || msg.includes('උණ') || msg.includes('කாய்ச்சල්')) {
+    return currentRemedies.fever;
+  }
+  if (msg.includes('head') || msg.includes('headache') || msg.includes('හිස') || msg.includes('හිසරදය') || msg.includes('தலைவலி')) {
+    return currentRemedies.headache;
+  }
+  if (msg.includes('stomach') || msg.includes('belly') || msg.includes('indigestion') || msg.includes('බඩ') || msg.includes('අජීර්ණ') || msg.includes('வயிற்று')) {
+    return currentRemedies.stomach;
+  }
+  if (msg.includes('joint') || msg.includes('knee') || msg.includes('pain') || msg.includes('රුදාව') || msg.includes('කැක්කුම') || msg.includes('வலி')) {
+    return currentRemedies.joint;
+  }
+  if (msg.includes('skin') || msg.includes('rash') || msg.includes('itch') || msg.includes('සම') || msg.includes('කැසීම') || msg.includes('அரிப்பு')) {
+    return currentRemedies.skin;
+  }
+  if (msg.includes('stress') || msg.includes('sleep') || msg.includes('anxiety') || msg.includes('ආතතිය') || msg.includes('නින්ද') || msg.includes('தூக்கம்')) {
+    return currentRemedies.stress;
+  }
+
+  return currentRemedies.default;
+}
+
 apiRouter.post('/chat', async (req, res) => {
   try {
     const { message, lang } = req.body;
-    
-    if (!process.env.GEMINI_API_KEY) {
-      return res.status(500).json({ error: "Gemini API key is not configured in backend." });
-    }
+    let replyText = "";
 
-    const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+    try {
+      if (process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY.startsWith("AIzaSy")) {
+        const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+        const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
-    const systemPrompt = `You are AyurBot, an expert Ayurvedic assistant for the Deergayu platform in Sri Lanka.
+        const systemPrompt = `You are AyurBot, an expert Ayurvedic assistant for the Deergayu platform in Sri Lanka.
 Your job is to provide safe, natural Ayurvedic home remedies for common ailments. 
 If the ailment is serious, strongly advise them to consult a doctor via the 'Channeling' page.
 Keep your answers brief, friendly, and highly relevant to Ayurveda.
 The user is speaking in ${lang === 'si' ? 'Sinhala' : lang === 'ta' ? 'Tamil' : 'English'}. Please reply in the same language.
 User's message: ${message}`;
 
-    const result = await model.generateContent(systemPrompt);
-    const response = await result.response;
-    const text = response.text();
+        const result = await model.generateContent(systemPrompt);
+        const response = await result.response;
+        replyText = response.text();
+      } else {
+        throw new Error("Gemini API Key is missing or invalid format.");
+      }
+    } catch (apiError) {
+      console.warn("Gemini API call failed. Using rule-based fallback:", apiError.message);
+      replyText = getAyurvedicFallback(message, lang);
+    }
 
-    res.json({ reply: text });
+    res.json({ reply: replyText });
   } catch (error) {
-    console.error("AI Chat Error:", error);
+    console.error("AI Chat Route error:", error);
     res.status(500).json({ error: "Failed to process chat" });
   }
 });
