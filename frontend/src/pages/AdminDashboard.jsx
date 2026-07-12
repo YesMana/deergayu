@@ -101,7 +101,6 @@ const AdminDashboard = () => {
       const usersCol = collection(db, 'users');
       const constraints = [
         where('role', 'in', ['doctor', 'clinic', 'organization', 'vendor']),
-        orderBy('createdAt', 'desc'),
         limit(PAGE_SIZE)
       ];
       if (startCursor) constraints.push(startAfter(startCursor));
@@ -109,6 +108,9 @@ const AdminDashboard = () => {
       const q = query(usersCol, ...constraints);
       const snap = await getDocs(q);
       let experts = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+      // Sort experts chronologically (newest first) client-side to avoid Firestore composite index requirement
+      experts.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
 
       if (providerSearch.trim()) {
         const term = providerSearch.toLowerCase();
@@ -127,7 +129,7 @@ const AdminDashboard = () => {
         } catch { setTotalProviders(0); }
       }
     } catch (e) {
-      console.error(e);
+      console.error("Firestore fetch error:", e);
     } finally {
       setLoadingProviders(false);
     }
@@ -189,14 +191,25 @@ const AdminDashboard = () => {
     setLoadingUsers(true);
     try {
       const usersCol = collection(db, 'users');
-      const constraints = [orderBy('createdAt', 'desc')];
-      if (userRoleFilter !== 'all') constraints.unshift(where('role', '==', userRoleFilter));
+      const constraints = [];
+      
+      // If filtering by role, omit orderBy to avoid composite index requirements. Sort client-side instead.
+      if (userRoleFilter !== 'all') {
+        constraints.push(where('role', '==', userRoleFilter));
+      } else {
+        constraints.push(orderBy('createdAt', 'desc'));
+      }
+      
       constraints.push(limit(PAGE_SIZE));
       if (startCursor) constraints.push(startAfter(startCursor));
 
       const q = query(usersCol, ...constraints);
       const snap = await getDocs(q);
       let userList = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+      if (userRoleFilter !== 'all') {
+        userList.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+      }
 
       if (userSearch.trim()) {
         const term = userSearch.toLowerCase();

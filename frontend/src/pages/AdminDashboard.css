@@ -607,6 +607,12 @@
   font-family: 'Inter', sans-serif;
 }
 
+.role-select option,
+.status-select option {
+  background-color: #1a1e1b !important;
+  color: #ffffff !important;
+}
+
 /* ─── User Avatar ─── */
 .user-avatar {
   width: 34px;
