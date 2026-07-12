@@ -79,6 +79,18 @@ const AdminDashboard = () => {
   const [orderSearch, setOrderSearch]       = useState('');
   const [apptSearch, setApptSearch]         = useState('');
 
+  // Appointments filter states
+  const [apptDoctorFilter, setApptDoctorFilter] = useState('all');
+  const getTodayDateString = () => {
+    const d = new Date();
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+  const [apptDateFilter, setApptDateFilter] = useState(getTodayDateString());
+
+
   // Pagination (All Users)
   const PAGE_SIZE = 20;
   const [currentPage, setCurrentPage]     = useState(1);
@@ -445,8 +457,14 @@ const AdminDashboard = () => {
   });
 
   const filteredAppts = appointments.filter(a => {
-    const s = apptSearch.toLowerCase();
-    return !s || a.customerName?.toLowerCase().includes(s) || a.providerName?.toLowerCase().includes(s);
+    const matchSearch = !apptSearch ||
+      a.customerName?.toLowerCase().includes(apptSearch.toLowerCase()) ||
+      a.providerName?.toLowerCase().includes(apptSearch.toLowerCase());
+
+    const matchDoctor = apptDoctorFilter === 'all' || a.providerId === apptDoctorFilter;
+    const matchDate   = !apptDateFilter || a.date === apptDateFilter;
+
+    return matchSearch && matchDoctor && matchDate;
   });
 
   const recentOrders = [...orders].slice(0, 5);
@@ -1107,12 +1125,59 @@ const AdminDashboard = () => {
             </div>
 
             <div className="table-container">
-              <div className="table-toolbar">
-                <span className="table-title"><Calendar size={16} /> {filteredAppts.length} appointments</span>
-                <div className="table-controls">
+              <div className="table-toolbar" style={{ flexWrap: 'wrap', gap: '1rem' }}>
+                <span className="table-title" style={{ minWidth: '150px' }}><Calendar size={16} /> {filteredAppts.length} appointments</span>
+                <div className="table-controls" style={{ gap: '0.8rem', flexWrap: 'wrap', width: 'auto', flex: 1, justifyContent: 'flex-end' }}>
+                  
+                  {/* Doctor Filter */}
+                  <select
+                    className="status-select"
+                    value={apptDoctorFilter}
+                    onChange={e => setApptDoctorFilter(e.target.value)}
+                    style={{ padding: '0.35rem 0.6rem', fontSize: '0.8rem', background: 'rgba(255,255,255,0.05)', minWidth: '160px', color: 'var(--text-primary)' }}
+                  >
+                    <option value="all">All Doctors</option>
+                    {Array.from(new Set(appointments.map(a => JSON.stringify({ id: a.providerId, name: a.providerName }))))
+                      .map(str => JSON.parse(str))
+                      .filter(p => p.id && p.name)
+                      .map(p => (
+                        <option key={p.id} value={p.id}>{p.name}</option>
+                      ))
+                    }
+                  </select>
+
+                  {/* Date Filter */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                    <input
+                      type="date"
+                      className="status-select"
+                      value={apptDateFilter}
+                      onChange={e => setApptDateFilter(e.target.value)}
+                      style={{ padding: '0.3rem 0.5rem', fontSize: '0.8rem', background: 'rgba(255,255,255,0.05)', color: 'var(--text-primary)' }}
+                    />
+                    {apptDateFilter ? (
+                      <button
+                        className="btn btn-ghost btn-sm"
+                        onClick={() => setApptDateFilter('')}
+                        style={{ padding: '0.3rem 0.6rem', fontSize: '0.75rem', border: '1px solid rgba(255,255,255,0.1)' }}
+                      >
+                        All Dates
+                      </button>
+                    ) : (
+                      <button
+                        className="btn btn-ghost btn-sm"
+                        onClick={() => setApptDateFilter(getTodayDateString())}
+                        style={{ padding: '0.3rem 0.6rem', fontSize: '0.75rem', border: '1px solid rgba(255,255,255,0.1)' }}
+                      >
+                        Today
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Search Box */}
                   <div className="search-box">
                     <Search size={14} />
-                    <input placeholder="Search patient or doctor…" value={apptSearch} onChange={e => setApptSearch(e.target.value)} />
+                    <input placeholder="Search patient name…" value={apptSearch} onChange={e => setApptSearch(e.target.value)} />
                   </div>
                 </div>
               </div>
