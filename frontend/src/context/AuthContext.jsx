@@ -77,17 +77,7 @@ export const AuthProvider = ({ children }) => {
   };
 
   const resetPassword = async (email) => {
-    const res = await fetch(`${API_URL}/api/auth/reset-password`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email })
-    });
-    
-    const data = await res.json();
-    if (!res.ok) {
-      throw new Error(data.error || 'Failed to send password reset email');
-    }
-    return data;
+    return sendPasswordResetEmail(auth, email);
   };
 
   const logout = () => {
