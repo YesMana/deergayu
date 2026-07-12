@@ -240,7 +240,18 @@ const Login = () => {
           </div>
           {mode !== 'forgot' && (
             <div className="form-group">
-              <label>Password</label>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <label>Password</label>
+                {mode === 'login' && (
+                  <span 
+                    onClick={() => setMode('forgot')} 
+                    style={{ fontSize: '0.85rem', color: 'var(--primary-color)', cursor: 'pointer' }}
+                    className="login-link"
+                  >
+                    Forgot Password?
+                  </span>
+                )}
+              </div>
               <input 
                 type="password" 
                 value={password}
