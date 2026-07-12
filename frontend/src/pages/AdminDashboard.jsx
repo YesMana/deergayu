@@ -61,6 +61,14 @@ const AdminDashboard = () => {
   const [loadingDoctorAppts, setLoadingDoctorAppts] = useState(false);
   const [modalTab, setModalTab] = useState('profile'); // 'profile' or 'appointments'
 
+  // Selected Platform User Details Modal states
+  const [selectedUser, setSelectedUser] = useState(null);
+  const [userAppts, setUserAppts] = useState([]);
+  const [loadingUserAppts, setLoadingUserAppts] = useState(false);
+  const [userOrders, setUserOrders] = useState([]);
+  const [loadingUserOrders, setLoadingUserOrders] = useState(false);
+  const [userModalTab, setUserModalTab] = useState('profile'); // 'profile', 'appointments', 'orders'
+
   // Loading states
   const [loadingProviders, setLoadingProviders]       = useState(false);
   const [loadingProducts, setLoadingProducts]         = useState(false);
@@ -162,6 +170,42 @@ const AdminDashboard = () => {
       console.error(e);
     } finally {
       setLoadingDoctorAppts(false);
+    }
+  };
+
+  const fetchUserAppointments = async (uid) => {
+    setLoadingUserAppts(true);
+    try {
+      const q = query(
+        collection(db, 'appointments'),
+        where('customerId', '==', uid)
+      );
+      const snap = await getDocs(q);
+      const list = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      list.sort((a, b) => new Date(b.createdAt || b.date) - new Date(a.createdAt || a.date));
+      setUserAppts(list.slice(0, 50)); // Show last 50
+    } catch (e) {
+      console.error("Error fetching user appointments:", e);
+    } finally {
+      setLoadingUserAppts(false);
+    }
+  };
+
+  const fetchUserOrders = async (uid) => {
+    setLoadingUserOrders(true);
+    try {
+      const q = query(
+        collection(db, 'orders'),
+        where('customerId', '==', uid)
+      );
+      const snap = await getDocs(q);
+      const list = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      list.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+      setUserOrders(list.slice(0, 50)); // Show last 50
+    } catch (e) {
+      console.error("Error fetching user orders:", e);
+    } finally {
+      setLoadingUserOrders(false);
     }
   };
 
@@ -893,6 +937,18 @@ const AdminDashboard = () => {
                                   <button className="btn-xs approve" onClick={() => handleApproveUser(u.id)}>Approve</button>
                                 )}
                                 <button
+                                  className="btn-xs edit-btn"
+                                  onClick={() => {
+                                    setSelectedUser(u);
+                                    setUserModalTab('profile');
+                                    fetchUserAppointments(u.id);
+                                    fetchUserOrders(u.id);
+                                  }}
+                                  style={{ background: 'var(--primary-color)', color: 'white' }}
+                                >
+                                  View Details
+                                </button>
+                                <button
                                   className="btn-xs delete-btn"
                                   onClick={() => handleDeleteUser(u.id, u.name)}
                                   disabled={u.email === 'yes.manujaya@gmail.com'}
@@ -1479,6 +1535,154 @@ const AdminDashboard = () => {
               {/* Footer */}
               <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '1.25rem', paddingTop: '1rem', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
                 <button className="btn btn-outline" onClick={() => setSelectedDoctor(null)}>Close</button>
+              </div>
+
+            </div>
+          </div>
+        )}
+
+        {/* Selected User / Patient Details Modal */}
+        {selectedUser && (
+          <div className="modal-overlay" style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, backdropFilter: 'blur(4px)' }}>
+            <div className="glass-panel" style={{ width: '90%', maxWidth: '650px', maxHeight: '85vh', display: 'flex', flexDirection: 'column', overflow: 'hidden', padding: '1.75rem', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '12px' }}>
+              
+              {/* Header */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.25rem' }}>
+                <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+                  <div className="user-avatar" style={{ width: '48px', height: '48px', fontSize: '1.2rem', overflow: 'hidden', borderRadius: '50%' }}>
+                    {userInitials(selectedUser)}
+                  </div>
+                  <div>
+                    <h2 style={{ fontSize: '1.3rem', fontWeight: 700, margin: 0 }}>{selectedUser.name || 'User'}</h2>
+                    <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', textTransform: 'capitalize' }}>
+                      👤 Role: {selectedUser.role} · Member since: {fmtDate(selectedUser.createdAt)}
+                    </span>
+                  </div>
+                </div>
+                <button className="btn btn-ghost btn-sm" onClick={() => setSelectedUser(null)} style={{ fontSize: '1.5rem', padding: '0.2rem 0.5rem', background: 'none', border: 'none', color: 'var(--text-primary)', cursor: 'pointer' }}>×</button>
+              </div>
+
+              {/* Modal Tabs */}
+              <div style={{ display: 'flex', gap: '0.5rem', borderBottom: '1px solid rgba(255,255,255,0.08)', marginBottom: '1.25rem' }}>
+                <button
+                  className={`dashboard-tab ${userModalTab === 'profile' ? 'active' : ''}`}
+                  onClick={() => setUserModalTab('profile')}
+                  style={{ background: 'none', border: 'none', color: userModalTab === 'profile' ? 'var(--primary-color)' : 'var(--text-secondary)', borderBottom: userModalTab === 'profile' ? '2px solid var(--primary-color)' : 'none', padding: '0.5rem 1rem', cursor: 'pointer', fontWeight: 600, fontSize: '0.88rem' }}
+                >
+                  Overview & Info
+                </button>
+                <button
+                  className={`dashboard-tab ${userModalTab === 'appointments' ? 'active' : ''}`}
+                  onClick={() => setUserModalTab('appointments')}
+                  style={{ background: 'none', border: 'none', color: userModalTab === 'appointments' ? 'var(--primary-color)' : 'var(--text-secondary)', borderBottom: userModalTab === 'appointments' ? '2px solid var(--primary-color)' : 'none', padding: '0.5rem 1rem', cursor: 'pointer', fontWeight: 600, fontSize: '0.88rem' }}
+                >
+                  Booked Appointments ({userAppts.length})
+                </button>
+                <button
+                  className={`dashboard-tab ${userModalTab === 'orders' ? 'active' : ''}`}
+                  onClick={() => setUserModalTab('orders')}
+                  style={{ background: 'none', border: 'none', color: userModalTab === 'orders' ? 'var(--primary-color)' : 'var(--text-secondary)', borderBottom: userModalTab === 'orders' ? '2px solid var(--primary-color)' : 'none', padding: '0.5rem 1rem', cursor: 'pointer', fontWeight: 600, fontSize: '0.88rem' }}
+                >
+                  Order History ({userOrders.length})
+                </button>
+              </div>
+
+              {/* Modal Content */}
+              <div style={{ flex: 1, overflowY: 'auto', paddingRight: '0.25rem' }}>
+                {userModalTab === 'profile' && (
+                  <div>
+                    {/* Basic Info */}
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1.5rem', fontSize: '0.85rem' }}>
+                      <div>
+                        <strong style={{ color: 'var(--text-secondary)' }}>Email:</strong>
+                        <div style={{ marginTop: '0.2rem' }}>
+                          <a href={`mailto:${selectedUser.email}`} style={{ color: 'var(--primary-color)', textDecoration: 'none' }}>{selectedUser.email}</a>
+                        </div>
+                      </div>
+                      <div>
+                        <strong style={{ color: 'var(--text-secondary)' }}>Account Status:</strong>
+                        <div style={{ marginTop: '0.2rem' }}>
+                          <StatusPill status={selectedUser.status === 'pending' ? 'pending' : 'active'} />
+                        </div>
+                      </div>
+                      <div>
+                        <strong style={{ color: 'var(--text-secondary)' }}>User ID:</strong>
+                        <div style={{ marginTop: '0.2rem', fontFamily: 'monospace', color: 'var(--text-muted)' }}>{selectedUser.id}</div>
+                      </div>
+                      <div>
+                        <strong style={{ color: 'var(--text-secondary)' }}>Joined Date:</strong>
+                        <div style={{ marginTop: '0.2rem' }}>{fmtDate(selectedUser.createdAt)}</div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {userModalTab === 'appointments' && (
+                  <div>
+                    <h3 style={{ fontSize: '0.95rem', fontWeight: 700, borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '0.4rem', margin: '0 0 0.75rem' }}>
+                      Appointments booked by this user
+                    </h3>
+                    {loadingUserAppts ? (
+                      <div className="loading-state"><div className="spinner spinner-sm" /> Loading appointments…</div>
+                    ) : userAppts.length === 0 ? (
+                      <p style={{ color: 'var(--text-secondary)', fontStyle: 'italic', fontSize: '0.85rem', padding: '1rem 0' }}>No appointments booked by this user yet.</p>
+                    ) : (
+                      <div style={{ overflowX: 'auto' }}>
+                        <table className="admin-table" style={{ fontSize: '0.78rem' }}>
+                          <thead><tr>
+                            <th>Doctor</th><th>Date/Time</th><th>Notes</th><th>Status</th>
+                          </tr></thead>
+                          <tbody>
+                            {userAppts.map(a => (
+                              <tr key={a.id}>
+                                <td><strong>{a.providerName || 'Doctor'}</strong></td>
+                                <td>{a.date} at {a.time}</td>
+                                <td>{a.notes || '—'}</td>
+                                <td><StatusPill status={a.status} /></td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {userModalTab === 'orders' && (
+                  <div>
+                    <h3 style={{ fontSize: '0.95rem', fontWeight: 700, borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '0.4rem', margin: '0 0 0.75rem' }}>
+                      Product orders placed by this user
+                    </h3>
+                    {loadingUserOrders ? (
+                      <div className="loading-state"><div className="spinner spinner-sm" /> Loading orders…</div>
+                    ) : userOrders.length === 0 ? (
+                      <p style={{ color: 'var(--text-secondary)', fontStyle: 'italic', fontSize: '0.85rem', padding: '1rem 0' }}>No orders placed by this user yet.</p>
+                    ) : (
+                      <div style={{ overflowX: 'auto' }}>
+                        <table className="admin-table" style={{ fontSize: '0.78rem' }}>
+                          <thead><tr>
+                            <th>Order ID</th><th>Date</th><th>Total</th><th>Status</th>
+                          </tr></thead>
+                          <tbody>
+                            {userOrders.map(o => (
+                              <tr key={o.id}>
+                                <td style={{ fontFamily: 'monospace' }}>{o.id?.slice(0, 8)}...</td>
+                                <td>{fmtDate(o.createdAt)}</td>
+                                <td style={{ fontWeight: 600 }}>{fmtCurrency(o.totalPrice)}</td>
+                                <td><StatusPill status={o.status} /></td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+              
+              {/* Footer */}
+              <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '1.25rem', paddingTop: '1rem', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
+                <button className="btn btn-outline" onClick={() => setSelectedUser(null)}>Close</button>
               </div>
 
             </div>
