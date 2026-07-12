@@ -69,6 +69,10 @@ const AdminDashboard = () => {
   const [loadingUserOrders, setLoadingUserOrders] = useState(false);
   const [userModalTab, setUserModalTab] = useState('profile'); // 'profile', 'appointments', 'orders'
 
+  // Selected Order / Product Details Modal states
+  const [selectedOrder, setSelectedOrder] = useState(null);
+  const [selectedProduct, setSelectedProduct] = useState(null);
+
   // Loading states
   const [loadingProviders, setLoadingProviders]       = useState(false);
   const [loadingProducts, setLoadingProducts]         = useState(false);
@@ -1046,27 +1050,34 @@ const AdminDashboard = () => {
                           <td>{p.stock ?? '—'}</td>
                           <td><StatusPill status={p.status} /></td>
                           <td>
-                            <div className="action-btns">
-                              {p.status === 'pending' && (
-                                <button className="btn-xs approve" onClick={() => handleProductAction(p.id, 'approve')}>Approve</button>
-                              )}
-                              {p.status === 'approved' && (
-                                <button className="btn-xs hide-btn" onClick={() => handleProductAction(p.id, 'hide')}>
-                                  <EyeOff size={12} style={{ display: 'inline', marginRight: '3px' }} />Hide
-                                </button>
-                              )}
-                              {(p.status === 'hidden' || p.status === 'rejected') && (
-                                <button className="btn-xs approve" onClick={() => handleProductAction(p.id, 'approve')}>
-                                  <Eye size={12} style={{ display: 'inline', marginRight: '3px' }} />Re-Approve
-                                </button>
-                              )}
-                              {p.status === 'pending' && (
-                                <button className="btn-xs reject" onClick={() => handleProductAction(p.id, 'reject')}>Reject</button>
-                              )}
-                              <button className="btn-xs delete-btn" onClick={() => handleProductAction(p.id, 'delete')}>
-                                <Trash2 size={12} style={{ display: 'inline', marginRight: '3px' }} />Del
-                              </button>
-                            </div>
+                             <div className="action-btns">
+                               <button
+                                 className="btn-xs edit-btn"
+                                 onClick={() => setSelectedProduct(p)}
+                                 style={{ background: 'var(--primary-color)', color: 'white' }}
+                               >
+                                 View Details
+                               </button>
+                               {p.status === 'pending' && (
+                                 <button className="btn-xs approve" onClick={() => handleProductAction(p.id, 'approve')}>Approve</button>
+                                )}
+                               {p.status === 'approved' && (
+                                 <button className="btn-xs hide-btn" onClick={() => handleProductAction(p.id, 'hide')}>
+                                   <EyeOff size={12} style={{ display: 'inline', marginRight: '3px' }} />Hide
+                                 </button>
+                               )}
+                               {(p.status === 'hidden' || p.status === 'rejected') && (
+                                 <button className="btn-xs approve" onClick={() => handleProductAction(p.id, 'approve')}>
+                                   <Eye size={12} style={{ display: 'inline', marginRight: '3px' }} />Re-Approve
+                                 </button>
+                               )}
+                               {p.status === 'pending' && (
+                                 <button className="btn-xs reject" onClick={() => handleProductAction(p.id, 'reject')}>Reject</button>
+                               )}
+                               <button className="btn-xs delete-btn" onClick={() => handleProductAction(p.id, 'delete')}>
+                                 <Trash2 size={12} style={{ display: 'inline', marginRight: '3px' }} />Del
+                               </button>
+                             </div>
                           </td>
                         </tr>
                       ))}
@@ -1111,7 +1122,7 @@ const AdminDashboard = () => {
                 <div style={{ overflowX: 'auto' }}>
                   <table className="admin-table">
                     <thead><tr>
-                      <th>Order ID</th><th>Customer</th><th>Vendor</th><th>Total</th><th>Date</th><th>Status</th><th>Update Status</th>
+                      <th>Order ID</th><th>Customer</th><th>Vendor</th><th>Total</th><th>Date</th><th>Status</th><th>Update Status</th><th>Actions</th>
                     </tr></thead>
                     <tbody>
                       {filteredOrders.map(o => (
@@ -1144,6 +1155,17 @@ const AdminDashboard = () => {
                                 <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>
                               ))}
                             </select>
+                          </td>
+                          <td>
+                            <div className="action-btns">
+                              <button
+                                className="btn-xs edit-btn"
+                                onClick={() => setSelectedOrder(o)}
+                                style={{ background: 'var(--primary-color)', color: 'white' }}
+                              >
+                                View Details
+                              </button>
+                            </div>
                           </td>
                         </tr>
                       ))}
@@ -1683,6 +1705,197 @@ const AdminDashboard = () => {
               {/* Footer */}
               <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '1.25rem', paddingTop: '1rem', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
                 <button className="btn btn-outline" onClick={() => setSelectedUser(null)}>Close</button>
+              </div>
+
+            </div>
+          </div>
+        )}
+
+        {/* Selected Product Details Modal */}
+        {selectedProduct && (
+          <div className="modal-overlay" style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, backdropFilter: 'blur(4px)' }}>
+            <div className="glass-panel" style={{ width: '90%', maxWidth: '600px', maxHeight: '85vh', display: 'flex', flexDirection: 'column', overflow: 'hidden', padding: '1.75rem', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '12px' }}>
+              
+              {/* Header */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.25rem' }}>
+                <div>
+                  <h2 style={{ fontSize: '1.3rem', fontWeight: 700, margin: 0 }}>{selectedProduct.name}</h2>
+                  <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                    Category: {selectedProduct.category || 'Ayurveda Item'}
+                  </span>
+                </div>
+                <button className="btn btn-ghost btn-sm" onClick={() => setSelectedProduct(null)} style={{ fontSize: '1.5rem', padding: '0.2rem 0.5rem', background: 'none', border: 'none', color: 'var(--text-primary)', cursor: 'pointer' }}>×</button>
+              </div>
+
+              {/* Modal Content */}
+              <div style={{ flex: 1, overflowY: 'auto', paddingRight: '0.25rem', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+                
+                {/* Product Image */}
+                <div style={{ display: 'flex', justifyContent: 'center', background: 'rgba(255,255,255,0.02)', padding: '1.5rem', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                  {(selectedProduct.imageUrl || (selectedProduct.images && selectedProduct.images[0])) ? (
+                    <img
+                      src={selectedProduct.imageUrl || selectedProduct.images[0]}
+                      alt={selectedProduct.name}
+                      style={{ maxHeight: '200px', maxWidth: '100%', objectFit: 'contain', borderRadius: '6px' }}
+                    />
+                  ) : (
+                    <div style={{ height: '120px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '3rem' }}>📦</div>
+                  )}
+                </div>
+
+                {/* Details Grid */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', fontSize: '0.85rem' }}>
+                  <div>
+                    <strong style={{ color: 'var(--text-secondary)' }}>Price:</strong>
+                    <div style={{ marginTop: '0.2rem', fontSize: '1.1rem', fontWeight: 700, color: 'var(--primary-color)' }}>
+                      {fmtCurrency(selectedProduct.price || selectedProduct.basePrice)}
+                    </div>
+                  </div>
+                  <div>
+                    <strong style={{ color: 'var(--text-secondary)' }}>Stock Status:</strong>
+                    <div style={{ marginTop: '0.2rem', fontSize: '1rem', fontWeight: 600 }}>
+                      {selectedProduct.stock ?? 0} items available
+                    </div>
+                  </div>
+                  <div>
+                    <strong style={{ color: 'var(--text-secondary)' }}>Vendor:</strong>
+                    <div style={{ marginTop: '0.2rem' }}>{selectedProduct.vendorName || selectedProduct.vendorId || '—'}</div>
+                  </div>
+                  <div>
+                    <strong style={{ color: 'var(--text-secondary)' }}>Status:</strong>
+                    <div style={{ marginTop: '0.2rem' }}><StatusPill status={selectedProduct.status} /></div>
+                  </div>
+                  <div style={{ gridColumn: 'span 2' }}>
+                    <strong style={{ color: 'var(--text-secondary)' }}>Description:</strong>
+                    <p style={{ marginTop: '0.4rem', color: 'var(--text-secondary)', lineHeight: 1.4, whiteSpace: 'pre-wrap' }}>
+                      {selectedProduct.description || 'No description provided.'}
+                    </p>
+                  </div>
+                </div>
+
+              </div>
+              
+              {/* Footer */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '1.25rem', paddingTop: '1rem', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
+                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                  {selectedProduct.status === 'pending' && (
+                    <button className="btn btn-primary btn-sm" onClick={() => { handleProductAction(selectedProduct.id, 'approve'); setSelectedProduct(null); }}>Approve</button>
+                  )}
+                  {selectedProduct.status === 'pending' && (
+                    <button className="btn btn-outline btn-sm" onClick={() => { handleProductAction(selectedProduct.id, 'reject'); setSelectedProduct(null); }} style={{ color: 'red', borderColor: 'rgba(255,0,0,0.3)' }}>Reject</button>
+                  )}
+                </div>
+                <button className="btn btn-outline" onClick={() => setSelectedProduct(null)}>Close</button>
+              </div>
+
+            </div>
+          </div>
+        )}
+
+        {/* Selected Order Details Modal */}
+        {selectedOrder && (
+          <div className="modal-overlay" style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, backdropFilter: 'blur(4px)' }}>
+            <div className="glass-panel" style={{ width: '90%', maxWidth: '650px', maxHeight: '85vh', display: 'flex', flexDirection: 'column', overflow: 'hidden', padding: '1.75rem', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '12px' }}>
+              
+              {/* Header */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.25rem' }}>
+                <div>
+                  <h2 style={{ fontSize: '1.3rem', fontWeight: 700, margin: 0 }}>Order Details</h2>
+                  <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                    Order ID: <span style={{ fontFamily: 'monospace' }}>#{selectedOrder.id}</span>
+                  </span>
+                </div>
+                <button className="btn btn-ghost btn-sm" onClick={() => setSelectedOrder(null)} style={{ fontSize: '1.5rem', padding: '0.2rem 0.5rem', background: 'none', border: 'none', color: 'var(--text-primary)', cursor: 'pointer' }}>×</button>
+              </div>
+
+              {/* Modal Content */}
+              <div style={{ flex: 1, overflowY: 'auto', paddingRight: '0.25rem', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+                
+                {/* Status & Date */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(255,255,255,0.02)', padding: '0.75rem 1rem', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                  <div>
+                    <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginRight: '0.5rem' }}>Status:</span>
+                    <StatusPill status={selectedOrder.status} />
+                  </div>
+                  <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                    Placed on: {fmtDate(selectedOrder.createdAt)}
+                  </div>
+                </div>
+
+                {/* Customer Details */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', fontSize: '0.85rem', background: 'rgba(255,255,255,0.01)', padding: '1rem', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.03)' }}>
+                  <div>
+                    <strong style={{ color: 'var(--text-secondary)' }}>Customer Name:</strong>
+                    <div style={{ marginTop: '0.2rem' }}>{selectedOrder.customerName || '—'}</div>
+                  </div>
+                  <div>
+                    <strong style={{ color: 'var(--text-secondary)' }}>Contact Info:</strong>
+                    <div style={{ marginTop: '0.2rem' }}>
+                      <div>✉️ {selectedOrder.customerEmail || '—'}</div>
+                      <div>📞 {selectedOrder.customerPhone || '—'}</div>
+                    </div>
+                  </div>
+                  <div style={{ gridColumn: 'span 2' }}>
+                    <strong style={{ color: 'var(--text-secondary)' }}>Shipping Address:</strong>
+                    <div style={{ marginTop: '0.2rem', lineHeight: 1.4 }}>
+                      📍 {selectedOrder.shippingAddress || selectedOrder.address || '—'}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Ordered Items List */}
+                <div>
+                  <h3 style={{ fontSize: '0.95rem', fontWeight: 700, borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '0.4rem', margin: '0.5rem 0 0.75rem' }}>
+                    Ordered Items
+                  </h3>
+                  {selectedOrder.items && selectedOrder.items.length > 0 ? (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                      {selectedOrder.items.map((item, idx) => (
+                        <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(255,255,255,0.02)', padding: '0.5rem 0.8rem', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.04)', fontSize: '0.82rem' }}>
+                          <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
+                            <div style={{ width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(255,255,255,0.04)', borderRadius: '4px', fontSize: '1rem', overflow: 'hidden' }}>
+                              {item.imageUrl ? <img src={item.imageUrl} alt={item.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : '📦'}
+                            </div>
+                            <div>
+                              <div style={{ fontWeight: 600 }}>{item.name}</div>
+                              <div style={{ color: 'var(--text-muted)', fontSize: '0.72rem' }}>Qty: {item.quantity} · Price: {fmtCurrency(item.price)}</div>
+                            </div>
+                          </div>
+                          <span style={{ fontWeight: 600, color: 'var(--primary-color)' }}>
+                            {fmtCurrency(item.price * item.quantity)}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p style={{ color: 'var(--text-secondary)', fontStyle: 'italic', fontSize: '0.82rem' }}>No items list found inside the order.</p>
+                  )}
+                </div>
+
+                {/* Totals */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '0.75rem', fontSize: '0.9rem' }}>
+                  <span style={{ fontWeight: 600 }}>Total Order Value:</span>
+                  <span style={{ fontWeight: 700, fontSize: '1.15rem', color: '#4caf50' }}>{fmtCurrency(selectedOrder.totalPrice)}</span>
+                </div>
+
+              </div>
+              
+              {/* Footer */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '1.25rem', paddingTop: '1rem', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Status:</span>
+                  <select
+                    className="status-select"
+                    value={selectedOrder.status || 'pending'}
+                    onChange={e => { handleOrderStatus(selectedOrder.id, e.target.value); setSelectedOrder({ ...selectedOrder, status: e.target.value }); }}
+                    style={{ padding: '0.2rem 0.5rem', fontSize: '0.8rem' }}
+                  >
+                    {['pending','confirmed','processing','shipped','delivered','cancelled'].map(s => (
+                      <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>
+                    ))}
+                  </select>
+                </div>
+                <button className="btn btn-outline" onClick={() => setSelectedOrder(null)}>Close</button>
               </div>
 
             </div>
