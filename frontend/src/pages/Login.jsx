@@ -89,16 +89,19 @@ const Login = () => {
           }
         }
         
-        const profileDetails = role !== 'user' ? {
+        const actualRole = role === 'astrologer' ? 'doctor' : role;
+        const finalDoctorType = role === 'astrologer' ? 'Vedic Astrologer' : 'Ayurvedic Physician';
+
+        const profileDetails = actualRole !== 'user' ? {
           address,
           telephone,
-          doctorType,
-          specialty: doctorType === 'Vedic Astrologer' ? 'Yantra & Mantra' : specialty,
-          astrologyServices: doctorType === 'Vedic Astrologer' ? astrologyServices : [],
+          doctorType: finalDoctorType,
+          specialty: role === 'astrologer' ? 'Yantra & Mantra' : specialty,
+          astrologyServices: role === 'astrologer' ? astrologyServices : [],
           experience
         } : null;
         
-        const userCredential = await signupWithEmail(email, password, name, role, profileDetails);
+        const userCredential = await signupWithEmail(email, password, name, actualRole, profileDetails);
         await handleAdminRouting(userCredential.user);
       } else if (mode === 'forgot') {
         await resetPassword(email);
@@ -176,7 +179,8 @@ const Login = () => {
                 <label>Account Type</label>
                 <select value={role} onChange={(e) => setRole(e.target.value)} required>
                   <option value="user">Normal User</option>
-                  <option value="doctor">Doctor</option>
+                  <option value="doctor">Ayurvedic Physician</option>
+                  <option value="astrologer">Astrologer / Yanthra Manthra</option>
                   <option value="clinic">Medical Clinic</option>
                   <option value="organization">Organization</option>
                 </select>
@@ -192,13 +196,12 @@ const Login = () => {
                       <select value={doctorType} onChange={(e) => setDoctorType(e.target.value)} required>
                         <option value="Ayurvedic Physician">Ayurvedic Physician</option>
                         <option value="traditional">Paramparika Doctor (Traditional)</option>
-                        <option value="Vedic Astrologer">Vedic Astrologer / Yanthra Manthra</option>
                       </select>
                     </div>
                   )}
                   
                   <div className="form-group">
-                    <label>Specialty / Category</label>
+                    <label>Specialty / Services Provided</label>
                     {role === 'doctor' ? (
                       <select 
                         value={specialty}
@@ -218,7 +221,7 @@ const Login = () => {
                         <option value="Skin Diseases (Dermatology)">Skin Diseases (Dermatology - චර්ම රෝග)</option>
                         <option value="Other">Other (වෙනත්)</option>
                       </select>
-                    ) : doctorType === 'Vedic Astrologer' ? (
+                    ) : role === 'astrologer' ? (
                       <div className="astrology-checkboxes" style={{ display: 'grid', gap: '0.5rem', background: 'var(--input-bg)', padding: '1rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--glass-border)' }}>
                         <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', margin: 0 }}>
                           <input type="checkbox" value="Horoscope Reading" checked={astrologyServices.includes("Horoscope Reading")} onChange={(e) => {
