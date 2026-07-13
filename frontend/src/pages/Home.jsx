@@ -1,40 +1,47 @@
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
-import { Leaf, Calendar, Star, Users, Package, Activity, Shield, ChevronRight, MapPin, Phone } from 'lucide-react';
+import { Link, useNavigate } from 'react-router-dom';
+import { Leaf, Calendar, Star, Users, Package, Activity, Shield, ChevronRight, MapPin, Search, CheckCircle } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
+import { motion } from 'framer-motion';
 import './Home.css';
 
 const API_URL = import.meta.env.VITE_API_URL || '';
 
 const Home = () => {
   const { t, lang } = useLanguage();
+  const navigate = useNavigate();
   const [stats, setStats] = useState({ expertCount: 0, productCount: 0, orderCount: 0, appointmentCount: 0 });
   const [featuredProviders, setFeaturedProviders] = useState([]);
   const [featuredProducts, setFeaturedProducts] = useState([]);
   const [loadingProviders, setLoadingProviders] = useState(true);
   const [loadingProducts, setLoadingProducts] = useState(true);
+  const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
-    // Fetch stats
     fetch(`${API_URL}/api/home-stats`)
       .then(r => r.ok ? r.json() : null)
       .then(data => { if (data) setStats(data); })
       .catch(() => {});
 
-    // Fetch featured providers
     fetch(`${API_URL}/api/featured-providers`)
       .then(r => r.ok ? r.json() : [])
       .then(data => { setFeaturedProviders(Array.isArray(data) ? data.slice(0, 3) : []); })
       .catch(() => setFeaturedProviders([]))
       .finally(() => setLoadingProviders(false));
 
-    // Fetch featured products
     fetch(`${API_URL}/api/featured-products`)
       .then(r => r.ok ? r.json() : [])
       .then(data => { setFeaturedProducts(Array.isArray(data) ? data.slice(0, 3) : []); })
       .catch(() => setFeaturedProducts([]))
       .finally(() => setLoadingProducts(false));
   }, []);
+
+  const handleSearch = (e) => {
+    e.preventDefault();
+    if(searchQuery.trim()) {
+      navigate(`/shop?q=${encodeURIComponent(searchQuery)}`);
+    }
+  };
 
   const statItems = [
     { icon: Users, value: stats.expertCount || '50+', label: 'Expert Practitioners' },
@@ -48,9 +55,21 @@ const Home = () => {
     return map[role] || 'Expert';
   };
 
+  const fadeUpVariant = {
+    hidden: { opacity: 0, y: 40 },
+    visible: { opacity: 1, y: 0, transition: { duration: 0.7, ease: "easeOut" } }
+  };
+
+  const staggerContainer = {
+    hidden: { opacity: 0 },
+    visible: {
+      opacity: 1,
+      transition: { staggerChildren: 0.2 }
+    }
+  };
+
   return (
     <div className="home-page animate-fade-in">
-
       {/* ── HERO SECTION ── */}
       <section className="hero-section">
         <div className="hero-bg-overlay" />
@@ -60,7 +79,12 @@ const Home = () => {
           ))}
         </div>
         <div className="container hero-content">
-          <div className="hero-text animate-fade-in">
+          <motion.div 
+            className="hero-text"
+            initial={{ opacity: 0, x: -30 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.8, ease: "easeOut" }}
+          >
             <div className="hero-label">
               <Leaf size={14} /> Sri Lanka's #1 Ayurvedic Platform
             </div>
@@ -72,21 +96,36 @@ const Home = () => {
               Connect with certified Ayurvedic doctors, shop authentic herbal remedies,
               and embrace holistic wellness — all in one place.
             </p>
-            <div className="hero-buttons">
-              <Link to="/shop" className="btn btn-primary btn-lg">
-                <Leaf size={20} /> Explore Shop
-              </Link>
-              <Link to="/channeling" className="btn btn-outline-gold btn-lg">
-                <Calendar size={20} /> Book a Doctor
-              </Link>
-            </div>
+            
+            <form onSubmit={handleSearch} className="hero-search-bar">
+              <div className="search-input-wrapper glass-panel">
+                <Search size={22} className="search-icon text-muted" />
+                <input 
+                  type="text" 
+                  placeholder="What are you looking for? (e.g. Back pain, Herbal Oil)"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="search-input"
+                />
+                <button type="submit" className="btn btn-primary search-btn">
+                  Search
+                </button>
+              </div>
+            </form>
+
             <div className="hero-trust">
-              <div className="trust-item"><span>✓</span> 100% Natural</div>
-              <div className="trust-item"><span>✓</span> Certified Experts</div>
-              <div className="trust-item"><span>✓</span> Islandwide Delivery</div>
+              <div className="trust-item"><CheckCircle size={14} className="text-primary-color" /> 100% Natural</div>
+              <div className="trust-item"><CheckCircle size={14} className="text-primary-color" /> Certified Experts</div>
+              <div className="trust-item"><CheckCircle size={14} className="text-primary-color" /> Islandwide Delivery</div>
             </div>
-          </div>
-          <div className="hero-image-area">
+          </motion.div>
+
+          <motion.div 
+            className="hero-image-area"
+            initial={{ opacity: 0, x: 30 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.8, ease: "easeOut", delay: 0.2 }}
+          >
             <div className="hero-glow" />
             <div className="hero-card glass-panel animate-float">
               <img src="/logo.png" alt="Deergayu" className="hero-logo-img" />
@@ -103,29 +142,41 @@ const Home = () => {
               <Activity size={14} style={{ color: 'var(--primary-color)' }} />
               <span>AI-Powered Care</span>
             </div>
-          </div>
+          </motion.div>
         </div>
       </section>
 
       {/* ── STATS SECTION ── */}
-      <section className="stats-section">
+      <motion.section 
+        className="stats-section"
+        initial="hidden"
+        whileInView="visible"
+        viewport={{ once: true, margin: "-50px" }}
+        variants={fadeUpVariant}
+      >
         <div className="container">
-          <div className="stats-grid">
+          <motion.div className="stats-grid" variants={staggerContainer}>
             {statItems.map(({ icon: Icon, value, label }, i) => (
-              <div key={i} className="stat-card glass-panel">
+              <motion.div key={i} className="stat-card glass-panel" variants={fadeUpVariant}>
                 <div className="stat-icon-wrap">
                   <Icon size={24} />
                 </div>
                 <div className="stat-value">{value}</div>
                 <div className="stat-label">{label}</div>
-              </div>
+              </motion.div>
             ))}
-          </div>
+          </motion.div>
         </div>
-      </section>
+      </motion.section>
 
       {/* ── SERVICES SECTION ── */}
-      <section className="services-section section">
+      <motion.section 
+        className="services-section section"
+        initial="hidden"
+        whileInView="visible"
+        viewport={{ once: true, margin: "-100px" }}
+        variants={fadeUpVariant}
+      >
         <div className="container">
           <div className="section-header">
             <div className="section-label">What We Offer</div>
@@ -134,88 +185,77 @@ const Home = () => {
               Everything you need for your holistic health journey — from ancient wisdom to modern convenience.
             </p>
           </div>
-          <div className="services-grid">
-            <div className="service-card glass-panel glass-panel-hover">
-              <div className="service-icon-wrapper">
-                <Leaf size={32} />
-              </div>
+          <motion.div className="services-grid" variants={staggerContainer}>
+            <motion.div className="service-card glass-panel glass-panel-hover" variants={fadeUpVariant}>
+              <div className="service-icon-wrapper"><Leaf size={32} /></div>
               <h3>Ayurvedic Shop</h3>
               <p>Browse hundreds of authentic herbal medicines, oils, and wellness products directly from certified vendors.</p>
-              <Link to="/shop" className="service-link">
-                Browse Products <ChevronRight size={16} />
-              </Link>
-            </div>
+              <Link to="/shop" className="service-link">Browse Products <ChevronRight size={16} /></Link>
+            </motion.div>
 
-            <div className="service-card glass-panel glass-panel-hover">
-              <div className="service-icon-wrapper">
-                <Calendar size={32} />
-              </div>
+            <motion.div className="service-card glass-panel glass-panel-hover" variants={fadeUpVariant}>
+              <div className="service-icon-wrapper"><Calendar size={32} /></div>
               <h3>Doctor Channeling</h3>
               <p>Book appointments with qualified Ayurvedic doctors and specialists. Online and in-person sessions available.</p>
-              <Link to="/channeling" className="service-link">
-                Book Now <ChevronRight size={16} />
-              </Link>
-            </div>
+              <Link to="/channeling" className="service-link">Book Now <ChevronRight size={16} /></Link>
+            </motion.div>
 
-            <div className="service-card glass-panel glass-panel-hover">
-              <div className="service-icon-wrapper">
-                <Activity size={32} />
-              </div>
+            <motion.div className="service-card glass-panel glass-panel-hover" variants={fadeUpVariant}>
+              <div className="service-icon-wrapper"><Activity size={32} /></div>
               <h3>AI Symptom Checker</h3>
               <p>Describe your symptoms and get AI-powered Ayurvedic recommendations plus real doctor and product matches.</p>
-              <Link to="/symptom-checker" className="service-link">
-                Check Symptoms <ChevronRight size={16} />
-              </Link>
-            </div>
+              <Link to="/symptom-checker" className="service-link">Check Symptoms <ChevronRight size={16} /></Link>
+            </motion.div>
 
-            <div className="service-card glass-panel glass-panel-hover">
-              <div className="service-icon-wrapper">
-                <Star size={32} />
-              </div>
+            <motion.div className="service-card glass-panel glass-panel-hover" variants={fadeUpVariant}>
+              <div className="service-icon-wrapper"><Star size={32} /></div>
               <h3>Astrology & Vastu</h3>
               <p>Consult with experienced astrologers and Vastu experts for life guidance and home harmony.</p>
-              <Link to="/channeling?type=astrologer" className="service-link">
-                Explore <ChevronRight size={16} />
-              </Link>
-            </div>
-          </div>
+              <Link to="/channeling?type=astrologer" className="service-link">Explore <ChevronRight size={16} /></Link>
+            </motion.div>
+          </motion.div>
         </div>
-      </section>
+      </motion.section>
 
       {/* ── FEATURED DOCTORS ── */}
       {(loadingProviders || featuredProviders.length > 0) && (
-        <section className="featured-section section" style={{ background: 'var(--surface-color)' }}>
+        <motion.section 
+          className="featured-section section" style={{ background: 'var(--surface-color)' }}
+          initial="hidden"
+          whileInView="visible"
+          viewport={{ once: true, margin: "-100px" }}
+          variants={fadeUpVariant}
+        >
           <div className="container">
             <div className="section-header">
               <div className="section-label">Verified Experts</div>
               <h2 className="section-title">Meet Our Doctors</h2>
               <p className="section-subtitle">Certified Ayurvedic practitioners ready to guide your healing journey.</p>
             </div>
-            <div className="featured-grid">
+            <motion.div className="featured-grid" variants={staggerContainer}>
               {loadingProviders
                 ? [1, 2, 3].map(i => (
-                    <div key={i} className="doctor-card glass-panel">
+                    <motion.div key={i} className="doctor-card glass-panel" variants={fadeUpVariant}>
                       <div className="skeleton doctor-avatar-skeleton" />
                       <div style={{ padding: '1rem' }}>
                         <div className="skeleton" style={{ height: 18, width: '70%', marginBottom: 8 }} />
                         <div className="skeleton" style={{ height: 14, width: '50%', marginBottom: 8 }} />
                         <div className="skeleton" style={{ height: 36, width: '100%' }} />
                       </div>
-                    </div>
+                    </motion.div>
                   ))
                 : featuredProviders.map(provider => {
                     const pic = provider.profileDetails?.profileImageUrl;
                     const initial = (provider.name || 'D')[0].toUpperCase();
                     return (
-                      <div key={provider.id} className="doctor-card glass-panel glass-panel-hover">
+                      <motion.div key={provider.id} className="doctor-card glass-panel glass-panel-hover" variants={fadeUpVariant}>
                         <div className="doctor-avatar">
-                          {pic
-                            ? <img src={pic} alt={provider.name} />
-                            : <div className="doctor-avatar-placeholder">{initial}</div>
-                          }
+                          {pic ? <img src={pic} alt={provider.name} /> : <div className="doctor-avatar-placeholder">{initial}</div>}
                         </div>
                         <div className="doctor-info">
-                          <h3>{provider.name}</h3>
+                          <h3 style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', justifyContent: 'center' }}>
+                            {provider.name} <CheckCircle size={16} color="var(--secondary-color)" fill="rgba(212, 175, 55, 0.15)" />
+                          </h3>
                           <p className="doctor-role">{getRoleLabel(provider.role)}</p>
                           {provider.profileDetails?.specialty && (
                             <p className="doctor-specialty">{provider.profileDetails.specialty}</p>
@@ -235,43 +275,49 @@ const Home = () => {
                             <Calendar size={14} /> Book Appointment
                           </Link>
                         </div>
-                      </div>
+                      </motion.div>
                     );
                   })
               }
-            </div>
+            </motion.div>
             <div style={{ textAlign: 'center', marginTop: '2.5rem' }}>
               <Link to="/channeling" className="btn btn-outline btn-lg">
                 View All Doctors <ChevronRight size={18} />
               </Link>
             </div>
           </div>
-        </section>
+        </motion.section>
       )}
 
       {/* ── FEATURED PRODUCTS ── */}
       {(loadingProducts || featuredProducts.length > 0) && (
-        <section className="featured-section section">
+        <motion.section 
+          className="featured-section section"
+          initial="hidden"
+          whileInView="visible"
+          viewport={{ once: true, margin: "-100px" }}
+          variants={fadeUpVariant}
+        >
           <div className="container">
             <div className="section-header">
               <div className="section-label">Popular Products</div>
               <h2 className="section-title">Trending Remedies</h2>
               <p className="section-subtitle">Authentic Ayurvedic products trusted by our community.</p>
             </div>
-            <div className="featured-grid">
+            <motion.div className="featured-grid" variants={staggerContainer}>
               {loadingProducts
                 ? [1, 2, 3].map(i => (
-                    <div key={i} className="product-preview-card glass-panel">
+                    <motion.div key={i} className="product-preview-card glass-panel" variants={fadeUpVariant}>
                       <div className="skeleton product-img-skeleton" />
                       <div style={{ padding: '1rem' }}>
                         <div className="skeleton" style={{ height: 18, width: '80%', marginBottom: 8 }} />
                         <div className="skeleton" style={{ height: 14, width: '40%', marginBottom: 8 }} />
                         <div className="skeleton" style={{ height: 36, width: '100%' }} />
                       </div>
-                    </div>
+                    </motion.div>
                   ))
                 : featuredProducts.map(product => (
-                    <div key={product.id} className="product-preview-card glass-panel glass-panel-hover">
+                    <motion.div key={product.id} className="product-preview-card glass-panel glass-panel-hover" variants={fadeUpVariant}>
                       <div className="product-preview-img">
                         <img
                           src={product.imageUrl || product.image || 'https://images.unsplash.com/photo-1611078516086-6ab28122db63?w=400&q=80'}
@@ -289,21 +335,27 @@ const Home = () => {
                           </Link>
                         </div>
                       </div>
-                    </div>
+                    </motion.div>
                   ))
               }
-            </div>
+            </motion.div>
             <div style={{ textAlign: 'center', marginTop: '2.5rem' }}>
               <Link to="/shop" className="btn btn-outline btn-lg">
                 Visit Full Shop <ChevronRight size={18} />
               </Link>
             </div>
           </div>
-        </section>
+        </motion.section>
       )}
 
       {/* ── EXPERT CTA ── */}
-      <section className="expert-cta-section section">
+      <motion.section 
+        className="expert-cta-section section"
+        initial="hidden"
+        whileInView="visible"
+        viewport={{ once: true, margin: "-100px" }}
+        variants={fadeUpVariant}
+      >
         <div className="container">
           <div className="cta-card glass-panel">
             <div className="cta-content">
@@ -329,7 +381,7 @@ const Home = () => {
             </div>
           </div>
         </div>
-      </section>
+      </motion.section>
 
     </div>
   );

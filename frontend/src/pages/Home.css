@@ -497,6 +497,55 @@
 /* ============================================================
    RESPONSIVE
    ============================================================ */
+
+/* ── HERO SEARCH BAR ── */
+.hero-search-bar {
+  margin-bottom: 2rem;
+  width: 100%;
+  max-width: 500px;
+}
+
+.search-input-wrapper {
+  display: flex;
+  align-items: center;
+  padding: 0.5rem 0.5rem 0.5rem 1.5rem;
+  border-radius: var(--radius-full);
+  gap: 0.5rem;
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--shadow-md);
+  transition: var(--transition);
+}
+
+.search-input-wrapper:focus-within {
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 4px rgba(76, 175, 80, 0.15), var(--shadow-lg);
+  transform: translateY(-2px);
+}
+
+.search-input {
+  flex: 1;
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  padding: 0;
+  font-size: 1rem;
+  color: var(--text-primary);
+}
+
+.search-input:focus {
+  box-shadow: none !important;
+  transform: none !important;
+  border: none !important;
+}
+
+.search-btn {
+  border-radius: var(--radius-full);
+  padding: 0.75rem 1.75rem;
+}
+
+/* ── RESPONSIVE ── */
+
 @media (max-width: 1024px) {
   .services-grid { grid-template-columns: repeat(2, 1fr); }
   .stats-grid { grid-template-columns: repeat(2, 1fr); }
