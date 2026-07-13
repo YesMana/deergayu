@@ -194,13 +194,34 @@ const Login = () => {
                   
                   <div className="form-group">
                     <label>Specialty / Category</label>
-                    <input 
-                      type="text" 
-                      value={specialty}
-                      onChange={(e) => setSpecialty(e.target.value)}
-                      placeholder="e.g. Sarwanga Roga, Skin Diseases..."
-                      required 
-                    />
+                    {role === 'doctor' ? (
+                      <select 
+                        value={specialty}
+                        onChange={(e) => setSpecialty(e.target.value)}
+                        required
+                      >
+                        <option value="" disabled>Select your specialty</option>
+                        <option value="Sarwanga Roga (General Medicine)">Sarwanga Roga (General Medicine - සර්වාංග රෝග)</option>
+                        <option value="Shalya Tantra (Surgery)">Shalya Tantra (Surgery - ශල්‍ය)</option>
+                        <option value="Shalakya Tantra (ENT & Eye)">Shalakya Tantra (ENT & Eye - උගුර කන නාසය සහ ඇස්)</option>
+                        <option value="Kaumarabhritya (Pediatrics)">Kaumarabhritya (Pediatrics - ළමා රෝග)</option>
+                        <option value="Prasuti & Stri Roga (Gynecology)">Prasuti & Stri Roga (Gynecology - කාන්තා රෝග)</option>
+                        <option value="Agada Tantra (Toxicology)">Agada Tantra (Toxicology - විෂ වෙදකම)</option>
+                        <option value="Manasa Roga (Psychiatry)">Manasa Roga (Psychiatry - මානසික රෝග)</option>
+                        <option value="Panchakarma">Panchakarma (පංචකර්ම)</option>
+                        <option value="Kedum Bindum (Orthopedics)">Kedum Bindum (Orthopedics - කැඩුම් බිඳුම්)</option>
+                        <option value="Skin Diseases (Dermatology)">Skin Diseases (Dermatology - චර්ම රෝග)</option>
+                        <option value="Other">Other (වෙනත්)</option>
+                      </select>
+                    ) : (
+                      <input 
+                        type="text" 
+                        value={specialty}
+                        onChange={(e) => setSpecialty(e.target.value)}
+                        placeholder="e.g. Herbal Products, Therapy Center..."
+                        required 
+                      />
+                    )}
                   </div>
                   
                   <div className="form-group">
