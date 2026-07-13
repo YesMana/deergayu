@@ -1,25 +1,11 @@
-import React, { useState } from 'react';
+import React from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '../context/LanguageContext';
-import { Star, Moon, Sun, Sparkles, Send } from 'lucide-react';
-import { useToast } from '../context/ToastContext';
-
-const API_URL = import.meta.env.VITE_API_URL || '';
+import { Star, Moon, Sun, Sparkles } from 'lucide-react';
 
 const Astrology = () => {
   const { lang } = useLanguage();
-  const { success, error } = useToast();
-  
-  const [formData, setFormData] = useState({
-    name: '',
-    phone: '',
-    serviceType: 'Horoscope Reading',
-    birthDate: '',
-    birthTime: '',
-    birthPlace: '',
-    message: ''
-  });
-  
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const navigate = useNavigate();
 
   const texts = {
     en: {
@@ -95,30 +81,8 @@ const Astrology = () => {
 
   const t = texts[lang] || texts.en;
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setIsSubmitting(true);
-    try {
-      const res = await fetch(`${API_URL}/api/astrology`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData)
-      });
-      if (res.ok) {
-        success(lang === 'si' ? "ඔබේ ඉල්ලීම සාර්ථකව යොමු කරන ලදී!" : "Your request has been submitted successfully!");
-        setFormData({ name: '', phone: '', serviceType: 'Horoscope Reading', birthDate: '', birthTime: '', birthPlace: '', message: '' });
-      } else {
-        error("Failed to submit request. Please try again.");
-      }
-    } catch (err) {
-      console.error(err);
-      error("An error occurred. Please try again later.");
-    }
-    setIsSubmitting(false);
-  };
-
-  const handleChange = (e) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
+  const handleTileClick = (serviceName) => {
+    navigate(`/channeling?tab=astrologer&service=${encodeURIComponent(serviceName)}`);
   };
 
   return (
@@ -141,25 +105,25 @@ const Astrology = () => {
           <h2 style={{ textAlign: 'center', fontSize: '2rem', marginBottom: '3rem', color: '#fff' }}>{t.servicesTitle}</h2>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '2rem' }}>
             
-            <div className="glass-panel glass-panel-hover" style={{ padding: '2rem', textAlign: 'center' }}>
+            <div className="glass-panel glass-panel-hover" style={{ padding: '2rem', textAlign: 'center', cursor: 'pointer' }} onClick={() => handleTileClick("Horoscope Reading")}>
               <Star size={40} style={{ color: 'var(--secondary-light)', margin: '0 auto 1rem' }} />
               <h3 style={{ fontSize: '1.3rem', marginBottom: '1rem', color: '#fff' }}>{t.horoscope}</h3>
               <p style={{ color: 'var(--text-muted)', fontSize: '0.95rem' }}>{t.horoscopeDesc}</p>
             </div>
 
-            <div className="glass-panel glass-panel-hover" style={{ padding: '2rem', textAlign: 'center' }}>
+            <div className="glass-panel glass-panel-hover" style={{ padding: '2rem', textAlign: 'center', cursor: 'pointer' }} onClick={() => handleTileClick("Yanthra Preparation")}>
               <Sun size={40} style={{ color: 'var(--accent-color)', margin: '0 auto 1rem' }} />
               <h3 style={{ fontSize: '1.3rem', marginBottom: '1rem', color: '#fff' }}>{t.yanthra}</h3>
               <p style={{ color: 'var(--text-muted)', fontSize: '0.95rem' }}>{t.yanthraDesc}</p>
             </div>
 
-            <div className="glass-panel glass-panel-hover" style={{ padding: '2rem', textAlign: 'center' }}>
+            <div className="glass-panel glass-panel-hover" style={{ padding: '2rem', textAlign: 'center', cursor: 'pointer' }} onClick={() => handleTileClick("Auspicious Times")}>
               <Moon size={40} style={{ color: 'var(--primary-light)', margin: '0 auto 1rem' }} />
               <h3 style={{ fontSize: '1.3rem', marginBottom: '1rem', color: '#fff' }}>{t.nekath}</h3>
               <p style={{ color: 'var(--text-muted)', fontSize: '0.95rem' }}>{t.nekathDesc}</p>
             </div>
 
-            <div className="glass-panel glass-panel-hover" style={{ padding: '2rem', textAlign: 'center' }}>
+            <div className="glass-panel glass-panel-hover" style={{ padding: '2rem', textAlign: 'center', cursor: 'pointer' }} onClick={() => handleTileClick("Vasthu Vidya")}>
               <div style={{ width: '40px', height: '40px', margin: '0 auto 1rem', border: '2px solid var(--info-color)', transform: 'rotate(45deg)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <div style={{ width: '15px', height: '15px', background: 'var(--info-color)' }}></div>
               </div>
@@ -170,62 +134,6 @@ const Astrology = () => {
           </div>
         </section>
 
-        {/* Consultation Form */}
-        <section style={{ maxWidth: '800px', margin: '0 auto' }}>
-          <div className="glass-panel" style={{ padding: '3rem' }}>
-            <div style={{ textAlign: 'center', marginBottom: '2.5rem' }}>
-              <h2 style={{ fontSize: '2rem', color: 'var(--secondary-color)', marginBottom: '0.5rem' }}>{t.formTitle}</h2>
-              <p style={{ color: 'var(--text-secondary)' }}>{t.formSubtitle}</p>
-            </div>
-
-            <form onSubmit={handleSubmit} style={{ display: 'grid', gap: '1.5rem' }}>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
-                <div>
-                  <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-secondary)', fontSize: '0.9rem' }}>{t.name} *</label>
-                  <input required type="text" name="name" className="form-control" value={formData.name} onChange={handleChange} placeholder="John Doe" />
-                </div>
-                <div>
-                  <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-secondary)', fontSize: '0.9rem' }}>{t.phone} *</label>
-                  <input required type="tel" name="phone" className="form-control" value={formData.phone} onChange={handleChange} placeholder="+94 77 123 4567" />
-                </div>
-              </div>
-
-              <div>
-                <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-secondary)', fontSize: '0.9rem' }}>{t.service} *</label>
-                <select name="serviceType" className="form-control" value={formData.serviceType} onChange={handleChange}>
-                  <option value="Horoscope Reading">{t.horoscope}</option>
-                  <option value="Yanthra Preparation">{t.yanthra}</option>
-                  <option value="Auspicious Times">{t.nekath}</option>
-                  <option value="Vasthu Vidya">{t.vasthu}</option>
-                </select>
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1.5rem' }}>
-                <div>
-                  <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-secondary)', fontSize: '0.9rem' }}>{t.dob}</label>
-                  <input type="date" name="birthDate" className="form-control" value={formData.birthDate} onChange={handleChange} />
-                </div>
-                <div>
-                  <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-secondary)', fontSize: '0.9rem' }}>{t.tob}</label>
-                  <input type="time" name="birthTime" className="form-control" value={formData.birthTime} onChange={handleChange} />
-                </div>
-                <div>
-                  <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-secondary)', fontSize: '0.9rem' }}>{t.pob}</label>
-                  <input type="text" name="birthPlace" className="form-control" value={formData.birthPlace} onChange={handleChange} placeholder="e.g. Colombo" />
-                </div>
-              </div>
-
-              <div>
-                <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-secondary)', fontSize: '0.9rem' }}>{t.msg}</label>
-                <textarea name="message" className="form-control" rows="4" value={formData.message} onChange={handleChange} placeholder="Tell us more about your requirements..."></textarea>
-              </div>
-
-              <button type="submit" className="btn btn-primary" style={{ width: '100%', padding: '1rem', marginTop: '1rem', fontSize: '1.1rem' }} disabled={isSubmitting}>
-                {isSubmitting ? 'Submitting...' : <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}>{t.submit} <Send size={18} /></span>}
-              </button>
-            </form>
-          </div>
-        </section>
       </div>
     </div>
   );

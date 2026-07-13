@@ -24,6 +24,7 @@ const Login = () => {
   const [doctorType, setDoctorType] = useState('Ayurvedic Physician');
   const [specialty, setSpecialty] = useState('');
   const [astrologyServices, setAstrologyServices] = useState([]);
+  const [experience, setExperience] = useState('');
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
   
@@ -93,7 +94,8 @@ const Login = () => {
           telephone,
           doctorType,
           specialty: doctorType === 'Vedic Astrologer' ? 'Yantra & Mantra' : specialty,
-          astrologyServices: doctorType === 'Vedic Astrologer' ? astrologyServices : []
+          astrologyServices: doctorType === 'Vedic Astrologer' ? astrologyServices : [],
+          experience
         } : null;
         
         const userCredential = await signupWithEmail(email, password, name, role, profileDetails);
@@ -256,6 +258,16 @@ const Login = () => {
                         required 
                       />
                     )}
+                  </div>
+                  
+                  <div className="form-group">
+                    <label>Years of Experience (Optional)</label>
+                    <input 
+                      type="text" 
+                      value={experience}
+                      onChange={(e) => setExperience(e.target.value)}
+                      placeholder="e.g. 5 Years, 10+ Years"
+                    />
                   </div>
                   
                   <div className="form-group">

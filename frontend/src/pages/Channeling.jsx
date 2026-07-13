@@ -4,7 +4,7 @@ import { useLanguage } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { auth } from '../firebase';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import SEO from '../components/SEO';
 import './Channeling.css';
 
@@ -35,11 +35,15 @@ const Channeling = () => {
   const [providers, setProviders] = useState([]);
   const [loading, setLoading] = useState(true);
   
-  const [filterType, setFilterType] = useState('all');
+  const [searchParams] = useSearchParams();
+  const initialTab = searchParams.get('tab') || 'all';
+  const initialService = searchParams.get('service') || 'all';
+
+  const [filterType, setFilterType] = useState(initialTab);
   const [searchQuery, setSearchQuery] = useState('');
   const [provinceFilter, setProvinceFilter] = useState('all');
   const [districtFilter, setDistrictFilter] = useState('all');
-  const [specialtyFilter, setSpecialtyFilter] = useState('all');
+  const [specialtyFilter, setSpecialtyFilter] = useState(initialService);
   
   // Booking Modal State
   const [selectedProvider, setSelectedProvider] = useState(null);
