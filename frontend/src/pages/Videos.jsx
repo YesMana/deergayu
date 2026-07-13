@@ -164,10 +164,13 @@ const Videos = () => {
     "யோகா மற்றும் மனம்": "Yoga & Mind"
   };
 
-  const filteredVideos = initialVideos.filter(v => {
+  const getTitle = (v) => typeof v.title === 'string' ? v.title : (v.title?.[lang] || v.title?.en || '');
+  const getDescription = (v) => typeof v.description === 'string' ? v.description : (v.description?.[lang] || v.description?.en || '');
+
+  const filteredVideos = videos.filter(v => {
     const matchSearch = searchQuery.trim() === '' || 
-      (v.title[lang] || v.title.en).toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (v.description[lang] || v.description.en).toLowerCase().includes(searchQuery.toLowerCase());
+      getTitle(v).toLowerCase().includes(searchQuery.toLowerCase()) ||
+      getDescription(v).toLowerCase().includes(searchQuery.toLowerCase());
     
     const targetCat = categoryMap[activeCategory] || 'All';
     const matchCat = targetCat === 'All' || v.category === targetCat;
