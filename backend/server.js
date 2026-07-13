@@ -1298,6 +1298,60 @@ function getAyurvedicFallback(message, lang) {
   return currentRemedies.default;
 }
 
+// --- VIDEOS ---
+apiRouter.get('/videos', async (req, res) => {
+  try {
+    const snapshot = await db.collection('videos').orderBy('createdAt', 'desc').get();
+    const videos = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    res.json(videos);
+  } catch (error) {
+    console.error('Error fetching videos:', error);
+    res.status(500).json({ error: 'Failed to fetch videos' });
+  }
+});
+
+apiRouter.post('/videos', verifyAdmin, async (req, res) => {
+  try {
+    const { title, description, youtubeId, category, duration } = req.body;
+    if (!title || !youtubeId) return res.status(400).json({ error: 'Title and YouTube ID are required' });
+    const newVideo = {
+      title, description, youtubeId, category, duration,
+      createdAt: new Date().toISOString()
+    };
+    const docRef = await db.collection('videos').add(newVideo);
+    res.status(201).json({ id: docRef.id, ...newVideo });
+  } catch (error) {
+    console.error('Error creating video:', error);
+    res.status(500).json({ error: 'Failed to create video' });
+  }
+});
+
+apiRouter.put('/videos/:id', verifyAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { title, description, youtubeId, category, duration } = req.body;
+    await db.collection('videos').doc(id).update({
+      title, description, youtubeId, category, duration,
+      updatedAt: new Date().toISOString()
+    });
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error updating video:', error);
+    res.status(500).json({ error: 'Failed to update video' });
+  }
+});
+
+apiRouter.delete('/videos/:id', verifyAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    await db.collection('videos').doc(id).delete();
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error deleting video:', error);
+    res.status(500).json({ error: 'Failed to delete video' });
+  }
+});
+
 apiRouter.post('/chat', async (req, res) => {
   try {
     const { message, lang } = req.body;

@@ -1,6 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Search, Play, ExternalLink } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
+
+const API_URL = import.meta.env.VITE_API_URL || '';
 
 const YoutubeIcon = () => (
   <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor" style={{ display: 'inline-block', verticalAlign: 'middle' }}>
@@ -12,6 +14,25 @@ const Videos = () => {
   const { lang } = useLanguage();
   const [searchQuery, setSearchQuery] = useState('');
   const [activeCategory, setActiveCategory] = useState('All');
+  const [videos, setVideos] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchVideos = async () => {
+      try {
+        const res = await fetch(`${API_URL}/api/videos`);
+        if (res.ok) {
+          const data = await res.json();
+          setVideos(data);
+        }
+      } catch (err) {
+        console.error('Failed to fetch videos', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchVideos();
+  }, []);
 
   // Multi-lingual content for page headings
   const pageContent = {
@@ -210,14 +231,20 @@ const Videos = () => {
       </div>
 
       {/* Videos Grid */}
-      {filteredVideos.length === 0 ? (
+      {loading && (
+        <div style={{ textAlign: 'center', padding: '4rem 0', color: '#aaa' }}>
+          <div className="spinner" style={{ margin: '0 auto 1rem' }}></div>
+          <p>Loading videos...</p>
+        </div>
+      )}
+      {!loading && filteredVideos.length === 0 ? (
         <div className="empty-state" style={{ padding: '4rem 1rem', textAlign: 'center' }}>
           <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>📺</div>
           <h4>{text.noResults}</h4>
         </div>
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '2rem' }}>
-          {filteredVideos.map(v => (
+          {!loading && filteredVideos.map(v => (
             <div
               key={v.id}
               className="glass-panel glass-panel-hover"
@@ -242,7 +269,7 @@ const Videos = () => {
                     border: 0
                   }}
                   src={`https://www.youtube.com/embed/${v.youtubeId}`}
-                  title={v.title[lang] || v.title.en}
+                  title={getTitle(v)}
                   allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                   allowFullScreen
                 />
@@ -269,11 +296,11 @@ const Videos = () => {
                   </div>
                   
                   <h3 style={{ fontSize: '1.05rem', fontWeight: 700, margin: '0 0 0.5rem', lineHeight: 1.4 }}>
-                    {v.title[lang] || v.title.en}
+                    {getTitle(v)}
                   </h3>
                   
                   <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', lineHeight: 1.4, margin: 0 }}>
-                    {v.description[lang] || v.description.en}
+                    {getDescription(v)}
                   </p>
                 </div>
 
