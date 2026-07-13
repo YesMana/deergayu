@@ -1554,6 +1554,7 @@ const AdminDashboard = () => {
                       <option value="Herbal Remedies" />
                       <option value="Healthy Diet" />
                       <option value="Daily Routine" />
+                      {Array.from(new Set(videos.map(v => v.category))).filter(c => c && !["Yoga & Meditation", "Herbal Remedies", "Healthy Diet", "Daily Routine"].includes(c)).map(c => <option key={c} value={c} />)}
                     </datalist>
                   </div>
                   <div style={{ flex: 1 }}>
