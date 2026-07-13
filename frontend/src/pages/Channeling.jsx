@@ -5,6 +5,7 @@ import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { auth } from '../firebase';
 import { useNavigate } from 'react-router-dom';
+import SEO from '../components/SEO';
 import './Channeling.css';
 
 const API_URL = import.meta.env.VITE_API_URL || '';
@@ -172,6 +173,7 @@ const Channeling = () => {
 
   return (
     <div className="channeling-page animate-fade-in">
+      <SEO title="Book Ayurvedic Doctors | Deergayu" />
       <div className="channeling-header">
         <div className="container">
           <h1 className="channeling-title">{t('ch_title')}</h1>

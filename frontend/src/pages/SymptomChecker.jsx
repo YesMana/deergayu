@@ -4,6 +4,7 @@ import { useLanguage } from '../context/LanguageContext';
 import { Link, useNavigate } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
 import { useToast } from '../context/ToastContext';
+import SEO from '../components/SEO';
 import './SymptomChecker.css';
 
 const API_URL = import.meta.env.VITE_API_URL || '';
@@ -61,6 +62,7 @@ const SymptomChecker = () => {
 
   return (
     <div className="symptom-page animate-fade-in">
+      <SEO title="AI Symptom Checker | Deergayu" />
       {/* Header */}
       <div className="symptom-header">
         <div className="container">

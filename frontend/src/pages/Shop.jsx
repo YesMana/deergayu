@@ -4,7 +4,8 @@ import { collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useCart } from '../context/CartContext';
 import { useToast } from '../context/ToastContext';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
+import SEO from '../components/SEO';
 import './Shop.css';
 
 const Shop = () => {
@@ -63,7 +64,7 @@ const Shop = () => {
   
   return (
     <div className="shop-page animate-fade-in" style={{ position: 'relative' }}>
-
+      <SEO title="Deergayu Shop | Authentic Herbal Remedies" />
       <div className="shop-header">
         <div className="container">
           <h1 className="shop-title">Ayurvedic Pharmacy</h1>

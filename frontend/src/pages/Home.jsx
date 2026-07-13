@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { Leaf, Calendar, Star, Users, Package, Activity, Shield, ChevronRight, MapPin, Search, CheckCircle } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import { motion } from 'framer-motion';
+import SEO from '../components/SEO';
 import './Home.css';
 
 const API_URL = import.meta.env.VITE_API_URL || '';
@@ -70,6 +71,7 @@ const Home = () => {
 
   return (
     <div className="home-page animate-fade-in">
+      <SEO />
       {/* ── HERO SECTION ── */}
       <section className="hero-section">
         <div className="hero-bg-overlay" />
