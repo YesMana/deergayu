@@ -58,7 +58,7 @@ const AdminDashboard = () => {
   const [loadingVideos, setLoadingVideos] = useState(false);
   const [showVideoModal, setShowVideoModal] = useState(false);
   const [editingVideo, setEditingVideo] = useState(null);
-  const [videoForm, setVideoForm] = useState({ title: '', description: '', youtubeId: '', category: 'Yoga & Meditation', duration: '' });
+  const [videoForm, setVideoForm] = useState({ title: '', description: '', youtubeId: '', category: '', duration: '' });
 
   // Selected Doctor Details Modal states
   const [selectedDoctor, setSelectedDoctor] = useState(null);
@@ -1483,7 +1483,7 @@ const AdminDashboard = () => {
                 <h2 style={{ fontSize: '1.5rem', fontWeight: '600', color: '#fff', marginBottom: '0.25rem' }}>Videos Management</h2>
                 <p style={{ color: '#aaa', fontSize: '0.9rem' }}>Add, edit, or remove videos displayed on the public library.</p>
               </div>
-              <button className="btn btn-primary" onClick={() => { setEditingVideo(null); setVideoForm({ title: '', description: '', youtubeId: '', category: 'Yoga & Meditation', duration: '' }); setShowVideoModal(true); }}>
+              <button className="btn btn-primary" onClick={() => { setEditingVideo(null); setVideoForm({ title: '', description: '', youtubeId: '', category: '', duration: '' }); setShowVideoModal(true); }}>
                 + Add Video
               </button>
             </div>
@@ -1519,7 +1519,7 @@ const AdminDashboard = () => {
                         <td><code style={{ background: 'rgba(0,0,0,0.2)', padding: '2px 6px', borderRadius: '4px', fontSize: '0.85rem' }}>{v.youtubeId}</code></td>
                         <td>{v.duration || '-'}</td>
                         <td style={{ textAlign: 'right' }}>
-                          <button className="btn btn-icon btn-sm" onClick={() => { setEditingVideo(v); setVideoForm({ title: v.title, description: v.description || '', youtubeId: v.youtubeId, category: v.category || 'Yoga & Meditation', duration: v.duration || '' }); setShowVideoModal(true); }} style={{ marginRight: '0.5rem' }}>✎</button>
+                          <button className="btn btn-icon btn-sm" onClick={() => { setEditingVideo(v); setVideoForm({ title: v.title, description: v.description || '', youtubeId: v.youtubeId, category: v.category || '', duration: v.duration || '' }); setShowVideoModal(true); }} style={{ marginRight: '0.5rem' }}>✎</button>
                           <button className="btn btn-icon btn-sm" onClick={() => handleDeleteVideo(v.id)} style={{ color: '#ef5350' }}><Trash2 size={16} /></button>
                         </td>
                       </tr>
