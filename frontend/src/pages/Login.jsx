@@ -211,6 +211,8 @@ const Login = () => {
                         <option value="Panchakarma">Panchakarma (පංචකර්ම)</option>
                         <option value="Kedum Bindum (Orthopedics)">Kedum Bindum (Orthopedics - කැඩුම් බිඳුම්)</option>
                         <option value="Skin Diseases (Dermatology)">Skin Diseases (Dermatology - චර්ම රෝග)</option>
+                        <option value="Yanthra Manthra (Occult Practices)">Yanthra Manthra (Occult Practices - යන්ත්‍ර මන්ත්‍ර)</option>
+                        <option value="Astrology (Jyotisha)">Astrology (Jyotisha - ජ්‍යොතිෂය)</option>
                         <option value="Other">Other (වෙනත්)</option>
                       </select>
                     ) : (
