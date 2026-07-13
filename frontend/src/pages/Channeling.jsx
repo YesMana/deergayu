@@ -23,7 +23,8 @@ const sriLankaData = {
   "Online": ["Online"]
 };
 
-const specialties = ["Sarwanga Roga (General)", "Kadum Bindum (Orthopedic)", "Sarpa Visha (Toxicology)", "Yantra & Mantra", "Vastu Shastra"];
+const docSpecialties = ["Sarwanga Roga (General)", "Kadum Bindum (Orthopedic)", "Sarpa Visha (Toxicology)", "Panchakarma", "Skin Diseases (Dermatology)", "Manasa Roga (Psychiatry)", "Kaumarabhritya (Pediatrics)", "Prasuti & Stri Roga (Gynecology)", "Shalakya Tantra (ENT & Eye)", "Shalya Tantra (Surgery)"];
+const astroSpecialties = ["Horoscope Reading", "Yanthra Preparation", "Auspicious Times", "Vasthu Vidya"];
 
 const Channeling = () => {
   const { t } = useLanguage();
@@ -107,7 +108,7 @@ const Channeling = () => {
     const matchType = filterType === 'all' || (filterType === 'doctor' && (type === 'doctor' || type === 'Ayurvedic Physician' || p.role === 'doctor' || p.role === 'clinic')) || (filterType === 'astrologer' && (type === 'astrologer' || type === 'Vedic Astrologer'));
     const matchProvince = provinceFilter === 'all' || province === provinceFilter;
     const matchDistrict = districtFilter === 'all' || district.includes(districtFilter);
-    const matchSpecialty = specialtyFilter === 'all' || specialty === specialtyFilter;
+    const matchSpecialty = specialtyFilter === 'all' || specialty === specialtyFilter || (details.astrologyServices && details.astrologyServices.includes(specialtyFilter));
     const matchSearch = p.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
                         specialty.toLowerCase().includes(searchQuery.toLowerCase());
                         
@@ -242,9 +243,9 @@ const Channeling = () => {
                 className="filter-select"
               >
                 <option value="all">{t('ch_all_spec')}</option>
-                {specialties.map(s => (
-                  <option key={s} value={s}>{t(s)}</option>
-                ))}
+                {filterType === 'doctor' && docSpecialties.map(s => <option key={s} value={s}>{s}</option>)}
+                {filterType === 'astrologer' && astroSpecialties.map(s => <option key={s} value={s}>{s}</option>)}
+                {filterType === 'all' && [...docSpecialties, ...astroSpecialties].map(s => <option key={s} value={s}>{s}</option>)}
               </select>
             </div>
           </div>
@@ -272,7 +273,15 @@ const Channeling = () => {
                   </div>
                   
                   <div className="provider-details">
-                    <span className="detail-tag">{t(provider.profileDetails?.specialty || 'General')}</span>
+                    {provider.profileDetails?.doctorType === 'Vedic Astrologer' && provider.profileDetails?.astrologyServices?.length > 0 ? (
+                      provider.profileDetails.astrologyServices.map(service => (
+                        <span key={service} className="detail-tag" style={{background: 'rgba(212,175,55,0.15)', border: '1px solid rgba(212,175,55,0.3)', color: '#d4af37'}}>
+                          {t(service)}
+                        </span>
+                      ))
+                    ) : (
+                      <span className="detail-tag">{t(provider.profileDetails?.specialty || 'General')}</span>
+                    )}
                     <span className="detail-tag">{provider.profileDetails?.experience || '10+ Years'}</span>
                     <span className="detail-tag flex-center"><MapPin size={14}/> {t(provider.profileDetails?.address || 'Sri Lanka')}</span>
                   </div>

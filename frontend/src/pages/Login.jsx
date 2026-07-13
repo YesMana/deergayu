@@ -18,11 +18,12 @@ const Login = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   
-  // Expert specific fields
+  // Provider specific details
   const [address, setAddress] = useState('');
   const [telephone, setTelephone] = useState('');
-  const [doctorType, setDoctorType] = useState('ayurvedic');
+  const [doctorType, setDoctorType] = useState('Ayurvedic Physician');
   const [specialty, setSpecialty] = useState('');
+  const [astrologyServices, setAstrologyServices] = useState([]);
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
   
@@ -91,7 +92,8 @@ const Login = () => {
           address,
           telephone,
           doctorType,
-          specialty
+          specialty: doctorType === 'Vedic Astrologer' ? 'Yantra & Mantra' : specialty,
+          astrologyServices: doctorType === 'Vedic Astrologer' ? astrologyServices : []
         } : null;
         
         const userCredential = await signupWithEmail(email, password, name, role, profileDetails);
@@ -186,8 +188,9 @@ const Login = () => {
                     <div className="form-group">
                       <label>Doctor Type</label>
                       <select value={doctorType} onChange={(e) => setDoctorType(e.target.value)} required>
-                        <option value="ayurvedic">Ayurvedic Doctor</option>
+                        <option value="Ayurvedic Physician">Ayurvedic Physician</option>
                         <option value="traditional">Paramparika Doctor (Traditional)</option>
+                        <option value="Vedic Astrologer">Vedic Astrologer / Yanthra Manthra</option>
                       </select>
                     </div>
                   )}
@@ -211,10 +214,39 @@ const Login = () => {
                         <option value="Panchakarma">Panchakarma (පංචකර්ම)</option>
                         <option value="Kedum Bindum (Orthopedics)">Kedum Bindum (Orthopedics - කැඩුම් බිඳුම්)</option>
                         <option value="Skin Diseases (Dermatology)">Skin Diseases (Dermatology - චර්ම රෝග)</option>
-                        <option value="Yanthra Manthra (Occult Practices)">Yanthra Manthra (Occult Practices - යන්ත්‍ර මන්ත්‍ර)</option>
-                        <option value="Astrology (Jyotisha)">Astrology (Jyotisha - ජ්‍යොතිෂය)</option>
                         <option value="Other">Other (වෙනත්)</option>
                       </select>
+                    ) : doctorType === 'Vedic Astrologer' ? (
+                      <div className="astrology-checkboxes" style={{ display: 'grid', gap: '0.5rem', background: 'var(--input-bg)', padding: '1rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--glass-border)' }}>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', margin: 0 }}>
+                          <input type="checkbox" value="Horoscope Reading" checked={astrologyServices.includes("Horoscope Reading")} onChange={(e) => {
+                            if(e.target.checked) setAstrologyServices([...astrologyServices, e.target.value]);
+                            else setAstrologyServices(astrologyServices.filter(s => s !== e.target.value));
+                          }} style={{ width: 'auto', margin: 0 }} />
+                          Horoscope Reading (කේන්දර පරීක්ෂාව)
+                        </label>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', margin: 0 }}>
+                          <input type="checkbox" value="Yanthra Preparation" checked={astrologyServices.includes("Yanthra Preparation")} onChange={(e) => {
+                            if(e.target.checked) setAstrologyServices([...astrologyServices, e.target.value]);
+                            else setAstrologyServices(astrologyServices.filter(s => s !== e.target.value));
+                          }} style={{ width: 'auto', margin: 0 }} />
+                          Yanthra Preparation (යන්ත්‍ර පැළඳවීම)
+                        </label>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', margin: 0 }}>
+                          <input type="checkbox" value="Auspicious Times" checked={astrologyServices.includes("Auspicious Times")} onChange={(e) => {
+                            if(e.target.checked) setAstrologyServices([...astrologyServices, e.target.value]);
+                            else setAstrologyServices(astrologyServices.filter(s => s !== e.target.value));
+                          }} style={{ width: 'auto', margin: 0 }} />
+                          Auspicious Times (නැකැත් සෑදීම)
+                        </label>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', margin: 0 }}>
+                          <input type="checkbox" value="Vasthu Vidya" checked={astrologyServices.includes("Vasthu Vidya")} onChange={(e) => {
+                            if(e.target.checked) setAstrologyServices([...astrologyServices, e.target.value]);
+                            else setAstrologyServices(astrologyServices.filter(s => s !== e.target.value));
+                          }} style={{ width: 'auto', margin: 0 }} />
+                          Vasthu Vidya (වාස්තු විද්‍යාව)
+                        </label>
+                      </div>
                     ) : (
                       <input 
                         type="text" 

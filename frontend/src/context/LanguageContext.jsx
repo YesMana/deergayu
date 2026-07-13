@@ -35,7 +35,11 @@ const translations = {
     ch_all_spec: "All Specialties",
     ch_no_results: "No providers found matching your criteria. Try adjusting your filters.",
     ch_btn_video: "Video Consult",
-    ch_btn_book: "Book Visit"
+    ch_btn_book: "Book Visit",
+    "Horoscope Reading": "Horoscope Reading",
+    "Yanthra Preparation": "Yanthra Preparation",
+    "Auspicious Times": "Auspicious Times",
+    "Vasthu Vidya": "Vasthu Vidya"
   },
   si: {
     nav_home: "මුල් පිටුව",
@@ -111,7 +115,11 @@ const translations = {
     "Kadum Bindum (Orthopedic)": "කැඩුම් බිඳුම්",
     "Sarpa Visha (Toxicology)": "සර්ප විෂ",
     "Yantra & Mantra": "යන්ත්‍ර මන්ත්‍ර",
-    "Vastu Shastra": "වාස්තු විද්‍යාව"
+    "Vastu Shastra": "වාස්තු විද්‍යාව",
+    "Horoscope Reading": "කේන්දර පරීක්ෂාව",
+    "Yanthra Preparation": "යන්ත්‍ර පැළඳවීම",
+    "Auspicious Times": "නැකැත් සෑදීම",
+    "Vasthu Vidya": "වාස්තු විද්‍යාව"
   },
   ta: {
     nav_home: "முகப்பு",
@@ -187,7 +195,11 @@ const translations = {
     "Kadum Bindum (Orthopedic)": "எலும்பு முறிவு",
     "Sarpa Visha (Toxicology)": "விஷக்கடி",
     "Yantra & Mantra": "யந்திரம் மற்றும் மந்திரம்",
-    "Vastu Shastra": "வாஸ்து சாஸ்திரம்"
+    "Vastu Shastra": "வாஸ்து சாஸ்திரம்",
+    "Horoscope Reading": "ஜாதகம் பார்த்தல்",
+    "Yanthra Preparation": "யந்திரம் தயாரித்தல்",
+    "Auspicious Times": "சுப நேரங்கள்",
+    "Vasthu Vidya": "வாஸ்து வித்யா"
   }
 };
 
