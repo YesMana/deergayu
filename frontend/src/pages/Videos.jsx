@@ -172,11 +172,15 @@ const Videos = () => {
       getTitle(v).toLowerCase().includes(searchQuery.toLowerCase()) ||
       getDescription(v).toLowerCase().includes(searchQuery.toLowerCase());
     
-    const targetCat = categoryMap[activeCategory] || 'All';
-    const matchCat = targetCat === 'All' || v.category === targetCat;
+    const targetCat = categoryMap[activeCategory] || activeCategory;
+    const matchCat = targetCat === 'All' || targetCat === 'සියල්ල' || targetCat === 'அனைத்தும்' || v.category === targetCat;
 
     return matchSearch && matchCat;
   });
+
+  const baseEnCategories = ["Daily Routines", "Nutrition", "Herbs", "Yoga & Mind"];
+  const dynamicCategories = Array.from(new Set(videos.map(v => v.category))).filter(c => c && !baseEnCategories.includes(c));
+  const displayCategories = [...text.categories, ...dynamicCategories];
 
   return (
     <div className="container" style={{ paddingTop: '8rem', paddingBottom: '4rem', minHeight: '80vh' }}>
@@ -197,7 +201,7 @@ const Videos = () => {
           
           {/* Category Chips */}
           <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-            {text.categories.map(cat => (
+            {displayCategories.map(cat => (
               <button
                 key={cat}
                 className={`filter-chip ${activeCategory === cat ? 'active' : ''}`}

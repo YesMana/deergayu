@@ -1548,12 +1548,13 @@ const AdminDashboard = () => {
                 <div style={{ marginBottom: '1rem', display: 'flex', gap: '1rem' }}>
                   <div style={{ flex: 1 }}>
                     <label style={{ display: 'block', marginBottom: '0.5rem', color: '#ccc', fontSize: '0.9rem' }}>Category</label>
-                    <select className="form-control" value={videoForm.category} onChange={e => setVideoForm({...videoForm, category: e.target.value})}>
-                      <option value="Yoga & Meditation">Yoga & Meditation</option>
-                      <option value="Herbal Remedies">Herbal Remedies</option>
-                      <option value="Healthy Diet">Healthy Diet</option>
-                      <option value="Daily Routine">Daily Routine</option>
-                    </select>
+                    <input list="video-categories" className="form-control" value={videoForm.category} onChange={e => setVideoForm({...videoForm, category: e.target.value})} placeholder="Select or type category" />
+                    <datalist id="video-categories">
+                      <option value="Yoga & Meditation" />
+                      <option value="Herbal Remedies" />
+                      <option value="Healthy Diet" />
+                      <option value="Daily Routine" />
+                    </datalist>
                   </div>
                   <div style={{ flex: 1 }}>
                     <label style={{ display: 'block', marginBottom: '0.5rem', color: '#ccc', fontSize: '0.9rem' }}>Duration (Optional)</label>
