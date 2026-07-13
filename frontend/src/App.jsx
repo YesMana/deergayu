@@ -15,6 +15,7 @@ import CustomerDashboard from './pages/CustomerDashboard';
 import ProtectedRoute from './components/Auth/ProtectedRoute';
 import NotFound from './pages/NotFound';
 import Videos from './pages/Videos';
+import Astrology from './pages/Astrology';
 import LanguagePopup from './components/Common/LanguagePopup';
 import AyurBot from './components/AI/AyurBot';
 import { LanguageProvider } from './context/LanguageContext';
@@ -44,6 +45,7 @@ function App() {
                     <Route path="/channeling" element={<Channeling />} />
                     <Route path="/symptom-checker" element={<SymptomChecker />} />
                     <Route path="/videos" element={<Videos />} />
+                    <Route path="/astrology" element={<Astrology />} />
                     <Route path="/login" element={<Login />} />
                     
                     {/* Protected User Routes */}

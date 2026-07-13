@@ -1352,6 +1352,18 @@ apiRouter.delete('/videos/:id', verifyAdmin, async (req, res) => {
   }
 });
 
+apiRouter.post('/astrology', async (req, res) => {
+  try {
+    const data = req.body;
+    data.createdAt = new Date().toISOString();
+    const docRef = await db.collection('astrology_requests').add(data);
+    res.json({ id: docRef.id, message: 'Astrology request saved successfully' });
+  } catch (error) {
+    console.error('Error saving astrology request:', error);
+    res.status(500).json({ error: 'Failed to save request' });
+  }
+});
+
 apiRouter.post('/chat', async (req, res) => {
   try {
     const { message, lang } = req.body;
