@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Leaf, Clock, Plus, Edit, Trash2, Image as ImageIcon, UploadCloud, RefreshCw } from 'lucide-react';
 import { auth } from '../../firebase';
 import { useToast } from '../../context/ToastContext';
+import { resolveMediaUrl } from './AdminUtils';
 
 const API_URL = import.meta.env.VITE_API_URL || '';
 
@@ -204,30 +205,38 @@ const ManageGuide = () => {
   const handleImageUpload = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      error('Please select a valid image file');
+      return;
+    }
     setUploadingImage(true);
     try {
       const token = await getToken();
+      if (!token) throw new Error('Please sign in again');
       const formData = new FormData();
       formData.append('image', file);
       const response = await fetch(`${API_URL}/api/upload`, {
         method: 'POST',
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        headers: { Authorization: `Bearer ${token}` },
         body: formData,
       });
-      if (!response.ok) throw new Error('Failed to upload image');
-      const data = await response.json();
-      setCurrentFormData((prev) => ({ ...prev, image: data.url }));
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error || `Upload failed (${response.status})`);
+      const imageUrl = data.url || (data.path ? resolveMediaUrl(data.path) : '');
+      if (!imageUrl) throw new Error('No image URL returned from server');
+      setCurrentFormData((prev) => ({ ...prev, image: imageUrl }));
       success('Image uploaded');
     } catch (err) {
       console.error('Upload error:', err);
-      error('Failed to upload image');
+      error(err.message || 'Failed to upload image');
     } finally {
       setUploadingImage(false);
+      e.target.value = '';
     }
   };
 
   const renderRemedyForm = () => (
-    <form onSubmit={handleSave} className="admin-form">
+    <form onSubmit={handleSave} className="admin-form" noValidate>
       <h3 style={{ marginTop: 0 }}>{currentFormData.id ? 'Edit Remedy' : 'Add New Remedy'}</h3>
 
       <div className="form-group">
@@ -235,9 +244,9 @@ const ManageGuide = () => {
         <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
           <ImageIcon size={20} />
           <input
-            type="url"
+            type="text"
             className="form-control"
-            placeholder="https://..."
+            placeholder="/uploads/... or https://..."
             value={currentFormData.image || ''}
             onChange={(e) => setCurrentFormData({ ...currentFormData, image: e.target.value })}
             style={{ flex: 1, minWidth: 200 }}
@@ -248,7 +257,12 @@ const ManageGuide = () => {
           </label>
         </div>
         {currentFormData.image ? (
-          <img src={currentFormData.image} alt="Preview" style={{ width: 100, height: 100, objectFit: 'cover', marginTop: 10, borderRadius: 8 }} />
+          <img
+            src={resolveMediaUrl(currentFormData.image)}
+            alt="Preview"
+            style={{ width: 100, height: 100, objectFit: 'cover', marginTop: 10, borderRadius: 8 }}
+            onError={(e) => { e.currentTarget.style.display = 'none'; }}
+          />
         ) : null}
       </div>
 
@@ -459,7 +473,7 @@ const ManageGuide = () => {
                           <>
                             <td>
                               {item.image ? (
-                                <img src={item.image} alt={item.en?.name || 'Remedy'} style={{ width: 50, height: 50, objectFit: 'cover', borderRadius: 4 }} />
+                                <img src={resolveMediaUrl(item.image)} alt={item.en?.name || 'Remedy'} style={{ width: 50, height: 50, objectFit: 'cover', borderRadius: 4 }} />
                               ) : (
                                 <span style={{ opacity: 0.5 }}>—</span>
                               )}

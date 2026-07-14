@@ -8,6 +8,22 @@ export const fmtDateShort = (s) => s ? new Date(s).toLocaleDateString('en-LK', {
 
 export const userInitials = (u) => (u?.name || u?.email || 'U').slice(0, 2).toUpperCase();
 
+/** Turn /uploads/... or relative paths into a browser-loadable URL */
+export const resolveMediaUrl = (url) => {
+  if (!url || typeof url !== 'string') return '';
+  const trimmed = url.trim();
+  if (/^https?:\/\//i.test(trimmed)) return trimmed;
+  const apiBase = (import.meta.env.VITE_API_URL || '').replace(/\/$/, '');
+  const path = trimmed.startsWith('/') ? trimmed : `/${trimmed}`;
+  if (path.startsWith('/api/uploads/')) {
+    return apiBase ? `${apiBase}${path}` : path;
+  }
+  if (path.startsWith('/uploads/')) {
+    return apiBase ? `${apiBase}/api${path}` : `/api${path}`;
+  }
+  return apiBase ? `${apiBase}${path}` : path;
+};
+
 export const STATUS_COLORS = {
   pending:    { bg: 'rgba(255,167,38,0.15)',  color: '#ffa726' },
   confirmed:  { bg: 'rgba(41,182,246,0.15)',  color: '#29b6f6' },

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Leaf, Sun, Coffee, Droplet, Moon, Activity, Info, BookOpen, Clock } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
+import { resolveMediaUrl } from '../components/Admin/AdminUtils';
 import './AyurvedicGuide.css';
 
 const fadeUpVariant = {
@@ -410,7 +411,7 @@ const AyurvedicGuide = () => {
                       const remedy = item[lang] || item.en;
                       return (
                       <motion.div key={item.id} className="remedy-card glass-panel glass-panel-hover" variants={fadeUpVariant} initial="hidden" whileInView="visible" viewport={{ once: true }}>
-                        <div className="remedy-image" style={{ backgroundImage: `url(${item.image})` }}>
+                        <div className="remedy-image" style={{ backgroundImage: `url(${resolveMediaUrl(item.image)})` }}>
                           <div className="remedy-badge">{data.badge}</div>
                         </div>
                         <div className="remedy-content">

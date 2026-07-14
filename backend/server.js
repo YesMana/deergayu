@@ -1824,8 +1824,31 @@ const storageConfig = multer.diskStorage({
 
 const upload = multer({ storage: storageConfig });
 
-// Serve uploads folder static
+// Serve uploaded files — explicit route works reliably on cPanel/Passenger
+function serveUploadFile(req, res) {
+  const filename = path.basename(req.params.filename || '');
+  if (!filename || filename.includes('..')) {
+    return res.status(400).json({ error: 'Invalid filename' });
+  }
+  const filePath = path.join(uploadDir, filename);
+  if (!fs.existsSync(filePath)) {
+    return res.status(404).json({ error: 'File not found' });
+  }
+  return res.sendFile(filePath);
+}
+
 app.use('/uploads', express.static(uploadDir));
+app.get('/uploads/:filename', serveUploadFile);
+app.get('/api/uploads/:filename', serveUploadFile);
+apiRouter.get('/uploads/:filename', serveUploadFile);
+apiRouter.use('/uploads', express.static(uploadDir));
+
+function publicUploadUrl(req, filename) {
+  const proto = req.get('x-forwarded-proto') || req.protocol || 'https';
+  const host = req.get('x-forwarded-host') || req.get('host');
+  const prefix = (process.env.PUBLIC_API_PREFIX || '/api').replace(/\/$/, '');
+  return `${proto}://${host}${prefix}/uploads/${filename}`;
+}
 
 // Add file upload API endpoint
 apiRouter.post('/upload', verifyUser, upload.single('image'), (req, res) => {
@@ -1833,9 +1856,9 @@ apiRouter.post('/upload', verifyUser, upload.single('image'), (req, res) => {
     if (!req.file) {
       return res.status(400).json({ error: 'No file uploaded' });
     }
-    // Return relative URL path
-    const fileUrl = `/uploads/${req.file.filename}`;
-    res.json({ url: fileUrl });
+    const relativePath = `/uploads/${req.file.filename}`;
+    const url = publicUploadUrl(req, req.file.filename);
+    res.json({ url, path: relativePath });
   } catch (error) {
     console.error('File upload error:', error);
     res.status(500).json({ error: 'Failed to upload file' });
