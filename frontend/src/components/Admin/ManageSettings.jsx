@@ -1,14 +1,34 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { DollarSign, Activity } from 'lucide-react';
+import { DollarSign, Activity, Mail, Tag, Shield, Send } from 'lucide-react';
 import { auth } from '../../firebase';
 import { useToast } from '../../context/ToastContext';
 
 const API_URL = import.meta.env.VITE_API_URL || '';
 
+const DEFAULT_SETTINGS = {
+  commissionPercent: 10,
+  bookingCommissionPercent: 10,
+  minCommissionRs: 300,
+  autoApproveExperts: false,
+  autoApproveProducts: false,
+  adminEmails: ['yes.manujaya@gmail.com'],
+  categories: [
+    { id: 'medicine', name: 'Medicine', commissionPercent: 10 },
+    { id: 'hair-care', name: 'Hair Care', commissionPercent: 12 },
+    { id: 'skin-care', name: 'Skin Care', commissionPercent: 12 },
+    { id: 'wellness', name: 'Wellness', commissionPercent: 10 },
+    { id: 'general', name: 'General', commissionPercent: 10 },
+  ],
+};
+
 const ManageSettings = () => {
   const { success, error } = useToast();
-  const [settings, setSettings] = useState({ commissionPercent: 10, autoApproveExperts: false, autoApproveProducts: false });
+  const [settings, setSettings] = useState(DEFAULT_SETTINGS);
   const [savingSettings, setSavingSettings] = useState(false);
+  const [newAdminEmail, setNewAdminEmail] = useState('');
+  const [broadcast, setBroadcast] = useState({ subject: '', message: '', audience: 'all' });
+  const [sendingBroadcast, setSendingBroadcast] = useState(false);
+  const [newCategory, setNewCategory] = useState({ name: '', commissionPercent: 10 });
 
   const getToken = () => auth.currentUser?.getIdToken();
 
@@ -16,13 +36,11 @@ const ManageSettings = () => {
     try {
       const token = await getToken();
       const res = await fetch(`${API_URL}/api/settings`, { headers: { Authorization: `Bearer ${token}` } });
-      if (res.ok) setSettings(await res.json());
+      if (res.ok) setSettings({ ...DEFAULT_SETTINGS, ...(await res.json()) });
     } catch (e) { console.error(e); }
   }, []);
 
-  useEffect(() => {
-    fetchSettings();
-  }, [fetchSettings]);
+  useEffect(() => { fetchSettings(); }, [fetchSettings]);
 
   const handleSaveSettings = async () => {
     setSavingSettings(true);
@@ -31,97 +49,189 @@ const ManageSettings = () => {
       const res = await fetch(`${API_URL}/api/settings`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify(settings)
+        body: JSON.stringify(settings),
       });
       if (res.ok) success('Settings saved!');
       else error('Failed to save');
     } catch (e) { error(e.message); } finally { setSavingSettings(false); }
   };
 
+  const handleBroadcast = async () => {
+    if (!broadcast.subject || !broadcast.message) return error('Subject and message required');
+    if (!window.confirm(`Send email to ${broadcast.audience} users?`)) return;
+    setSendingBroadcast(true);
+    try {
+      const token = await getToken();
+      const res = await fetch(`${API_URL}/api/admin/broadcast`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify(broadcast),
+      });
+      const data = await res.json();
+      if (res.ok) success(`Sent to ${data.sent} users`);
+      else error(data.error || 'Broadcast failed');
+    } catch (e) { error(e.message); } finally { setSendingBroadcast(false); }
+  };
+
+  const addCategory = () => {
+    if (!newCategory.name.trim()) return;
+    const id = newCategory.name.toLowerCase().replace(/\s+/g, '-');
+    setSettings({
+      ...settings,
+      categories: [...(settings.categories || []), { id, name: newCategory.name.trim(), commissionPercent: Number(newCategory.commissionPercent) || 10 }],
+    });
+    setNewCategory({ name: '', commissionPercent: 10 });
+  };
+
+  const addAdminEmail = () => {
+    if (!newAdminEmail.trim()) return;
+    const emails = [...(settings.adminEmails || [])];
+    if (!emails.includes(newAdminEmail.trim())) emails.push(newAdminEmail.trim());
+    setSettings({ ...settings, adminEmails: emails });
+    setNewAdminEmail('');
+  };
+
   return (
     <>
       <div className="admin-page-header">
-        <div><h1>Platform Settings</h1><p className="page-subtitle">Configure global platform behavior</p></div>
+        <div><h1>Platform Settings</h1><p className="page-subtitle">Commission, categories, admins & email broadcast</p></div>
+        <button className="btn btn-primary" onClick={handleSaveSettings} disabled={savingSettings}>
+          {savingSettings ? 'Saving…' : '💾 Save All Settings'}
+        </button>
       </div>
 
+      {/* Commission */}
       <div className="dash-section">
-        <div className="dash-section-header">
-          <h3><DollarSign size={15} /> Revenue & Commission</h3>
-        </div>
+        <div className="dash-section-header"><h3><DollarSign size={15} /> Revenue & Commission</h3></div>
         <div className="settings-grid">
           <div className="settings-card">
-            <h4>Platform Commission Rate</h4>
-            <p>Percentage taken from each vendor sale</p>
-            <div className="form-group">
-              <input
-                type="number"
-                min="0"
-                max="50"
-                value={settings.commissionPercent}
-                onChange={e => setSettings({ ...settings, commissionPercent: Number(e.target.value) })}
-                className="form-control"
-                style={{ maxWidth: '120px' }}
-              />
-            </div>
-            <div className="commission-preview">
-              <span>On a Rs. 1,000 sale:</span>
-              <span className="highlight">Rs. {Math.round(1000 * settings.commissionPercent / 100)} commission</span>
-            </div>
+            <h4>Product Sale Commission (%)</h4>
+            <p>Default when category has no specific rate</p>
+            <input type="number" min="0" max="50" value={settings.commissionPercent}
+              onChange={(e) => setSettings({ ...settings, commissionPercent: Number(e.target.value) })}
+              className="form-control" style={{ maxWidth: 120 }} />
+          </div>
+          <div className="settings-card">
+            <h4>Booking / Appointment Commission (%)</h4>
+            <p>Platform fee on doctor consultations</p>
+            <input type="number" min="0" max="50" value={settings.bookingCommissionPercent ?? 10}
+              onChange={(e) => setSettings({ ...settings, bookingCommissionPercent: Number(e.target.value) })}
+              className="form-control" style={{ maxWidth: 120 }} />
+          </div>
+          <div className="settings-card">
+            <h4>Minimum Commission (Rs.)</h4>
+            <p>Minimum platform fee per product</p>
+            <input type="number" min="0" value={settings.minCommissionRs ?? 300}
+              onChange={(e) => setSettings({ ...settings, minCommissionRs: Number(e.target.value) })}
+              className="form-control" style={{ maxWidth: 120 }} />
           </div>
         </div>
       </div>
 
+      {/* Categories */}
       <div className="dash-section">
-        <div className="dash-section-header">
-          <h3><Activity size={15} /> Auto-Approval Rules</h3>
+        <div className="dash-section-header"><h3><Tag size={15} /> Product Categories & Commission</h3></div>
+        <div className="table-container" style={{ marginBottom: '1rem' }}>
+          <table className="admin-table">
+            <thead><tr><th>Category</th><th>Commission %</th><th></th></tr></thead>
+            <tbody>
+              {(settings.categories || []).map((cat, idx) => (
+                <tr key={cat.id || idx}>
+                  <td><input value={cat.name} className="form-control"
+                    onChange={(e) => {
+                      const cats = [...settings.categories];
+                      cats[idx] = { ...cat, name: e.target.value };
+                      setSettings({ ...settings, categories: cats });
+                    }} /></td>
+                  <td><input type="number" min="0" max="50" value={cat.commissionPercent} className="form-control" style={{ maxWidth: 80 }}
+                    onChange={(e) => {
+                      const cats = [...settings.categories];
+                      cats[idx] = { ...cat, commissionPercent: Number(e.target.value) };
+                      setSettings({ ...settings, categories: cats });
+                    }} /></td>
+                  <td><button className="btn-xs" style={{ color: '#ef5350' }}
+                    onClick={() => setSettings({ ...settings, categories: settings.categories.filter((_, i) => i !== idx) })}>Remove</button></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
+        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', padding: '0 1rem 1rem' }}>
+          <input placeholder="New category name" value={newCategory.name} onChange={(e) => setNewCategory({ ...newCategory, name: e.target.value })} className="form-control" style={{ maxWidth: 200 }} />
+          <input type="number" placeholder="%" value={newCategory.commissionPercent} onChange={(e) => setNewCategory({ ...newCategory, commissionPercent: e.target.value })} className="form-control" style={{ maxWidth: 80 }} />
+          <button className="btn btn-outline" onClick={addCategory}>+ Add Category</button>
+        </div>
+      </div>
+
+      {/* Admins */}
+      <div className="dash-section">
+        <div className="dash-section-header"><h3><Shield size={15} /> Admin Accounts</h3></div>
+        <div className="settings-card" style={{ margin: '0 1rem 1rem' }}>
+          <p>These emails get full admin access. You can also set <code>role: admin</code> on a user in All Users.</p>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', margin: '1rem 0' }}>
+            {(settings.adminEmails || []).map((email) => (
+              <span key={email} style={{ background: 'rgba(76,175,80,0.15)', color: '#4caf50', padding: '0.3rem 0.75rem', borderRadius: 999, fontSize: '0.85rem' }}>
+                {email}
+                {email !== 'yes.manujaya@gmail.com' && (
+                  <button onClick={() => setSettings({ ...settings, adminEmails: settings.adminEmails.filter((e) => e !== email) })}
+                    style={{ background: 'none', border: 'none', color: '#ef5350', marginLeft: 6, cursor: 'pointer' }}>×</button>
+                )}
+              </span>
+            ))}
+          </div>
+          <div style={{ display: 'flex', gap: '0.5rem' }}>
+            <input type="email" placeholder="Add admin email" value={newAdminEmail} onChange={(e) => setNewAdminEmail(e.target.value)} className="form-control" style={{ maxWidth: 280 }} />
+            <button className="btn btn-outline" onClick={addAdminEmail}>Add Admin</button>
+          </div>
+        </div>
+      </div>
+
+      {/* Email Broadcast */}
+      <div className="dash-section">
+        <div className="dash-section-header"><h3><Send size={15} /> Email Broadcast (via info@deergayu.com)</h3></div>
+        <div className="settings-card" style={{ margin: '0 1rem 1rem' }}>
+          <div className="form-group">
+            <label>Send to</label>
+            <select value={broadcast.audience} onChange={(e) => setBroadcast({ ...broadcast, audience: e.target.value })} className="form-control" style={{ maxWidth: 240 }}>
+              <option value="all">Everyone</option>
+              <option value="customers">Customers only</option>
+              <option value="experts">All Experts (doctors + vendors)</option>
+              <option value="doctors">Doctors / Clinics / Astrologers</option>
+              <option value="vendors">Vendors only</option>
+            </select>
+          </div>
+          <div className="form-group">
+            <label>Subject</label>
+            <input value={broadcast.subject} onChange={(e) => setBroadcast({ ...broadcast, subject: e.target.value })} className="form-control" placeholder="Email subject" />
+          </div>
+          <div className="form-group">
+            <label>Message</label>
+            <textarea value={broadcast.message} onChange={(e) => setBroadcast({ ...broadcast, message: e.target.value })} className="form-control" rows={5} placeholder="Your message to users…" />
+          </div>
+          <button className="btn btn-primary" onClick={handleBroadcast} disabled={sendingBroadcast}>
+            {sendingBroadcast ? 'Sending…' : <><Mail size={14} /> Send Broadcast Email</>}
+          </button>
+        </div>
+      </div>
+
+      {/* Auto-approve */}
+      <div className="dash-section">
+        <div className="dash-section-header"><h3><Activity size={15} /> Auto-Approval Rules</h3></div>
         <div className="settings-grid">
           <div className="settings-card">
-            <h4>Auto-Approve Verified Clinics</h4>
-            <p>Instantly approve new clinic/doctor registrations without manual review</p>
+            <h4>Auto-Approve Experts</h4>
             <div className="toggle-group">
-              <div
-                className={`toggle-option ${settings.autoApproveExperts ? 'active' : ''}`}
-                onClick={() => setSettings({ ...settings, autoApproveExperts: true })}
-              >
-                ✓ Yes, Auto-Approve
-              </div>
-              <div
-                className={`toggle-option ${!settings.autoApproveExperts ? 'active' : ''}`}
-                onClick={() => setSettings({ ...settings, autoApproveExperts: false })}
-              >
-                ✗ Manual Review
-              </div>
+              <div className={`toggle-option ${settings.autoApproveExperts ? 'active' : ''}`} onClick={() => setSettings({ ...settings, autoApproveExperts: true })}>✓ Yes</div>
+              <div className={`toggle-option ${!settings.autoApproveExperts ? 'active' : ''}`} onClick={() => setSettings({ ...settings, autoApproveExperts: false })}>✗ Manual</div>
             </div>
           </div>
           <div className="settings-card">
             <h4>Auto-Approve Products</h4>
-            <p>Instantly approve new vendor products without manual review</p>
             <div className="toggle-group">
-              <div
-                className={`toggle-option ${settings.autoApproveProducts ? 'active' : ''}`}
-                onClick={() => setSettings({ ...settings, autoApproveProducts: true })}
-              >
-                ✓ Yes, Auto-Approve
-              </div>
-              <div
-                className={`toggle-option ${!settings.autoApproveProducts ? 'active' : ''}`}
-                onClick={() => setSettings({ ...settings, autoApproveProducts: false })}
-              >
-                ✗ Manual Review
-              </div>
+              <div className={`toggle-option ${settings.autoApproveProducts ? 'active' : ''}`} onClick={() => setSettings({ ...settings, autoApproveProducts: true })}>✓ Yes</div>
+              <div className={`toggle-option ${!settings.autoApproveProducts ? 'active' : ''}`} onClick={() => setSettings({ ...settings, autoApproveProducts: false })}>✗ Manual</div>
             </div>
           </div>
-        </div>
-        <div style={{ padding: '1rem 1.5rem', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
-          <button
-            className="btn btn-primary"
-            onClick={handleSaveSettings}
-            disabled={savingSettings}
-            style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
-          >
-            {savingSettings ? <><div className="spinner spinner-sm" /> Saving…</> : '💾 Save Settings'}
-          </button>
         </div>
       </div>
     </>

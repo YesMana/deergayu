@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { doc, getDoc, collection, getDocs, addDoc, serverTimestamp, query, orderBy } from 'firebase/firestore';
+import { doc, getDoc, collection, getDocs, query, orderBy } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
@@ -87,19 +87,17 @@ const ProductDetail = () => {
     
     setSubmittingReview(true);
     try {
-      const reviewData = {
-        userId: user.uid,
-        userName: user.displayName || user.name || 'Anonymous User',
-        rating: Number(rating),
-        comment: reviewText,
-        createdAt: serverTimestamp()
-      };
-      
-      const reviewsRef = collection(db, 'products', id, 'reviews');
-      const docRef = await addDoc(reviewsRef, reviewData);
-      
-      // Update local state to show immediately
-      setReviews([{ id: docRef.id, ...reviewData, createdAt: new Date() }, ...reviews]);
+      const token = await user.getIdToken();
+      const API_URL = import.meta.env.VITE_API_URL || '';
+      const res = await fetch(`${API_URL}/api/reviews`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ targetType: 'product', targetId: id, rating: Number(rating), comment: reviewText }),
+      });
+      if (!res.ok) throw new Error('Review failed');
+      const data = await res.json();
+      setReviews([{ id: data.id, userName: data.userName, rating: data.rating, comment: data.comment, createdAt: data.createdAt }, ...reviews]);
+      if (data.aggregates) setProduct((p) => ({ ...p, rating: data.aggregates.rating, reviewCount: data.aggregates.reviewCount }));
       setReviewText('');
       setRating(5);
       success("Review submitted successfully!");

@@ -4,6 +4,7 @@ import { collection, getDocs, doc, deleteDoc, query, orderBy, limit, startAfter,
 import { db, auth } from '../../firebase';
 import { useToast } from '../../context/ToastContext';
 import { fmtDate, userInitials, StatusPill } from './AdminUtils';
+import AdminUserProfileModal from './AdminUserProfileModal';
 
 const API_URL = import.meta.env.VITE_API_URL || '';
 const PAGE_SIZE = 20;
@@ -22,6 +23,7 @@ export default function ManageUsers() {
 
   // Modal
   const [selectedUser, setSelectedUser] = useState(null);
+  const [profileUserId, setProfileUserId] = useState(null);
   const [userModalTab, setUserModalTab] = useState('profile');
   const [userAppts, setUserAppts] = useState([]);
   const [userOrders, setUserOrders] = useState([]);
@@ -199,7 +201,7 @@ export default function ManageUsers() {
               <input placeholder="Search name or email…" value={userSearch} onChange={e => setUserSearch(e.target.value)} />
             </div>
             <div className="filter-chips">
-              {['all','user','doctor','clinic','organization','vendor'].map(r => (
+              {['all','user','doctor','clinic','organization','vendor','admin'].map(r => (
                 <button key={r} className={`filter-chip ${userRoleFilter === r ? 'active' : ''}`} onClick={() => setUserRoleFilter(r)}>
                   {r === 'all' ? 'All' : r.charAt(0).toUpperCase() + r.slice(1)}
                 </button>
@@ -241,7 +243,7 @@ export default function ManageUsers() {
                           onChange={e => handleUpdateRole(u.id, e.target.value)}
                           disabled={u.email === 'yes.manujaya@gmail.com'}
                         >
-                          {['user','doctor','clinic','organization','vendor'].map(r => (
+                          {['user','doctor','clinic','organization','vendor','admin'].map(r => (
                             <option key={r} value={r}>{r.charAt(0).toUpperCase() + r.slice(1)}</option>
                           ))}
                           {u.email === 'yes.manujaya@gmail.com' && <option value="admin">Admin</option>}
@@ -254,6 +256,13 @@ export default function ManageUsers() {
                           {u.status === 'pending' && (
                             <button className="btn-xs approve" onClick={() => handleApproveUser(u.id)}>Approve</button>
                           )}
+                          <button
+                            className="btn-xs edit-btn"
+                            onClick={() => setProfileUserId(u.id)}
+                            style={{ background: '#1565c0', color: 'white' }}
+                          >
+                            Full Profile
+                          </button>
                           <button
                             className="btn-xs edit-btn"
                             onClick={() => {
@@ -424,6 +433,8 @@ export default function ManageUsers() {
           </div>
         </div>
       )}
+
+      {profileUserId && <AdminUserProfileModal userId={profileUserId} onClose={() => setProfileUserId(null)} />}
     </>
   );
 }

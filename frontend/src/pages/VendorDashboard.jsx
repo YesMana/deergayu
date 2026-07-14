@@ -111,8 +111,9 @@ const VendorDashboard = () => {
   const [loadingProducts, setLoadingProducts] = useState(false);
   const [appointments, setAppointments] = useState([]);
   const [loadingAppointments, setLoadingAppointments] = useState(false);
-  
-  const [showAddProductModal, setShowAddProductModal] = useState(false);
+  const [platformCategories, setPlatformCategories] = useState([]);
+  const [platformConfig, setPlatformConfig] = useState({ defaultCommissionPercent: 10, minCommissionRs: 300 });
+  const [earnings, setEarnings] = useState({ totalEarnings: 0, monthEarnings: 0, bookingEarnings: 0 });
   const [newProduct, setNewProduct] = useState({ name: '', category: 'Medicine', basePrice: 0, imageUrl: '', images: [], description: '' });
   const [productImages, setProductImages] = useState([null, null, null, null]);
   const [uploadingSlot, setUploadingSlot] = useState(null);
@@ -205,6 +206,16 @@ const VendorDashboard = () => {
     if (user) {
       fetchProducts();
       fetchOrders();
+      fetchEarnings();
+      fetch(`${API_URL}/api/categories`)
+        .then((r) => r.ok ? r.json() : null)
+        .then((data) => {
+          if (data?.categories?.length) {
+            setPlatformCategories(data.categories);
+            setPlatformConfig({ defaultCommissionPercent: data.defaultCommissionPercent, minCommissionRs: data.minCommissionRs });
+          }
+        })
+        .catch(() => {});
       if (user.profileDetails?.schedule) {
         setSchedule(user.profileDetails.schedule);
       }
@@ -269,6 +280,14 @@ const VendorDashboard = () => {
     } finally {
       setLoadingProducts(false);
     }
+  };
+
+  const fetchEarnings = async () => {
+    try {
+      const token = await auth.currentUser.getIdToken();
+      const res = await fetch(`${API_URL}/api/vendor/earnings`, { headers: { Authorization: `Bearer ${token}` } });
+      if (res.ok) setEarnings(await res.json());
+    } catch (err) { console.error('Earnings fetch error:', err); }
   };
 
   const fetchOrders = async () => {
@@ -338,11 +357,17 @@ const VendorDashboard = () => {
     }
   };
 
-  const calculateSitePrice = (price) => {
+  const getCategoryCommission = (categoryName) => {
+    const cat = platformCategories.find((c) => c.name === categoryName);
+    return cat?.commissionPercent ?? platformConfig.defaultCommissionPercent ?? 10;
+  };
+
+  const calculateSitePrice = (price, categoryName) => {
     const base = Number(price) || 0;
     if (base === 0) return 0;
-    const commission = Math.max(300, base * 0.10);
-    // Return site price rounded to 1 decimal place
+    const pct = getCategoryCommission(categoryName);
+    const min = platformConfig.minCommissionRs ?? 300;
+    const commission = Math.max(min, base * pct / 100);
     return Number((base + commission).toFixed(1));
   };
 
@@ -458,7 +483,7 @@ const VendorDashboard = () => {
     if (!editingProduct) return;
     setSavingEdit(true);
     try {
-      const sitePrice = calculateSitePrice(editingProduct.basePrice);
+      const sitePrice = calculateSitePrice(editingProduct.basePrice, editingProduct.category);
       const { updateDoc, doc: firestoreDoc } = await import('firebase/firestore');
       await updateDoc(firestoreDoc(db, 'products', editingProduct.id), {
         name: editingProduct.name,
@@ -486,7 +511,7 @@ const VendorDashboard = () => {
     setAddingProduct(true);
     
     try {
-      const sitePrice = calculateSitePrice(newProduct.basePrice);
+      const sitePrice = calculateSitePrice(newProduct.basePrice, newProduct.category);
       const token = await auth.currentUser.getIdToken();
       const res = await fetch(`${API_URL}/api/vendor/products`, {
         method: 'POST',
@@ -708,14 +733,9 @@ const VendorDashboard = () => {
     }
   }
 
-  // ── Derived revenue stats ──────────────────────────────────
-  const totalRevenue = orders.filter(o => o.status === 'delivered').reduce((s, o) => s + Number(o.totalPrice || 0), 0);
-  const monthRevenue = orders.filter(o => {
-    if (o.status !== 'delivered') return false;
-    const d = new Date(o.createdAt || 0);
-    const now = new Date();
-    return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
-  }).reduce((s, o) => s + Number(o.totalPrice || 0), 0);
+  // Vendor sees net earnings only (not customer-facing totals)
+  const totalRevenue = earnings.totalEarnings || 0;
+  const monthRevenue = earnings.monthEarnings || 0;
   const pendingOrdersCount = orders.filter(o => ['pending', 'confirmed', 'processing'].includes(o.status)).length;
   const todayAppts = appointments.filter(a => a.date === new Date().toISOString().split('T')[0]);
   const upcomingAppts = appointments.filter(a => ['pending', 'accepted'].includes(a.status)).slice(0, 5);
@@ -839,8 +859,8 @@ const VendorDashboard = () => {
               ) : (
                 // Vendor KPI cards
                 [
-                  { label: 'Total Revenue', value: fmtCurrency(totalRevenue), color: '#4caf50', icon: '💰', sub: 'Delivered orders' },
-                  { label: 'This Month', value: fmtCurrency(monthRevenue), color: '#29b6f6', icon: '📅', sub: 'Monthly earnings' },
+                  { label: 'Your Earnings', value: fmtCurrency(totalRevenue), color: '#4caf50', icon: '💰', sub: 'Net payout (delivered)' },
+                  { label: 'This Month', value: fmtCurrency(monthRevenue), color: '#29b6f6', icon: '📅', sub: 'Your net earnings' },
                   { label: 'Active Products', value: approvedProducts, color: '#ab47bc', icon: '📦', sub: `of ${vendorProducts.length} total` },
                   { label: 'Pending Orders', value: pendingOrdersCount, color: '#ffa726', icon: '🛒', sub: 'Need processing' },
                 ].map(({ label, value, color, icon, sub }) => (
@@ -1185,11 +1205,9 @@ const VendorDashboard = () => {
                       className="form-control"
                       style={{ width: '100%', padding: '0.8rem', borderRadius: '4px', background: 'var(--surface-color)', color: 'var(--text-primary)' }}
                     >
-                      <option value="Medicine">Medicine / Supplements</option>
-                      <option value="Hair Care">Hair Care</option>
-                      <option value="Skin Care">Skin Care</option>
-                      <option value="Pain Relief">Pain Relief Oils</option>
-                      <option value="Equipment">Medical Equipment</option>
+                      {(platformCategories.length ? platformCategories : [{ name: 'Medicine' }, { name: 'Hair Care' }, { name: 'Skin Care' }, { name: 'General' }]).map((c) => (
+                        <option key={c.id || c.name} value={c.name}>{c.name}{c.commissionPercent ? ` (${c.commissionPercent}% fee)` : ''}</option>
+                      ))}
                     </select>
                   </div>
                   {/* ── MULTI-PHOTO UPLOAD (up to 4) ── */}
@@ -1300,11 +1318,11 @@ const VendorDashboard = () => {
                       </div>
                       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem', color: 'var(--error-color)', fontSize: '0.9rem' }}>
                         <span>Platform Commission:</span>
-                        <span>+ Rs. {(calculateSitePrice(newProduct.basePrice) - Number(newProduct.basePrice)).toFixed(1)}</span>
+                        <span>+ Rs. {(calculateSitePrice(newProduct.basePrice, newProduct.category) - Number(newProduct.basePrice)).toFixed(1)}</span>
                       </div>
                       <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 'bold', color: 'var(--primary-color)', fontSize: '1.1rem', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '0.5rem' }}>
                         <span>Final Site Price:</span>
-                        <span>Rs. {calculateSitePrice(newProduct.basePrice)}</span>
+                        <span>Rs. {calculateSitePrice(newProduct.basePrice, newProduct.category)}</span>
                       </div>
                     </div>
                   )}
@@ -1348,11 +1366,9 @@ const VendorDashboard = () => {
                       className="form-control"
                       style={{ width: '100%', padding: '0.8rem', borderRadius: '4px', background: 'var(--surface-color)', color: 'var(--text-primary)' }}
                     >
-                      <option value="Medicine">Medicine / Supplements</option>
-                      <option value="Hair Care">Hair Care</option>
-                      <option value="Skin Care">Skin Care</option>
-                      <option value="Pain Relief">Pain Relief Oils</option>
-                      <option value="Equipment">Medical Equipment</option>
+                      {(platformCategories.length ? platformCategories : [{ name: 'Medicine' }, { name: 'Hair Care' }, { name: 'Skin Care' }, { name: 'General' }]).map((c) => (
+                        <option key={c.id || c.name} value={c.name}>{c.name}{c.commissionPercent ? ` (${c.commissionPercent}% fee)` : ''}</option>
+                      ))}
                     </select>
                   </div>
 
@@ -1425,10 +1441,10 @@ const VendorDashboard = () => {
                         <span>Your Price:</span><span>Rs. {Number(editingProduct.basePrice)}</span>
                       </div>
                       <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--error-color)', marginBottom: '0.4rem' }}>
-                        <span>Commission:</span><span>+ Rs. {(calculateSitePrice(editingProduct.basePrice) - Number(editingProduct.basePrice)).toFixed(1)}</span>
+                        <span>Commission:</span><span>+ Rs. {(calculateSitePrice(editingProduct.basePrice, editingProduct.category) - Number(editingProduct.basePrice)).toFixed(1)}</span>
                       </div>
                       <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 'bold', color: 'var(--primary-color)', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '0.4rem' }}>
-                        <span>Final Site Price:</span><span>Rs. {calculateSitePrice(editingProduct.basePrice)}</span>
+                        <span>Final Site Price:</span><span>Rs. {calculateSitePrice(editingProduct.basePrice, editingProduct.category)}</span>
                       </div>
                     </div>
                   )}

@@ -5,6 +5,15 @@ const { getFirestore, FieldValue } = require('firebase-admin/firestore');
 const { getAuth } = require('firebase-admin/auth');
 const dotenv = require('dotenv');
 const { sendEmail, sendAdminEmail } = require('./emailService');
+const {
+  getSettings,
+  isAdminUser,
+  calcProductPricing,
+  getCategoryCommission,
+  calcOrderEarnings,
+  updateReviewAggregates,
+  DEFAULT_SETTINGS,
+} = require('./platformUtils');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 const multer = require('multer');
 const path = require('path');
@@ -79,14 +88,15 @@ const verifyUser = async (req, res, next) => {
   }
 };
 
-// Verify Admin Token
+// Verify Admin Token (multi-admin: Firestore role, adminEmails list, or super-admin)
 const verifyAdmin = async (req, res, next) => {
   const token = req.headers.authorization?.split('Bearer ')[1];
   if (!token) return res.status(401).json({ error: 'No token provided' });
 
   try {
     const decodedToken = await auth.verifyIdToken(token);
-    if (decodedToken.email !== 'yes.manujaya@gmail.com') {
+    const allowed = await isAdminUser(db, decodedToken);
+    if (!allowed) {
       return res.status(403).json({ error: 'Unauthorized: Admin access required' });
     }
     req.user = decodedToken;
@@ -112,7 +122,8 @@ const verifyVendor = async (req, res, next) => {
     
     const userData = userDoc.data();
     const vendorRoles = ['vendor', 'doctor', 'clinic', 'organization'];
-    if (!vendorRoles.includes(userData.role) && decodedToken.email !== 'yes.manujaya@gmail.com') {
+    const isAdmin = await isAdminUser(db, decodedToken);
+    if (!vendorRoles.includes(userData.role) && !isAdmin) {
       return res.status(403).json({ error: 'Vendor/Doctor access required' });
     }
     
@@ -511,7 +522,7 @@ apiRouter.post('/users/:uid/role', verifyAdmin, async (req, res) => {
   const { uid } = req.params;
   const { role } = req.body;
   
-  if (!['user', 'doctor', 'clinic', 'organization', 'vendor'].includes(role)) {
+  if (!['user', 'doctor', 'clinic', 'organization', 'vendor', 'admin'].includes(role)) {
     return res.status(400).json({ error: 'Invalid role' });
   }
 
@@ -658,13 +669,21 @@ apiRouter.delete('/appointments/:id', verifyAdmin, async (req, res) => {
 // Get admin settings
 apiRouter.get('/settings', verifyAdmin, async (req, res) => {
   try {
-    const doc = await db.collection('settings').doc('admin').get();
-    if (doc.exists) {
-      res.json(doc.data());
-    } else {
-      // Return defaults
-      res.json({ commissionPercent: 10, autoApproveExperts: false, autoApproveProducts: false });
-    }
+    res.json(await getSettings(db));
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Public: product categories + commission rates (for vendor product form)
+apiRouter.get('/categories', async (req, res) => {
+  try {
+    const settings = await getSettings(db);
+    res.json({
+      categories: settings.categories || DEFAULT_SETTINGS.categories,
+      defaultCommissionPercent: settings.commissionPercent || 10,
+      minCommissionRs: settings.minCommissionRs || 300,
+    });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -672,15 +691,123 @@ apiRouter.get('/settings', verifyAdmin, async (req, res) => {
 
 // Save admin settings
 apiRouter.post('/settings', verifyAdmin, async (req, res) => {
-  const { commissionPercent, autoApproveExperts, autoApproveProducts } = req.body;
+  const {
+    commissionPercent,
+    bookingCommissionPercent,
+    minCommissionRs,
+    autoApproveExperts,
+    autoApproveProducts,
+    adminEmails,
+    categories,
+  } = req.body;
   try {
-    await db.collection('settings').doc('admin').set({
-      commissionPercent: commissionPercent || 10,
-      autoApproveExperts: autoApproveExperts || false,
-      autoApproveProducts: autoApproveProducts || false,
-      updatedAt: new Date().toISOString()
-    }, { merge: true });
+    const payload = {
+      updatedAt: new Date().toISOString(),
+    };
+    if (commissionPercent !== undefined) payload.commissionPercent = Number(commissionPercent) || 10;
+    if (bookingCommissionPercent !== undefined) payload.bookingCommissionPercent = Number(bookingCommissionPercent) || 10;
+    if (minCommissionRs !== undefined) payload.minCommissionRs = Number(minCommissionRs) || 300;
+    if (autoApproveExperts !== undefined) payload.autoApproveExperts = !!autoApproveExperts;
+    if (autoApproveProducts !== undefined) payload.autoApproveProducts = !!autoApproveProducts;
+    if (Array.isArray(adminEmails)) payload.adminEmails = adminEmails.filter(Boolean);
+    if (Array.isArray(categories)) payload.categories = categories;
+
+    await db.collection('settings').doc('admin').set(payload, { merge: true });
     res.json({ message: 'Settings saved successfully' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Admin: broadcast email to customers, doctors, vendors, or all
+apiRouter.post('/admin/broadcast', verifyAdmin, async (req, res) => {
+  const { subject, message, audience } = req.body;
+  if (!subject || !message) {
+    return res.status(400).json({ error: 'subject and message are required' });
+  }
+
+  const roleMap = {
+    all: null,
+    customers: ['user'],
+    experts: ['doctor', 'clinic', 'organization', 'vendor'],
+    vendors: ['vendor'],
+    doctors: ['doctor', 'clinic', 'organization'],
+  };
+  const targetRoles = roleMap[audience] ?? roleMap.all;
+
+  try {
+    const snap = await db.collection('users').get();
+    let recipients = snap.docs
+      .map((d) => ({ id: d.id, ...d.data() }))
+      .filter((u) => u.email && u.status !== 'rejected');
+
+    if (targetRoles) {
+      recipients = recipients.filter((u) => targetRoles.includes(u.role));
+    }
+
+    let sent = 0;
+    for (const user of recipients) {
+      const personalizedHtml = `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 8px;">
+          <h2 style="color: #2e7d32;">Deergayu Platform</h2>
+          <p>Hello <strong>${user.name || 'there'}</strong>,</p>
+          <div style="white-space: pre-wrap; font-size: 16px; color: #333; line-height: 1.6;">${message}</div>
+          <hr style="border: none; border-top: 1px solid #eee; margin: 24px 0;" />
+          <p style="font-size: 12px; color: #999; text-align: center;">Deergayu &copy; ${new Date().getFullYear()}</p>
+        </div>
+      `;
+      const ok = await sendEmail(user.email, subject, message, personalizedHtml);
+      if (ok) sent++;
+    }
+
+    res.json({ message: `Broadcast sent to ${sent} of ${recipients.length} recipients`, sent, total: recipients.length });
+  } catch (error) {
+    console.error('Broadcast error:', error);
+    res.status(500).json({ error: 'Failed to send broadcast' });
+  }
+});
+
+// Admin: full profile view (everything about a user/vendor/doctor)
+apiRouter.get('/admin/users/:uid/profile', verifyAdmin, async (req, res) => {
+  const { uid } = req.params;
+  try {
+    const userDoc = await db.collection('users').doc(uid).get();
+    if (!userDoc.exists) return res.status(404).json({ error: 'User not found' });
+    const userData = { id: uid, ...userDoc.data() };
+
+    const [productsSnap, ordersSnap, customerOrdersSnap, apptsAsProvider, apptsAsCustomer, reviewsSnap] =
+      await Promise.all([
+        db.collection('products').where('vendorId', '==', uid).get(),
+        db.collection('orders').where('vendorId', '==', uid).get(),
+        db.collection('orders').where('customerId', '==', uid).get(),
+        db.collection('appointments').where('providerId', '==', uid).get(),
+        db.collection('appointments').where('customerId', '==', uid).get(),
+        db.collection('users').doc(uid).collection('reviews').get(),
+      ]);
+
+    const vendorOrders = ordersSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
+    const delivered = vendorOrders.filter((o) => o.status === 'delivered');
+    const totalSales = delivered.reduce((s, o) => s + Number(o.totalPrice || 0), 0);
+    const vendorEarnings = delivered.reduce((s, o) => s + Number(o.vendorEarnings ?? o.totalPrice * 0.9), 0);
+    const platformFees = delivered.reduce((s, o) => s + Number(o.platformFee ?? o.totalPrice * 0.1), 0);
+
+    res.json({
+      user: userData,
+      products: productsSnap.docs.map((d) => ({ id: d.id, ...d.data() })),
+      vendorOrders,
+      customerOrders: customerOrdersSnap.docs.map((d) => ({ id: d.id, ...d.data() })),
+      appointmentsAsProvider: apptsAsProvider.docs.map((d) => ({ id: d.id, ...d.data() })),
+      appointmentsAsCustomer: apptsAsCustomer.docs.map((d) => ({ id: d.id, ...d.data() })),
+      reviews: reviewsSnap.docs.map((d) => ({ id: d.id, ...d.data() })),
+      stats: {
+        totalSales,
+        vendorEarnings,
+        platformFees,
+        productCount: productsSnap.size,
+        orderCount: vendorOrders.length,
+        appointmentCount: apptsAsProvider.size,
+      },
+    });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -706,32 +833,39 @@ apiRouter.get('/vendor/products', verifyVendor, async (req, res) => {
 
 // Add new product
 apiRouter.post('/vendor/products', verifyVendor, async (req, res) => {
-  const { name, description, price, category, imageUrl, stock } = req.body;
-  
-  if (!name || !price) {
-    return res.status(400).json({ error: 'Name and price are required' });
+  const { name, description, category, imageUrl, images, stock } = req.body;
+  const basePrice = Number(req.body.basePrice ?? req.body.price);
+
+  if (!name || !basePrice) {
+    return res.status(400).json({ error: 'Name and base price are required' });
   }
 
   try {
+    const settings = await getSettings(db);
     const userDoc = await db.collection('users').doc(req.user.uid).get();
     const vendorName = userDoc.exists ? userDoc.data().name : req.user.email;
+    const catCommission = await getCategoryCommission(db, category || 'General');
+    const pricing = calcProductPricing(basePrice, catCommission, settings.minCommissionRs);
 
     const productData = {
       name,
       description: description || '',
-      basePrice: req.body.basePrice ? Number(req.body.basePrice) : Number(price),
-      price: Number(price),
+      basePrice: pricing.basePrice,
+      commissionPercent: pricing.commissionPercent,
+      commissionAmount: pricing.commissionAmount,
+      price: pricing.price,
       category: category || 'General',
       imageUrl: imageUrl || '',
+      images: Array.isArray(images) ? images : (imageUrl ? [imageUrl] : []),
       stock: Number(stock) || 0,
       vendorId: req.user.uid,
       vendorEmail: req.user.email,
-      vendorName: vendorName,
-      status: 'pending',
+      vendorName,
+      status: settings.autoApproveProducts ? 'approved' : 'pending',
       rating: 0,
       reviewCount: 0,
       createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
+      updatedAt: new Date().toISOString(),
     };
     
     const docRef = await db.collection('products').add(productData);
@@ -743,7 +877,7 @@ apiRouter.post('/vendor/products', verifyVendor, async (req, res) => {
         <p>A vendor has added a new product awaiting approval:</p>
         <div style="background: #f5f5f5; padding: 15px; border-radius: 8px; margin: 20px 0;">
           <p style="margin: 5px 0;"><strong>Product:</strong> ${name}</p>
-          <p style="margin: 5px 0;"><strong>Price:</strong> Rs. ${Number(price).toLocaleString()}</p>
+          <p style="margin: 5px 0;"><strong>Price:</strong> Rs. ${pricing.price.toLocaleString()} (Base: Rs. ${pricing.basePrice.toLocaleString()}, Commission: ${pricing.commissionPercent}%)</p>
           <p style="margin: 5px 0;"><strong>Category:</strong> ${category || 'General'}</p>
           <p style="margin: 5px 0;"><strong>Vendor:</strong> ${vendorName}</p>
           <p style="margin: 5px 0;"><strong>Vendor Email:</strong> ${req.user.email}</p>
@@ -756,6 +890,100 @@ apiRouter.post('/vendor/products', verifyVendor, async (req, res) => {
       .catch(e => console.error('Admin new product email error:', e));
 
     res.status(201).json({ id: docRef.id, ...productData });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Vendor earnings — net payout only (not customer-facing totals)
+apiRouter.get('/vendor/earnings', verifyVendor, async (req, res) => {
+  try {
+    const [ordersSnap, apptsSnap, settings] = await Promise.all([
+      db.collection('orders').where('vendorId', '==', req.user.uid).get(),
+      db.collection('appointments').where('providerId', '==', req.user.uid).where('status', '==', 'completed').get(),
+      getSettings(db),
+    ]);
+
+    const orders = ordersSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
+    const delivered = orders.filter((o) => o.status === 'delivered');
+    const now = new Date();
+
+    const sumEarnings = (list) =>
+      list.reduce((s, o) => s + Number(o.vendorEarnings ?? calcOrderEarnings(o.items).vendorEarnings), 0);
+
+    const totalEarnings = sumEarnings(delivered);
+    const monthEarnings = sumEarnings(
+      delivered.filter((o) => {
+        const d = new Date(o.createdAt || 0);
+        return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+      })
+    );
+
+    const bookingPct = settings.bookingCommissionPercent || 10;
+    const bookingEarnings = apptsSnap.docs.reduce((s, d) => {
+      const fee = Number(d.data().consultationFee || d.data().fee || 0);
+      return s + fee * (1 - bookingPct / 100);
+    }, 0);
+
+    res.json({
+      totalEarnings: Math.round(totalEarnings),
+      monthEarnings: Math.round(monthEarnings),
+      bookingEarnings: Math.round(bookingEarnings),
+      pendingOrders: orders.filter((o) => ['pending', 'confirmed', 'processing', 'shipped'].includes(o.status)).length,
+      deliveredOrders: delivered.length,
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Reviews — products and providers
+apiRouter.get('/reviews/:targetType/:targetId', async (req, res) => {
+  const { targetType, targetId } = req.params;
+  if (!['product', 'provider'].includes(targetType)) {
+    return res.status(400).json({ error: 'Invalid target type' });
+  }
+  try {
+    const col =
+      targetType === 'product'
+        ? db.collection('products').doc(targetId).collection('reviews')
+        : db.collection('users').doc(targetId).collection('reviews');
+    const snap = await col.orderBy('createdAt', 'desc').limit(50).get();
+    res.json(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+apiRouter.post('/reviews', verifyUser, async (req, res) => {
+  const { targetType, targetId, rating, comment } = req.body;
+  if (!targetType || !targetId || !rating) {
+    return res.status(400).json({ error: 'targetType, targetId, and rating are required' });
+  }
+  if (!['product', 'provider'].includes(targetType)) {
+    return res.status(400).json({ error: 'Invalid target type' });
+  }
+
+  try {
+    const userDoc = await db.collection('users').doc(req.user.uid).get();
+    const userName = userDoc.exists ? userDoc.data().name : req.user.email;
+    const reviewData = {
+      userId: req.user.uid,
+      userName,
+      rating: Number(rating),
+      comment: comment || '',
+      createdAt: new Date().toISOString(),
+    };
+
+    const col =
+      targetType === 'product'
+        ? db.collection('products').doc(targetId).collection('reviews')
+        : db.collection('users').doc(targetId).collection('reviews');
+
+    const ref = await col.add(reviewData);
+    const aggregates = await updateReviewAggregates(db, targetType === 'product' ? 'product' : 'provider', targetId);
+
+    res.status(201).json({ id: ref.id, ...reviewData, aggregates });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -959,7 +1187,7 @@ apiRouter.get('/cart', verifyUser, async (req, res) => {
 
 // Add/update cart
 apiRouter.post('/cart', verifyUser, async (req, res) => {
-  const { productId, name, price, quantity, vendorId, vendorName, imageUrl, category } = req.body;
+  const { productId, name, price, basePrice, quantity, vendorId, vendorName, imageUrl, category } = req.body;
   
   if (!productId || !name || !price) {
     return res.status(400).json({ error: 'productId, name, and price are required' });
@@ -983,6 +1211,7 @@ apiRouter.post('/cart', verifyUser, async (req, res) => {
         productId,
         name,
         price: Number(price),
+        basePrice: Number(basePrice ?? price),
         quantity: quantity || 1,
         vendorId: vendorId || '',
         vendorName: vendorName || '',
@@ -1059,6 +1288,17 @@ apiRouter.post('/checkout', verifyUser, async (req, res) => {
     }
     
     const items = cartDoc.data().items;
+
+    // Enrich cart items with basePrice from product records
+    const enrichedItems = await Promise.all(
+      items.map(async (item) => {
+        if (item.basePrice !== undefined) return item;
+        if (!item.productId) return item;
+        const prod = await db.collection('products').doc(item.productId).get();
+        if (!prod.exists) return item;
+        return { ...item, basePrice: prod.data().basePrice ?? item.price };
+      })
+    );
     
     // Get user info
     const userDoc = await db.collection('users').doc(req.user.uid).get();
@@ -1066,7 +1306,7 @@ apiRouter.post('/checkout', verifyUser, async (req, res) => {
     
     // Group items by vendor for separate orders
     const vendorGroups = {};
-    items.forEach(item => {
+    enrichedItems.forEach(item => {
       const vid = item.vendorId || 'unknown';
       if (!vendorGroups[vid]) {
         vendorGroups[vid] = { items: [], vendorName: item.vendorName || 'Unknown Vendor' };
@@ -1079,6 +1319,7 @@ apiRouter.post('/checkout', verifyUser, async (req, res) => {
     // Create an order per vendor
     for (const [vendorId, group] of Object.entries(vendorGroups)) {
       const totalPrice = group.items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+      const { vendorEarnings, platformFee } = calcOrderEarnings(group.items);
       
       const orderData = {
         customerId: req.user.uid,
@@ -1088,6 +1329,8 @@ apiRouter.post('/checkout', verifyUser, async (req, res) => {
         vendorName: group.vendorName,
         items: group.items,
         totalPrice,
+        vendorEarnings: Math.round(vendorEarnings),
+        platformFee: Math.round(platformFee),
         status: 'pending',
         paymentMethod: paymentMethod || 'cash_on_delivery',
         deliveryAddress: deliveryAddress || '',
@@ -1128,8 +1371,8 @@ apiRouter.post('/checkout', verifyUser, async (req, res) => {
 
     // Send customer confirmation email (fire and forget)
     try {
-      const allItemsHtml = items.map(i => `<tr><td style="padding:6px 12px">${i.name}</td><td style="padding:6px 12px">x${i.quantity}</td><td style="padding:6px 12px">Rs. ${(i.price * i.quantity).toLocaleString()}</td></tr>`).join('');
-      const grandTotal = items.reduce((sum, i) => sum + (i.price * i.quantity), 0);
+      const allItemsHtml = enrichedItems.map(i => `<tr><td style="padding:6px 12px">${i.name}</td><td style="padding:6px 12px">x${i.quantity}</td><td style="padding:6px 12px">Rs. ${(i.price * i.quantity).toLocaleString()}</td></tr>`).join('');
+      const grandTotal = enrichedItems.reduce((sum, i) => sum + (i.price * i.quantity), 0);
       const paymentInstructions = (paymentMethod === 'bank_transfer' || paymentMethod === 'qr_pay') 
         ? `<div style="background:#fff8e1;border-left:4px solid #ffc107;padding:16px;margin:16px 0;border-radius:4px">
             <h3 style="margin:0 0 8px 0;color:#f57f17">Payment Pending</h3>
@@ -1585,7 +1828,7 @@ const upload = multer({ storage: storageConfig });
 app.use('/uploads', express.static(uploadDir));
 
 // Add file upload API endpoint
-apiRouter.post('/upload', verifyAdmin, upload.single('image'), (req, res) => {
+apiRouter.post('/upload', verifyUser, upload.single('image'), (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ error: 'No file uploaded' });
@@ -1599,8 +1842,6 @@ apiRouter.post('/upload', verifyAdmin, upload.single('image'), (req, res) => {
   }
 });
 
-});
-
 // --- AYURVEDIC GUIDE ---
 const mapGuideDocs = (snapshot) => snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
@@ -1612,7 +1853,7 @@ const isGuideAdmin = async (req) => {
   if (!token) return false;
   try {
     const decoded = await auth.verifyIdToken(token);
-    return decoded.email === 'yes.manujaya@gmail.com';
+    return isAdminUser(db, decoded);
   } catch {
     return false;
   }

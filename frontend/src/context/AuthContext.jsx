@@ -30,7 +30,11 @@ export const AuthProvider = ({ children }) => {
             const userDoc = await getDoc(doc(db, 'users', currentUser.uid));
             if (userDoc.exists()) {
               const data = userDoc.data();
-              currentUser.role = data.role || 'user';
+              if (data.role === 'admin') {
+                currentUser.role = 'admin';
+              } else {
+                currentUser.role = data.role || 'user';
+              }
               currentUser.status = data.status || 'approved';
               currentUser.displayName = data.name || currentUser.displayName;
               currentUser.profileDetails = data.profileDetails || null;
@@ -101,7 +105,8 @@ export const AuthProvider = ({ children }) => {
       const userDoc = await getDoc(doc(db, 'users', currentUser.uid));
       if (userDoc.exists()) {
         const data = userDoc.data();
-        currentUser.role = data.role || 'user';
+        if (data.role === 'admin') currentUser.role = 'admin';
+        else currentUser.role = data.role || 'user';
         currentUser.status = data.status || 'approved';
         currentUser.displayName = data.name || currentUser.displayName;
         currentUser.name = data.name || currentUser.displayName;

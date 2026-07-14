@@ -13,10 +13,10 @@ const API_URL = import.meta.env.VITE_API_URL || '';
 export default function OverviewDashboard({ setActiveTab }) {
   const { error } = useToast();
   
-  const { data: providers = [], isLoading: p1, refetch: r1 } = useProvidersQuery();
-  const { data: products = [], isLoading: p2, refetch: r2 } = useProductsQuery();
-  const { data: orders = [], isLoading: p3, refetch: r3 } = useOrdersQuery();
-  const { data: appointments = [], isLoading: p4, refetch: r4 } = useAppointmentsQuery();
+  const { data: providers = [], isLoading: p1, isError: e1, refetch: r1 } = useProvidersQuery();
+  const { data: products = [], isLoading: p2, isError: e2, refetch: r2 } = useProductsQuery();
+  const { data: orders = [], isLoading: p3, isError: e3, refetch: r3 } = useOrdersQuery();
+  const { data: appointments = [], isLoading: p4, isError: e4, refetch: r4 } = useAppointmentsQuery();
   const [settings, setSettings] = useState({ commissionPercent: 10 });
   
   const loading = p1 || p2 || p3 || p4;
@@ -54,6 +54,18 @@ export default function OverviewDashboard({ setActiveTab }) {
 
   if (loading) {
     return <div className="loading-state" style={{ padding: '4rem 0' }}><div className="spinner" /> Loading dashboard…</div>;
+  }
+
+  if (e1 || e2 || e3 || e4) {
+    return (
+      <div style={{ padding: '3rem', textAlign: 'center' }}>
+        <h2 style={{ color: '#ffa726' }}>Dashboard data could not load</h2>
+        <p style={{ color: 'var(--text-secondary)', margin: '1rem 0' }}>
+          Backend API connection failed. Make sure backend is running and <code>VITE_API_URL</code> is set correctly.
+        </p>
+        <button className="btn btn-primary" onClick={fetchData}>Retry</button>
+      </div>
+    );
   }
 
   return (

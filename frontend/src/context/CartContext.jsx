@@ -60,6 +60,7 @@ export const CartProvider = ({ children }) => {
           productId: product.id || product.productId,
           name: product.name,
           price: product.price,
+          basePrice: product.basePrice ?? product.price,
           quantity: product.quantity || 1,
           vendorId: product.vendorId || '',
           vendorName: product.vendorName || '',
