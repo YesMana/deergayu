@@ -602,6 +602,47 @@ apiRouter.post('/users/:uid/role', verifyAdmin, async (req, res) => {
   }
 });
 
+// Update user profile details (admin edit expert)
+apiRouter.post('/users/:uid/profile', verifyAdmin, async (req, res) => {
+  const { uid } = req.params;
+  const { name, role, status, profileDetails, email } = req.body;
+  try {
+    const updates = { updatedAt: new Date().toISOString() };
+    if (name !== undefined) updates.name = name;
+    if (role !== undefined) {
+      if (!['user', 'doctor', 'clinic', 'organization', 'vendor', 'admin'].includes(role)) {
+        return res.status(400).json({ error: 'Invalid role' });
+      }
+      updates.role = role;
+    }
+    if (status !== undefined) {
+      if (!['pending', 'approved', 'rejected', 'hidden'].includes(status)) {
+        return res.status(400).json({ error: 'Invalid status' });
+      }
+      updates.status = status;
+    }
+    if (profileDetails !== undefined && typeof profileDetails === 'object') {
+      const existing = await db.collection('users').doc(uid).get();
+      const prev = existing.exists ? (existing.data().profileDetails || {}) : {};
+      updates.profileDetails = { ...prev, ...profileDetails };
+    }
+    await db.collection('users').doc(uid).set(updates, { merge: true });
+
+    // Keep Auth displayName in sync when name changes
+    if (name) {
+      try {
+        await auth.updateUser(uid, { displayName: name });
+      } catch (e) {
+        console.warn('Auth displayName update skipped:', e.message);
+      }
+    }
+
+    res.json({ message: 'Profile updated', email: email || null });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Update user status
 apiRouter.post('/users/:uid/status', verifyAdmin, async (req, res) => {
   const { uid } = req.params;

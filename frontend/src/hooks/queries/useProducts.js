@@ -4,7 +4,6 @@ import { db } from '../../firebase';
 
 /**
  * Fetch all products (optionally filtered by status)
- * Good for admin panels or small lists where infinite scrolling isn't needed.
  */
 export const useProductsQuery = (status = null) => {
   return useQuery({
@@ -13,43 +12,55 @@ export const useProductsQuery = (status = null) => {
       const col = collection(db, 'products');
       const q = status ? query(col, where('status', '==', status)) : query(col);
       const snap = await getDocs(q);
-      return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      const products = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+      products.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+      return products;
     },
   });
 };
 
 /**
  * Fetch products with cursor-based pagination.
- * Good for consumer-facing Shop pages.
- * Note: Since Firestore requires composite indexes for sorting + filtering,
- * we handle search/category client-side on the loaded data for simplicity,
- * or server-side if strict indexes exist.
+ * When status is null/"All", load without status filter so admin sees every vendor product.
  */
-export const useInfiniteProductsQuery = ({ pageSize = 12, status = 'approved' }) => {
+export const useInfiniteProductsQuery = ({ pageSize = 12, status = null }) => {
   return useInfiniteQuery({
-    queryKey: ['products', 'infinite', { status }],
+    queryKey: ['products', 'infinite', { status: status || 'all' }],
     queryFn: async ({ pageParam = null }) => {
       const col = collection(db, 'products');
-      let constraints = [
-        where('status', '==', status),
-        orderBy('createdAt', 'desc'),
-        limit(pageSize)
-      ];
+      const constraints = [];
 
-      if (pageParam) {
-        constraints.push(startAfter(pageParam));
+      if (status) {
+        constraints.push(where('status', '==', status));
       }
 
-      const q = query(col, ...constraints);
-      const snap = await getDocs(q);
-      
-      const lastDoc = snap.docs.length > 0 ? snap.docs[snap.docs.length - 1] : null;
-      const products = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-
-      return {
-        products,
-        nextCursor: lastDoc,
-      };
+      // Prefer createdAt ordering when possible; fall back without order if index missing
+      try {
+        const ordered = [
+          ...constraints,
+          orderBy('createdAt', 'desc'),
+          limit(pageSize),
+        ];
+        if (pageParam) ordered.push(startAfter(pageParam));
+        const snap = await getDocs(query(col, ...ordered));
+        const lastDoc = snap.docs.length > 0 ? snap.docs[snap.docs.length - 1] : null;
+        return {
+          products: snap.docs.map((d) => ({ id: d.id, ...d.data() })),
+          nextCursor: lastDoc,
+        };
+      } catch (err) {
+        // Missing composite index — fetch and sort client-side
+        console.warn('Products query falling back (index?):', err?.code || err?.message);
+        const snap = await getDocs(
+          status ? query(col, where('status', '==', status), limit(200)) : query(col, limit(200))
+        );
+        let products = snap.docs.map((d) => ({ id: d.id, ...d.data(), _doc: d }));
+        products.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+        return {
+          products: products.map(({ _doc, ...p }) => p),
+          nextCursor: null,
+        };
+      }
     },
     getNextPageParam: (lastPage) => lastPage.nextCursor || undefined,
   });
