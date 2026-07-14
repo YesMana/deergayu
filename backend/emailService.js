@@ -178,6 +178,9 @@ async function verifySmtp() {
 
 function getEmailStatus() {
   const { user, pass, host, port, secure } = resolveSmtpConfig();
+  const smtpKeys = Object.keys(process.env)
+    .filter((k) => /^SMTP_/i.test(k) || /^MAIL_HOST$/i.test(k) || /^ADMIN_EMAIL$/i.test(k))
+    .sort();
   return {
     mode: pass ? (transporterMeta.mode === 'smtp' ? 'smtp' : 'smtp-pending') : 'ethereal',
     configured: Boolean(pass),
@@ -187,11 +190,12 @@ function getEmailStatus() {
     user,
     adminEmail: ADMIN_EMAIL,
     lastError: transporterMeta.lastError,
-    // Safe debug — never includes the password
     envFilePresent: fs.existsSync(ENV_PATH),
     passLength: pass.length,
     cwd: process.cwd(),
     appDir: __dirname,
+    // Key names only — never values
+    envKeysSeen: smtpKeys,
   };
 }
 

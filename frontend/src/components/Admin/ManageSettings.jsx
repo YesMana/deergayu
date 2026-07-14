@@ -318,6 +318,12 @@ const ManageSettings = () => {
                 .env file: <strong>{emailStatus.envFilePresent ? 'found' : 'NOT found'}</strong>
                 {' · '}pass length: <strong>{emailStatus.passLength ?? '?'}</strong>
                 {emailStatus.appDir ? <> {' · '}app: <code>{emailStatus.appDir}</code></> : null}
+                {Array.isArray(emailStatus.envKeysSeen) ? (
+                  <>
+                    <br />
+                    Env keys: <code>{emailStatus.envKeysSeen.length ? emailStatus.envKeysSeen.join(', ') : '(none)'}</code>
+                  </>
+                ) : null}
               </span>
             </p>
           ) : (

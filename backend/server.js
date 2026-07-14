@@ -163,6 +163,7 @@ apiRouter.get('/email/status', (req, res) => {
     envFilePresent: s.envFilePresent,
     passLength: s.passLength,
     appDir: s.appDir,
+    envKeysSeen: s.envKeysSeen || [],
   });
 });
 
