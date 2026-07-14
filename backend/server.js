@@ -470,6 +470,22 @@ apiRouter.get('/featured-products', async (req, res) => {
   }
 });
 
+// Public product catalog (mobile + storefront)
+apiRouter.get('/products', async (req, res) => {
+  try {
+    const limitN = Math.min(Number(req.query.limit) || 50, 100);
+    const snapshot = await db.collection('products')
+      .where('status', '==', 'approved')
+      .limit(limitN)
+      .get();
+    const products = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+    products.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+    res.json(products);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // AI-Powered Symptom Checker
 apiRouter.post('/symptom-check', async (req, res) => {
   try {
