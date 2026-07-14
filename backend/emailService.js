@@ -10,7 +10,8 @@ const ENV_PATH = path.join(__dirname, '.env');
 
 function loadEnvFile() {
   if (fs.existsSync(ENV_PATH)) {
-    dotenv.config({ path: ENV_PATH, override: false });
+    // .env must win — empty cPanel UI vars can otherwise block the real password
+    dotenv.config({ path: ENV_PATH, override: true });
   }
 }
 
