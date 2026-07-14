@@ -2,11 +2,13 @@ import { Tabs, useRouter } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useLanguage } from '../../context/LanguageContext';
 import { useCart } from '../../context/CartContext';
+import { useAuth } from '../../context/AuthContext';
 import { TouchableOpacity, Text, View } from 'react-native';
 
 export default function TabLayout() {
   const { t, lang, toggleLanguage } = useLanguage();
   const { cartCount } = useCart();
+  const { user } = useAuth();
   const router = useRouter();
 
   return (
@@ -14,17 +16,27 @@ export default function TabLayout() {
       screenOptions={{
         headerStyle: { backgroundColor: '#142018' },
         headerTintColor: '#7cb342',
-        tabBarStyle: { backgroundColor: '#142018', borderTopColor: 'rgba(124,179,66,0.2)' },
+        tabBarStyle: {
+          backgroundColor: '#142018',
+          borderTopColor: 'rgba(124,179,66,0.2)',
+          height: 62,
+          paddingBottom: 6,
+        },
         tabBarActiveTintColor: '#d4af37',
         tabBarInactiveTintColor: '#9aaa9a',
         headerRight: () => (
-          <View style={{ flexDirection: 'row', alignItems: 'center', marginRight: 15, gap: 15 }}>
-            <TouchableOpacity onPress={toggleLanguage} style={{ flexDirection: 'row', alignItems: 'center' }}>
-              <MaterialIcons name="language" size={24} color="#d4af37" />
-              <Text style={{ color: '#d4af37', fontWeight: 'bold', marginLeft: 4 }}>{lang.toUpperCase()}</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', marginRight: 12, gap: 14 }}>
+            <TouchableOpacity
+              onPress={toggleLanguage}
+              style={{ flexDirection: 'row', alignItems: 'center' }}
+            >
+              <MaterialIcons name="language" size={22} color="#d4af37" />
+              <Text style={{ color: '#d4af37', fontWeight: 'bold', marginLeft: 4 }}>
+                {lang.toUpperCase()}
+              </Text>
             </TouchableOpacity>
             <TouchableOpacity onPress={() => router.push('/cart')} style={{ position: 'relative' }}>
-              <MaterialIcons name="shopping-cart" size={24} color="#7cb342" />
+              <MaterialIcons name="shopping-cart" size={22} color="#7cb342" />
               {cartCount > 0 ? (
                 <View
                   style={{
@@ -44,35 +56,53 @@ export default function TabLayout() {
                 </View>
               ) : null}
             </TouchableOpacity>
+            <TouchableOpacity onPress={() => router.push(user ? '/account' : '/login')}>
+              <MaterialIcons name={user ? 'person' : 'login'} size={22} color="#d4af37" />
+            </TouchableOpacity>
           </View>
         ),
-      }}>
+      }}
+    >
       <Tabs.Screen
         name="index"
         options={{
           title: t('nav_home'),
-          tabBarIcon: ({ color }) => <MaterialIcons name="home" size={24} color={color} />,
+          tabBarIcon: ({ color }) => <MaterialIcons name="home" size={22} color={color} />,
         }}
       />
       <Tabs.Screen
         name="shop"
         options={{
           title: t('nav_shop'),
-          tabBarIcon: ({ color }) => <MaterialIcons name="shopping-bag" size={24} color={color} />,
+          tabBarIcon: ({ color }) => <MaterialIcons name="shopping-bag" size={22} color={color} />,
         }}
       />
       <Tabs.Screen
         name="channeling"
         options={{
           title: t('nav_channeling'),
-          tabBarIcon: ({ color }) => <MaterialIcons name="person" size={24} color={color} />,
+          tabBarIcon: ({ color }) => <MaterialIcons name="person" size={22} color={color} />,
+        }}
+      />
+      <Tabs.Screen
+        name="guide"
+        options={{
+          title: 'Guide',
+          tabBarIcon: ({ color }) => <MaterialIcons name="menu-book" size={22} color={color} />,
+        }}
+      />
+      <Tabs.Screen
+        name="videos"
+        options={{
+          title: t('nav_videos'),
+          tabBarIcon: ({ color }) => <MaterialIcons name="ondemand-video" size={22} color={color} />,
         }}
       />
       <Tabs.Screen
         name="astrology"
         options={{
-          title: "Astrology",
-          tabBarIcon: ({ color }) => <MaterialIcons name="auto-fix-high" size={24} color={color} />,
+          href: null,
+          title: 'Astrology',
         }}
       />
     </Tabs>

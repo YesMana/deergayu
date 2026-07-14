@@ -175,7 +175,9 @@ export default function HomeScreen() {
                   </Text>
                   <TouchableOpacity
                     style={styles.addBtn}
-                    onPress={() => addToCart(item)}
+                    onPress={() => {
+                      addToCart(item).catch(() => {});
+                    }}
                     activeOpacity={0.85}
                   >
                     <MaterialIcons name="add-shopping-cart" size={16} color="#0a140f" />
@@ -253,7 +255,7 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#0a140f' },
   heroContainer: { minHeight: 420, justifyContent: 'flex-end' },
-  overlay: { ...StyleSheet.absoluteFillObject },
+  overlay: { ...StyleSheet.absoluteFill },
   heroContent: { padding: 24, paddingBottom: 36, zIndex: 1 },
   heroTitle: {
     fontSize: 32,

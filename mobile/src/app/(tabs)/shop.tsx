@@ -53,10 +53,14 @@ export default function ShopScreen() {
     );
   });
 
-  const handleAdd = (item: Product) => {
-    addToCart(item);
-    setAddedId(item.id);
-    setTimeout(() => setAddedId(null), 1200);
+  const handleAdd = async (item: Product) => {
+    try {
+      await addToCart(item);
+      setAddedId(item.id);
+      setTimeout(() => setAddedId(null), 1200);
+    } catch {
+      /* alert handled in cart context when logged-in server fails */
+    }
   };
 
   const renderProduct = ({ item }: { item: Product }) => {
