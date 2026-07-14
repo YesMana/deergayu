@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Leaf, Clock, Plus, Edit, Trash2, Save, X, Image as ImageIcon } from 'lucide-react';
+import { Leaf, Clock, Plus, Edit, Trash2, Save, X, Image as ImageIcon, UploadCloud } from 'lucide-react';
 import { useLanguage } from '../../context/LanguageContext';
 
 const ManageGuide = () => {
@@ -8,6 +8,7 @@ const ManageGuide = () => {
   const [routines, setRoutines] = useState([]);
   const [loading, setLoading] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
+  const [uploadingImage, setUploadingImage] = useState(false);
   
   const initialRemedyState = {
     image: '',
@@ -46,6 +47,23 @@ const ManageGuide = () => {
     } catch (error) {
       console.error(error);
     } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSeedData = async () => {
+    if (!window.confirm('This will add the initial demo data to your database. Continue?')) return;
+    setLoading(true);
+    try {
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/guide/seed`, {
+        method: 'POST'
+      });
+      if (!response.ok) throw new Error('Failed to seed data');
+      alert('Demo data seeded successfully!');
+      fetchData();
+    } catch (error) {
+      console.error(error);
+      alert('Failed to seed demo data.');
       setLoading(false);
     }
   };
@@ -110,21 +128,58 @@ const ManageGuide = () => {
     }));
   };
 
+  const handleImageUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    setUploadingImage(true);
+    try {
+      const formData = new FormData();
+      formData.append('image', file);
+      
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/upload`, {
+        method: 'POST',
+        body: formData
+      });
+      
+      if (!response.ok) throw new Error('Failed to upload image');
+      const data = await response.json();
+      setCurrentFormData({...currentFormData, image: data.url});
+    } catch (error) {
+      console.error('Upload error:', error);
+      alert('Failed to upload image');
+    } finally {
+      setUploadingImage(false);
+    }
+  };
+
   const renderRemedyForm = () => (
     <form onSubmit={handleSave} className="admin-form">
       <h3>{currentFormData.id ? 'Edit Remedy' : 'Add New Remedy'}</h3>
       
       <div className="form-group">
-        <label>Image URL</label>
-        <div className="image-input-group">
+        <label>Image Upload or URL</label>
+        <div className="image-input-group" style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
           <ImageIcon size={20} />
           <input 
             type="url" 
-            placeholder="https://unsplash.com/..." 
+            placeholder="Or paste URL here (https://...)" 
             value={currentFormData.image || ''} 
             onChange={(e) => setCurrentFormData({...currentFormData, image: e.target.value})}
-            required
+            style={{ flex: 1 }}
           />
+          <div style={{ position: 'relative', overflow: 'hidden', display: 'inline-block' }}>
+            <button type="button" className="btn-secondary" style={{ display: 'flex', gap: '5px', alignItems: 'center' }} disabled={uploadingImage}>
+              <UploadCloud size={16} /> {uploadingImage ? 'Uploading...' : 'Upload Image'}
+            </button>
+            <input 
+              type="file" 
+              accept="image/*"
+              onChange={handleImageUpload}
+              disabled={uploadingImage}
+              style={{ position: 'absolute', top: 0, left: 0, opacity: 0, width: '100%', height: '100%', cursor: 'pointer' }}
+            />
+          </div>
         </div>
         {currentFormData.image && (
           <img src={currentFormData.image} alt="Preview" style={{width: '100px', height: '100px', objectFit: 'cover', marginTop: '10px', borderRadius: '8px'}} />
@@ -223,9 +278,14 @@ const ManageGuide = () => {
       <div className="admin-header">
         <h2>Ayurvedic Guide Content Management</h2>
         {!isEditing && (
-          <button className="btn-primary" onClick={handleAddNew}>
-            <Plus size={18} /> Add New {activeTab === 'remedies' ? 'Remedy' : 'Routine'}
-          </button>
+          <div style={{ display: 'flex', gap: '10px' }}>
+            <button className="btn-secondary" onClick={handleSeedData}>
+              Seed Demo Data
+            </button>
+            <button className="btn-primary" onClick={handleAddNew}>
+              <Plus size={18} /> Add New {activeTab === 'remedies' ? 'Remedy' : 'Routine'}
+            </button>
+          </div>
         )}
       </div>
 
