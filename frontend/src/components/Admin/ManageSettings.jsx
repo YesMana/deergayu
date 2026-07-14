@@ -313,6 +313,12 @@ const ManageSettings = () => {
               {' · '}Host: <strong>{emailStatus.host}:{emailStatus.port}</strong>
               <br />
               <span style={{ fontSize: '0.85rem' }}>{emailStatus.okHint}</span>
+              <br />
+              <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                .env file: <strong>{emailStatus.envFilePresent ? 'found' : 'NOT found'}</strong>
+                {' · '}pass length: <strong>{emailStatus.passLength ?? '?'}</strong>
+                {emailStatus.appDir ? <> {' · '}app: <code>{emailStatus.appDir}</code></> : null}
+              </span>
             </p>
           ) : (
             <p style={{ color: 'var(--text-secondary)' }}>Loading email status…</p>

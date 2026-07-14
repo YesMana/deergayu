@@ -1,20 +1,29 @@
 const nodemailer = require('nodemailer');
+const path = require('path');
+const fs = require('fs');
+const dotenv = require('dotenv');
 
 let transporter;
 let transporterMeta = { mode: 'uninitialized', host: null, user: null, lastError: null };
+
+const ENV_PATH = path.join(__dirname, '.env');
+
+function loadEnvFile() {
+  if (fs.existsSync(ENV_PATH)) {
+    dotenv.config({ path: ENV_PATH, override: false });
+  }
+}
+
+loadEnvFile();
 
 const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'yes.manujaya@gmail.com';
 const SUPPORT_EMAIL = process.env.SUPPORT_EMAIL || 'info@deergayu.com';
 
 function resolveSmtpConfig() {
-  // Prefer explicit SMTP_* ; also accept Rudraksha-style SMTP_EMAIL / SMTP_PASSWORD
-  const user = process.env.SMTP_USER || process.env.SMTP_EMAIL || 'info@deergayu.com';
-  const pass = process.env.SMTP_PASS || process.env.SMTP_PASSWORD || '';
-  // Namecheap/cPanel shared hosting often needs mail.domain.com or the server hostname
-  const host =
-    process.env.SMTP_HOST ||
-    process.env.MAIL_HOST ||
-    'mail.deergayu.com';
+  loadEnvFile();
+  const user = (process.env.SMTP_USER || process.env.SMTP_EMAIL || 'info@deergayu.com').trim();
+  const pass = (process.env.SMTP_PASS || process.env.SMTP_PASSWORD || '').trim();
+  const host = (process.env.SMTP_HOST || process.env.MAIL_HOST || 'mail.deergayu.com').trim();
   const port = Number(process.env.SMTP_PORT || 465);
   const secure = process.env.SMTP_SECURE
     ? process.env.SMTP_SECURE === 'true'
@@ -25,6 +34,7 @@ function resolveSmtpConfig() {
 
 async function createTransporter() {
   const { user, pass, host, port, secure } = resolveSmtpConfig();
+  transporter = null;
 
   if (user && pass) {
     transporter = nodemailer.createTransport({
@@ -32,7 +42,6 @@ async function createTransporter() {
       port,
       secure,
       auth: { user, pass },
-      // Helpful on shared cPanel / Namecheap when certs mismatch slightly
       tls: {
         rejectUnauthorized: process.env.SMTP_TLS_REJECT_UNAUTHORIZED === 'true',
         minVersion: 'TLSv1.2',
@@ -44,7 +53,6 @@ async function createTransporter() {
     transporterMeta = { mode: 'smtp', host, user, port, secure, lastError: null };
     console.log(`[Email] SMTP transporter ready → ${user} @ ${host}:${port} (secure=${secure})`);
   } else {
-    // No password → Ethereal (NOT real delivery). Warn loudly.
     console.warn('[Email] SMTP_PASS / SMTP_PASSWORD missing — using Ethereal TEST mail (not delivered to real inboxes)');
     const testAccount = await nodemailer.createTestAccount();
     transporter = nodemailer.createTransport({
@@ -62,6 +70,20 @@ async function createTransporter() {
   }
 }
 
+async function ensureTransporter() {
+  const { pass, host } = resolveSmtpConfig();
+  const wantMode = pass ? 'smtp' : 'ethereal';
+  if (
+    transporter &&
+    transporterMeta.mode === wantMode &&
+    (wantMode === 'ethereal' || transporterMeta.host === host)
+  ) {
+    return transporter;
+  }
+  await createTransporter();
+  return transporter;
+}
+
 createTransporter().catch((e) => {
   console.error('[Email] Failed to init transporter:', e.message);
   transporterMeta.lastError = e.message;
@@ -71,10 +93,10 @@ createTransporter().catch((e) => {
  * @returns {Promise<{ ok: boolean, messageId?: string, previewUrl?: string, error?: string }>}
  */
 const sendEmail = async (to, subject, text, html) => {
-  if (!transporter) await createTransporter();
+  await ensureTransporter();
 
   try {
-    const fromUser = process.env.SMTP_USER || process.env.SMTP_EMAIL || 'info@deergayu.com';
+    const fromUser = (process.env.SMTP_USER || process.env.SMTP_EMAIL || 'info@deergayu.com').trim();
     const info = await transporter.sendMail({
       from: `"Deergayu" <${fromUser}>`,
       to,
@@ -106,7 +128,6 @@ const sendAdminEmail = async (subject, html, text = '') => {
 };
 
 async function verifySmtp() {
-  if (!transporter) await createTransporter();
   const { user, pass, host, port, secure } = resolveSmtpConfig();
   if (!pass) {
     return {
@@ -114,9 +135,18 @@ async function verifySmtp() {
       configured: false,
       mode: transporterMeta.mode,
       error: 'SMTP_PASS (or SMTP_PASSWORD) is not set on the Node app',
-      hint: 'cPanel → Setup Node.js App → Environment Variables → add SMTP_PASS → Restart',
+      hint: 'Put real mailbox password in /home/dilspxws/api/.env then Restart the Node app',
+      debug: {
+        envFilePresent: fs.existsSync(ENV_PATH),
+        passLength: 0,
+        cwd: process.cwd(),
+        appDir: __dirname,
+      },
     };
   }
+
+  await ensureTransporter();
+
   try {
     await transporter.verify();
     return {
@@ -140,7 +170,7 @@ async function verifySmtp() {
       user,
       error: error.message,
       hint:
-        'Try SMTP_HOST=mail.deergayu.com or server221.web-hosting.com, port 465. Confirm info@deergayu.com password in Email Accounts.',
+        'Wrong mailbox password, or try SMTP_HOST=server221.web-hosting.com or deergayu.com (port 465).',
     };
   }
 }
@@ -148,7 +178,7 @@ async function verifySmtp() {
 function getEmailStatus() {
   const { user, pass, host, port, secure } = resolveSmtpConfig();
   return {
-    mode: transporterMeta.mode,
+    mode: pass ? (transporterMeta.mode === 'smtp' ? 'smtp' : 'smtp-pending') : 'ethereal',
     configured: Boolean(pass),
     host,
     port,
@@ -156,6 +186,11 @@ function getEmailStatus() {
     user,
     adminEmail: ADMIN_EMAIL,
     lastError: transporterMeta.lastError,
+    // Safe debug — never includes the password
+    envFilePresent: fs.existsSync(ENV_PATH),
+    passLength: pass.length,
+    cwd: process.cwd(),
+    appDir: __dirname,
   };
 }
 
