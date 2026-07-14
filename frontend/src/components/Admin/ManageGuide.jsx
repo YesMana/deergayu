@@ -291,13 +291,14 @@ const ManageGuide = () => {
         <div className="form-group">
           <label>Condition Category</label>
           <select
-            className="form-control"
+            className="form-control dark-select"
             value={currentFormData.condition || 'general'}
             onChange={(e) => setCurrentFormData({ ...currentFormData, condition: e.target.value })}
             required
+            style={{ background: '#1a1e1b', color: '#f5f5f5' }}
           >
             {Object.entries(CONDITION_LABELS).map(([id, label]) => (
-              <option key={id} value={id}>{label}</option>
+              <option key={id} value={id} style={{ background: '#1a1e1b', color: '#f5f5f5' }}>{label}</option>
             ))}
           </select>
         </div>
@@ -400,11 +401,11 @@ const ManageGuide = () => {
               className="form-control"
               value={conditionFilter}
               onChange={(e) => setConditionFilter(e.target.value)}
-              style={{ maxWidth: 220 }}
+              style={{ maxWidth: 220, background: '#1a1e1b', color: '#f5f5f5' }}
             >
-              <option value="all">All conditions</option>
+              <option value="all" style={{ background: '#1a1e1b', color: '#f5f5f5' }}>All conditions</option>
               {Object.entries(CONDITION_LABELS).map(([id, label]) => (
-                <option key={id} value={id}>{label}</option>
+                <option key={id} value={id} style={{ background: '#1a1e1b', color: '#f5f5f5' }}>{label}</option>
               ))}
             </select>
           )}

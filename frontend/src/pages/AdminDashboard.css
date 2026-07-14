@@ -608,7 +608,10 @@
 }
 
 .role-select option,
-.status-select option {
+.status-select option,
+.admin-layout select option,
+.admin-layout .form-control option,
+.manage-guide select option {
   background-color: #1a1e1b !important;
   color: #ffffff !important;
 }
