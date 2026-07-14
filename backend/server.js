@@ -1,9 +1,15 @@
+const path = require('path');
+const fs = require('fs');
+const dotenv = require('dotenv');
+// Always load .env next to server.js (cPanel cwd is often not the app root)
+dotenv.config({ path: path.join(__dirname, '.env') });
+dotenv.config();
+
 const express = require('express');
 const cors = require('cors');
 const admin = require('firebase-admin');
 const { getFirestore, FieldValue } = require('firebase-admin/firestore');
 const { getAuth } = require('firebase-admin/auth');
-const dotenv = require('dotenv');
 const { sendEmail, sendAdminEmail, verifySmtp, getEmailStatus, ADMIN_EMAIL } = require('./emailService');
 const {
   getSettings,
@@ -16,10 +22,6 @@ const {
 } = require('./platformUtils');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 const multer = require('multer');
-const path = require('path');
-const fs = require('fs');
-
-dotenv.config();
 
 const app = express();
 const allowedOrigins = [
