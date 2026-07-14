@@ -171,7 +171,9 @@ async function verifySmtp() {
       user,
       error: error.message,
       hint:
-        'Wrong mailbox password, or try SMTP_HOST=server221.web-hosting.com or deergayu.com (port 465).',
+        error.message?.toLowerCase().includes('timeout') || error.message?.toLowerCase().includes('timed out')
+          ? 'Render cannot reach cPanel SMTP (connection timeout). In Render Environment set SMTP_PORT=587 and SMTP_SECURE=false, or SMTP_HOST=server221.web-hosting.com. If still timing out, use Resend/Brevo instead — shared hosts often block SMTP from cloud IPs.'
+          : 'Wrong mailbox password, or try SMTP_HOST=server221.web-hosting.com / port 587 with SMTP_SECURE=false.',
     };
   }
 }
