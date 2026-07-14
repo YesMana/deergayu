@@ -32,8 +32,23 @@ Optional: `EXPO_PUBLIC_API_URL=https://deergayu-api.onrender.com`
 - Login / Account / Orders / Appointments
 - AyurBot (`/api/chat`), Symptom checker (`/api/symptom-check`)
 
-## Still thinner than web
+## Google Sign-In
 
-- PayHere checkout (use website for now)
-- Product detail page, wishlist, Google Sign-In
-- Admin / Vendor dashboards (web only)
+Website already uses Google. Mobile needs the **Web client ID**:
+
+1. [Firebase Console](https://console.firebase.google.com/) → project **deergayu-9de41**
+2. **Authentication** → **Sign-in method** → **Google** (enable if needed)
+3. Copy **Web client ID** (`….apps.googleusercontent.com`)
+4. Create `mobile/.env`:
+
+```env
+EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID=YOUR_WEB_CLIENT_ID.apps.googleusercontent.com
+```
+
+5. [Google Cloud Console](https://console.cloud.google.com/apis/credentials) → that OAuth client → **Authorized redirect URIs** add:
+   - `deergayu://oauthredirect`
+6. Restart Expo: `npx expo start -c`
+
+Then Login screen → **Continue with Google** uses the same Firebase users as the website.
+
+> Native Google Sign-In packages need a **development build** (not Expo Go). This app uses browser OAuth + Firebase so Expo Go can work after the Client ID is set.
