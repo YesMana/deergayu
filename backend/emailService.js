@@ -194,38 +194,17 @@ const sendAdminEmail = async (subject, html, text = '') => {
 
 async function verifySmtp() {
   if (getResendKey()) {
-    try {
-      const res = await fetch('https://api.resend.com/domains', {
-        headers: { Authorization: `Bearer ${getResendKey()}` },
-      });
-      if (res.status === 401) {
-        return {
-          ok: false,
-          configured: true,
-          mode: 'resend',
-          error: 'RESEND_API_KEY is invalid',
-          hint: 'Create a new API key at https://resend.com/api-keys and update Render Environment',
-        };
-      }
-      // 200 or other = key accepted (domains list may be empty before verify)
-      return {
-        ok: true,
-        configured: true,
-        mode: 'resend',
-        host: 'api.resend.com',
-        user: getFromAddress(),
-        adminEmail: ADMIN_EMAIL,
-        hint: 'Optional: verify deergayu.com in Resend → Domains, then set RESEND_FROM="Deergayu <info@deergayu.com>"',
-      };
-    } catch (error) {
-      return {
-        ok: false,
-        configured: true,
-        mode: 'resend',
-        error: error.message,
-        hint: 'Could not reach Resend API from Render',
-      };
-    }
+    // A "Sending access" key can send but cannot list /domains (would 401).
+    // So we don't gate on /domains — the real send below is the source of truth.
+    return {
+      ok: true,
+      configured: true,
+      mode: 'resend',
+      host: 'api.resend.com',
+      user: getFromAddress(),
+      adminEmail: ADMIN_EMAIL,
+      hint: 'Optional: verify deergayu.com in Resend → Domains, then set RESEND_FROM="Deergayu <info@deergayu.com>"',
+    };
   }
 
   const { user, pass, host, port, secure } = resolveSmtpConfig();
