@@ -327,7 +327,9 @@ const ManageSettings = () => {
             {testingEmail ? 'Testing…' : 'Send test email to ADMIN_EMAIL'}
           </button>
           <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: 0 }}>
-            If this fails: cPanel → Node.js App → set SMTP_HOST=mail.deergayu.com, SMTP_PORT=465, SMTP_USER=info@deergayu.com, SMTP_PASS=(mailbox password) → Restart.
+            {emailStatus?.appDir?.includes('/opt/render')
+              ? 'Live API is on Render (not cPanel). Set SMTP_* in Render → Dashboard → your backend service → Environment → Save → Redeploy.'
+              : 'If this fails: set SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS on the host that runs the API, then Restart/Redeploy.'}
           </p>
         </div>
       </div>
