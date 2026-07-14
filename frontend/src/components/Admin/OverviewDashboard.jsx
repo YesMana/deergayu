@@ -180,10 +180,10 @@ export default function OverviewDashboard({ setActiveTab }) {
                   </div>
                   <div className="activity-info">
                     <div className="title">Order #{o.id?.slice(-6).toUpperCase()}</div>
-                    <div className="meta">{o.customerName} · {fmtDate(o.createdAt)}</div>
+                    <div className="subtitle">{o.customerName} · {fmtDate(o.createdAt)}</div>
                   </div>
-                  <div className="activity-right">
-                    <div className="amt">{fmtCurrency(o.totalPrice)}</div>
+                  <div className="activity-meta">
+                    <div className="amount" style={{ marginBottom: '0.2rem' }}>{fmtCurrency(o.totalPrice)}</div>
                     <StatusPill status={o.status} />
                   </div>
                 </div>
@@ -212,10 +212,10 @@ export default function OverviewDashboard({ setActiveTab }) {
                   </div>
                   <div className="activity-info">
                     <div className="title">{a.customerName}</div>
-                    <div className="meta">{a.date} at {a.time}</div>
+                    <div className="subtitle">{a.date} at {a.time}</div>
                   </div>
-                  <div className="activity-right" style={{ textAlign: 'right' }}>
-                    <div className="meta" style={{ marginBottom: '0.2rem' }}>Dr. {a.providerName}</div>
+                  <div className="activity-meta">
+                    <div className="subtitle" style={{ marginBottom: '0.2rem' }}>Dr. {a.providerName}</div>
                     <StatusPill status={a.status} />
                   </div>
                 </div>
