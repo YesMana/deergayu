@@ -156,12 +156,10 @@ apiRouter.get('/email/status', (req, res) => {
     port: s.port,
     user: s.user,
     adminEmail: s.adminEmail,
-    okHint: s.configured
-      ? 'SMTP password is set. Use admin email-test to verify connection.'
-      : 'SMTP_PASS missing — emails go nowhere real (Ethereal test mode).',
-    // Safe debug (no secrets): helps confirm .env is next to the running app
+    okHint: s.okHint,
     envFilePresent: s.envFilePresent,
     passLength: s.passLength,
+    resendConfigured: s.resendConfigured,
     appDir: s.appDir,
     envKeysSeen: s.envKeysSeen || [],
   });

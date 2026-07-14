@@ -333,9 +333,11 @@ const ManageSettings = () => {
             {testingEmail ? 'Testing…' : 'Send test email to ADMIN_EMAIL'}
           </button>
           <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: 0 }}>
-            {emailStatus?.appDir?.includes('/opt/render')
-              ? 'Live API is on Render (not cPanel). Set SMTP_* in Render → Dashboard → your backend service → Environment → Save → Redeploy.'
-              : 'If this fails: set SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS on the host that runs the API, then Restart/Redeploy.'}
+            {emailStatus?.mode === 'resend' || emailStatus?.resendConfigured
+              ? 'Using Resend API. Optional: verify deergayu.com in Resend Domains, then set RESEND_FROM=Deergayu &lt;info@deergayu.com&gt;.'
+              : emailStatus?.appDir?.includes('/opt/render')
+                ? 'cPanel SMTP times out from Render. Add RESEND_API_KEY in Render Environment (https://resend.com — free), then redeploy.'
+                : 'If this fails: set SMTP_* or RESEND_API_KEY on the host that runs the API, then Restart/Redeploy.'}
           </p>
         </div>
       </div>
