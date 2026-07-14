@@ -35,8 +35,14 @@ function resolveSmtpConfig() {
   loadEnvFile();
   const user = (process.env.SMTP_USER || process.env.SMTP_EMAIL || 'info@deergayu.com').trim();
   const pass = (process.env.SMTP_PASS || process.env.SMTP_PASSWORD || '').trim();
-  const host = (process.env.SMTP_HOST || process.env.MAIL_HOST || 'mail.deergayu.com').trim();
-  const port = Number(process.env.SMTP_PORT || 465);
+  // On cPanel (/home/...), localhost SMTP works; Render must use Resend — never default to mail.* from cloud
+  const onCpanel = __dirname.includes('/home/') || __dirname.includes('\\home\\');
+  const host = (
+    process.env.SMTP_HOST ||
+    process.env.MAIL_HOST ||
+    (onCpanel ? 'localhost' : 'mail.deergayu.com')
+  ).trim();
+  const port = Number(process.env.SMTP_PORT || (onCpanel ? 587 : 465));
   const secure = process.env.SMTP_SECURE
     ? process.env.SMTP_SECURE === 'true'
     : port === 465;

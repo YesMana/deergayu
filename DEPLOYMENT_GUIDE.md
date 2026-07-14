@@ -1,29 +1,67 @@
 # Deergayu Website - Deployment Guide
 
-මේ project එකේ අනාගතයේදී මොනවා හරි වෙනස්කම් කරලා (Update කරලා) ඒවා Live Website එකට (deergayu.com එකට) දාන්න ඕන වුණාම මේ පියවර 4 අනුගමනය කරන්න:
+## Production layout (Option A — cPanel API + mail)
 
-## 1. Local එකේ Build කිරීම
-Frontend එකේ මොනවා හරි වෙනස් කළා නම්, ඒක අනිවාර්යයෙන්ම Build කරන්න ඕනේ.
-- VS Code Terminal එකේ `frontend` folder එකට යන්න (`cd frontend`)
-- `npm run build` කියන command එක දෙන්න. (එතකොට අලුත් වෙනස්කම් ටික `dist` folder එකට හැදෙනවා).
+| Piece | Where it runs |
+|-------|----------------|
+| Frontend | cPanel `deergayu.com` (FTP deploy) **or** Vercel |
+| API + email | **cPanel Node** `/home/dilspxws/api` — NOT Render |
+| Mail | `info@deergayu.com` via `localhost:587` on the same server |
 
-## 2. GitHub එකට Push කිරීම
-ඔයා කරපු ඔක්කොම වෙනස්කම් GitHub එකට යවන්න:
-- Terminal එකේ Project එකේ ප්‍රධාන folder එකට එන්න (`cd ..`)
-- `git add .`
-- `git commit -m "Updated website"`
-- `git push`
+Render cannot open Namecheap SMTP (connection timeout). Keep the API on cPanel so mail works.
 
-## 3. cPanel එකට අලුත් Code එක ගැනීම (Pull)
-දැන් cPanel එකේ Terminal එක Open කරලා මේ ටික දෙන්න:
-- `cd /home/dilspxws/deergayu`
-- `git pull` (මේක දුන්න ගමන් GitHub එකට දාපු අලුත් කෝඩ් එක සර්වර් එකට එනවා!)
+### Switch DNS back to cPanel (required if site still shows Server: Vercel)
 
-*(Backend එකේ අලුතින් packages මොනවා හරි දැම්මා නම් විතරක් `cd backend` ගිහින් `npm install` කරලා Node.js App එක Restart කරන්න).*
+1. cPanel home → note **Shared IP Address** (General Information).
+2. Namecheap → Domain List → **deergayu.com** → Advanced DNS.
+3. A Record `@` → that Shared IP (replace the Vercel IP).
+4. A Record `www` → same Shared IP (or CNAME to `@`).
+5. Wait 5–30 minutes. Check: https://deergayu.com/api/health → `{"status":"OK"...}`.
+6. In Render → **deergayu-api** → Settings → **Suspend** (optional, saves free-tier spins).
 
-## 4. Frontend එක Live කිරීම
-cPanel File Manager එකට ගිහින්:
-- `/home/dilspxws/deergayu/frontend/dist/` කියන තැන තියෙන අලුත් files ටික Copy කරගන්න.
-- ඒ ටික `/home/dilspxws/deergayu.com/` ෆෝල්ඩරේට ගිහින් Paste කරන්න (පරණ ඒවා Replace කරන්න).
+### cPanel mail `.env`
 
-එච්චරයි! දැන් Site එක Refresh කළාම අලුත් වෙනස්කම් පෙනේවි.
+File Manager → `/home/dilspxws/api/.env`:
+
+```env
+SMTP_HOST=localhost
+SMTP_PORT=587
+SMTP_SECURE=false
+SMTP_USER=info@deergayu.com
+SMTP_PASS="YOUR_MAILBOX_PASSWORD"
+ADMIN_EMAIL=yes.manujaya@gmail.com
+```
+
+Then **Setup Node.js App → Restart**.
+
+### Frontend API URL
+
+- Same domain on cPanel: leave `VITE_API_URL` empty (requests go to `/api/...`).
+- If frontend stays on Vercel while API is on cPanel: set Vercel env `VITE_API_URL=https://deergayu.com` only after DNS points the domain at cPanel — or use subdomain `https://api.deergayu.com`.
+
+---
+
+## Routine update (code changes)
+
+### 1. Local build
+```bash
+cd frontend
+npm run build
+```
+
+### 2. Push to GitHub
+```bash
+git add .
+git commit -m "Updated website"
+git push
+```
+
+GitHub Actions FTP-deploys `frontend/dist` + `backend/` to cPanel.
+
+### 3. Manual pull (if needed)
+```bash
+cd /home/dilspxws/deergayu
+git pull
+cd /home/dilspxws/api && npm install   # only if package.json changed
+```
+Restart the Node.js app in cPanel.

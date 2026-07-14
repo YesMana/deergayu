@@ -333,11 +333,11 @@ const ManageSettings = () => {
             {testingEmail ? 'Testing…' : 'Send test email to ADMIN_EMAIL'}
           </button>
           <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: 0 }}>
-            {emailStatus?.mode === 'resend' || emailStatus?.resendConfigured
-              ? 'Using Resend API. Optional: verify deergayu.com in Resend Domains, then set RESEND_FROM=Deergayu &lt;info@deergayu.com&gt;.'
-              : emailStatus?.appDir?.includes('/opt/render')
-                ? 'cPanel SMTP times out from Render. Add RESEND_API_KEY in Render Environment (https://resend.com — free), then redeploy.'
-                : 'If this fails: set SMTP_* or RESEND_API_KEY on the host that runs the API, then Restart/Redeploy.'}
+            {emailStatus?.appDir?.includes('/opt/render')
+              ? 'API is still on Render — cPanel SMTP will keep timing out. Point deergayu.com DNS to cPanel Shared IP, use /home/dilspxws/api, then Suspend Render.'
+              : emailStatus?.mode === 'resend' || emailStatus?.resendConfigured
+                ? 'Using Resend API. Optional: verify deergayu.com in Resend Domains, then set RESEND_FROM=Deergayu &lt;info@deergayu.com&gt;.'
+                : 'cPanel API: set SMTP_HOST=localhost, SMTP_PORT=587, SMTP_SECURE=false, SMTP_PASS="password" in /home/dilspxws/api/.env → Restart Node app.'}
           </p>
         </div>
       </div>
