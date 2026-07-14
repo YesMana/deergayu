@@ -13,8 +13,7 @@ import {
 import { useLanguage } from '../../context/LanguageContext';
 import { MaterialIcons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
-import { fetchProducts, type Product } from '../../lib/api';
-import { mediaUrl } from '../../constants/api';
+import { fetchProducts, productImage, type Product } from '../../lib/api';
 import { useCart } from '../../context/CartContext';
 
 export default function ShopScreen() {
@@ -61,7 +60,7 @@ export default function ShopScreen() {
   };
 
   const renderProduct = ({ item }: { item: Product }) => {
-    const img = mediaUrl(item.image || item.images?.[0]);
+    const img = productImage(item);
     return (
       <BlurView intensity={20} tint="dark" style={styles.card}>
         {img ? (

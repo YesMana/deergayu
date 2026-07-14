@@ -1,4 +1,4 @@
-import { API_URL } from '../constants/api';
+import { API_URL, mediaUrl } from '../constants/api';
 
 async function getJson<T>(path: string): Promise<T> {
   const res = await fetch(`${API_URL}${path}`);
@@ -22,12 +22,17 @@ export type Product = {
   price?: number;
   category?: string;
   image?: string;
+  imageUrl?: string;
   images?: string[];
   rating?: number;
   reviewCount?: number;
   description?: string;
   status?: string;
 };
+
+export function productImage(p: Product): string | null {
+  return mediaUrl(p.imageUrl || p.image || p.images?.[0]);
+}
 
 export type Provider = {
   id: string;

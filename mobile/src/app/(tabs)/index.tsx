@@ -19,11 +19,11 @@ import {
   fetchFeaturedProducts,
   fetchFeaturedProviders,
   fetchHomeStats,
+  productImage,
   type HomeStats,
   type Product,
   type Provider,
 } from '../../lib/api';
-import { mediaUrl } from '../../constants/api';
 import { useCart } from '../../context/CartContext';
 
 export default function HomeScreen() {
@@ -155,7 +155,7 @@ export default function HomeScreen() {
           <ActivityIndicator color="#4caf50" style={{ marginVertical: 20 }} />
         ) : (
           products.map((item) => {
-            const img = mediaUrl(item.image || item.images?.[0]);
+            const img = productImage(item);
             return (
               <BlurView key={item.id} intensity={20} tint="dark" style={styles.productCard}>
                 {img ? (

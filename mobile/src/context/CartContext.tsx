@@ -48,7 +48,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     const productId = product.id;
     const name = product.name || 'Product';
     const price = Number(product.price) || 0;
-    const image = product.image || product.images?.[0] || null;
+    const image = product.imageUrl || product.image || product.images?.[0] || null;
     setItems((prev) => {
       const existing = prev.find((i) => i.productId === productId);
       if (existing) {
