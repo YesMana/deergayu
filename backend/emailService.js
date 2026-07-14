@@ -2,12 +2,14 @@ const nodemailer = require('nodemailer');
 
 let transporter;
 
+const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'yes.manujaya@gmail.com';
+const SUPPORT_EMAIL = process.env.SUPPORT_EMAIL || 'info@deergayu.com';
+
 async function createTransporter() {
-  // Using hardcoded credentials as fallback for easy cPanel deployment
   const smtpHost = process.env.SMTP_HOST || 'deergayu.com';
-  const smtpPort = process.env.SMTP_PORT || 465;
+  const smtpPort = Number(process.env.SMTP_PORT) || 465;
   const smtpUser = process.env.SMTP_USER || 'info@deergayu.com';
-  const smtpPass = process.env.SMTP_PASS || 'Manu@2748#@';
+  const smtpPass = process.env.SMTP_PASS;
 
   if (smtpUser && smtpPass) {
     // Use real SMTP if provided
@@ -50,7 +52,7 @@ const sendEmail = async (to, subject, text, html) => {
 
   try {
     const info = await transporter.sendMail({
-      from: '"Deergayu Platform" <no-reply@deergayu.com>', // sender address
+      from: `"Deergayu Platform" <${process.env.SMTP_USER || 'info@deergayu.com'}>`,
       to,
       subject,
       text,
@@ -71,4 +73,8 @@ const sendEmail = async (to, subject, text, html) => {
   }
 };
 
-module.exports = { sendEmail };
+const sendAdminEmail = async (subject, html, text = '') => {
+  return sendEmail(ADMIN_EMAIL, subject, text, html);
+};
+
+module.exports = { sendEmail, sendAdminEmail, ADMIN_EMAIL, SUPPORT_EMAIL };

@@ -6,6 +6,8 @@ import { db } from '../firebase';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import './Login.css';
 
+const API_URL = import.meta.env.VITE_API_URL || '';
+
 const Login = () => {
   const location = useLocation();
   const [searchParams] = useSearchParams();
@@ -122,13 +124,24 @@ const Login = () => {
       
       if (!userDoc.exists()) {
         const isSuperAdmin = user.email && user.email.toLowerCase() === 'yes.manujaya@gmail.com';
-        await setDoc(userDocRef, {
+        const newUserData = {
           name: user.displayName || 'New User',
           email: user.email,
           role: isSuperAdmin ? 'admin' : 'user',
           status: 'approved',
           createdAt: new Date().toISOString()
-        });
+        };
+        await setDoc(userDocRef, newUserData);
+
+        fetch(`${API_URL}/api/auth/register-notify`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name: newUserData.name,
+            email: newUserData.email,
+            role: newUserData.role,
+          }),
+        }).catch(e => console.error('Register notify error:', e));
       }
       await handleAdminRouting(user);
     } catch (err) {

@@ -4,7 +4,7 @@ const admin = require('firebase-admin');
 const { getFirestore, FieldValue } = require('firebase-admin/firestore');
 const { getAuth } = require('firebase-admin/auth');
 const dotenv = require('dotenv');
-const { sendEmail } = require('./emailService');
+const { sendEmail, sendAdminEmail } = require('./emailService');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 const multer = require('multer');
 const path = require('path');
@@ -164,6 +164,114 @@ apiRouter.post('/auth/reset-password', async (req, res) => {
       return res.status(404).json({ error: 'User with this email not found' });
     }
     res.status(500).json({ error: 'Failed to process password reset request' });
+  }
+});
+
+// Notify user + admin after registration (called from frontend after Firebase signup)
+apiRouter.post('/auth/register-notify', async (req, res) => {
+  const { name, email, role, profileDetails } = req.body;
+  if (!name || !email || !role) {
+    return res.status(400).json({ error: 'name, email, and role are required' });
+  }
+
+  const isExpert = ['doctor', 'clinic', 'organization', 'vendor'].includes(role);
+  const statusLabel = isExpert ? 'Pending Admin Approval' : 'Active';
+
+  const welcomeHtml = `
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 8px;">
+      <h2 style="color: #2e7d32; text-align: center;">Welcome to Deergayu!</h2>
+      <p>Hello <strong>${name}</strong>,</p>
+      <p>Thank you for registering on the Deergayu Ayurvedic platform. Your account has been created successfully.</p>
+      <div style="background: #f5f5f5; padding: 15px; border-radius: 8px; margin: 20px 0;">
+        <p style="margin: 5px 0;"><strong>Account Type:</strong> ${role}</p>
+        <p style="margin: 5px 0;"><strong>Status:</strong> ${statusLabel}</p>
+      </div>
+      ${isExpert
+        ? '<p>Our team will review your expert profile shortly. You will be notified once your account is approved.</p>'
+        : '<p>You can now browse products, book doctor appointments, and use our AI health assistant.</p>'}
+      <p style="text-align: center; margin: 30px 0;">
+        <a href="https://deergayu.com" style="background-color: #2e7d32; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; font-weight: bold;">Visit Deergayu</a>
+      </p>
+      <p style="font-size: 12px; color: #999; text-align: center;">Deergayu Platform &copy; ${new Date().getFullYear()}</p>
+    </div>
+  `;
+
+  const adminHtml = `
+    <div style="font-family: Arial, sans-serif; padding: 20px; color: #333;">
+      <h2 style="color: #1565c0;">New User Registration</h2>
+      <p>A new user has registered on Deergayu:</p>
+      <div style="background: #f5f5f5; padding: 15px; border-radius: 8px; margin: 20px 0;">
+        <p style="margin: 5px 0;"><strong>Name:</strong> ${name}</p>
+        <p style="margin: 5px 0;"><strong>Email:</strong> ${email}</p>
+        <p style="margin: 5px 0;"><strong>Role:</strong> ${role}</p>
+        <p style="margin: 5px 0;"><strong>Status:</strong> ${statusLabel}</p>
+        ${profileDetails?.telephone ? `<p style="margin: 5px 0;"><strong>Phone:</strong> ${profileDetails.telephone}</p>` : ''}
+        ${profileDetails?.address ? `<p style="margin: 5px 0;"><strong>Address:</strong> ${profileDetails.address}</p>` : ''}
+        ${profileDetails?.specialty ? `<p style="margin: 5px 0;"><strong>Specialty:</strong> ${profileDetails.specialty}</p>` : ''}
+      </div>
+      ${isExpert ? '<p><strong>Action required:</strong> Please review and approve this expert in the Admin Dashboard.</p>' : ''}
+      <p><a href="https://deergayu.com/admin">Open Admin Dashboard</a></p>
+    </div>
+  `;
+
+  try {
+    sendEmail(email, 'Welcome to Deergayu!', '', welcomeHtml)
+      .catch(e => console.error('Welcome email error:', e));
+    sendAdminEmail(`New Registration: ${name} (${role})`, adminHtml)
+      .catch(e => console.error('Admin registration email error:', e));
+    res.json({ message: 'Registration notifications sent' });
+  } catch (error) {
+    console.error('Register notify error:', error);
+    res.status(500).json({ error: 'Failed to send registration notifications' });
+  }
+});
+
+// Public contact form — emails admin and sends confirmation to user
+apiRouter.post('/contact', async (req, res) => {
+  const { name, email, phone, message, subject } = req.body;
+  if (!name || !email || !message) {
+    return res.status(400).json({ error: 'name, email, and message are required' });
+  }
+
+  const topic = subject || 'General Inquiry';
+
+  const adminHtml = `
+    <div style="font-family: Arial, sans-serif; padding: 20px; color: #333;">
+      <h2 style="color: #1565c0;">New Contact Message</h2>
+      <div style="background: #f5f5f5; padding: 15px; border-radius: 8px; margin: 20px 0;">
+        <p style="margin: 5px 0;"><strong>Name:</strong> ${name}</p>
+        <p style="margin: 5px 0;"><strong>Email:</strong> ${email}</p>
+        ${phone ? `<p style="margin: 5px 0;"><strong>Phone:</strong> ${phone}</p>` : ''}
+        <p style="margin: 5px 0;"><strong>Subject:</strong> ${topic}</p>
+      </div>
+      <p style="white-space: pre-wrap;">${message}</p>
+      <p style="margin-top: 20px;"><a href="mailto:${email}">Reply to ${name}</a></p>
+    </div>
+  `;
+
+  const userHtml = `
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 8px;">
+      <h2 style="color: #2e7d32;">We received your message</h2>
+      <p>Hello <strong>${name}</strong>,</p>
+      <p>Thank you for contacting Deergayu. We have received your message and our team will get back to you shortly.</p>
+      <div style="background: #f5f5f5; padding: 15px; border-radius: 8px; margin: 20px 0;">
+        <p style="margin: 5px 0;"><strong>Subject:</strong> ${topic}</p>
+        <p style="margin: 5px 0; white-space: pre-wrap;"><strong>Your message:</strong><br/>${message}</p>
+      </div>
+      <p>For urgent matters, call us at <strong>0762209299</strong>.</p>
+      <p style="font-size: 12px; color: #999; text-align: center;">Deergayu Platform &copy; ${new Date().getFullYear()}</p>
+    </div>
+  `;
+
+  try {
+    sendAdminEmail(`Contact: ${topic} — ${name}`, adminHtml)
+      .catch(e => console.error('Admin contact email error:', e));
+    sendEmail(email, 'We received your message — Deergayu', '', userHtml)
+      .catch(e => console.error('Contact confirmation email error:', e));
+    res.json({ message: 'Message sent successfully' });
+  } catch (error) {
+    console.error('Contact form error:', error);
+    res.status(500).json({ error: 'Failed to send message' });
   }
 });
 
@@ -627,6 +735,26 @@ apiRouter.post('/vendor/products', verifyVendor, async (req, res) => {
     };
     
     const docRef = await db.collection('products').add(productData);
+    
+    // Notify admin about new product pending approval
+    const adminProductHtml = `
+      <div style="font-family: Arial, sans-serif; padding: 20px; color: #333;">
+        <h2 style="color: #1565c0;">New Product Submitted</h2>
+        <p>A vendor has added a new product awaiting approval:</p>
+        <div style="background: #f5f5f5; padding: 15px; border-radius: 8px; margin: 20px 0;">
+          <p style="margin: 5px 0;"><strong>Product:</strong> ${name}</p>
+          <p style="margin: 5px 0;"><strong>Price:</strong> Rs. ${Number(price).toLocaleString()}</p>
+          <p style="margin: 5px 0;"><strong>Category:</strong> ${category || 'General'}</p>
+          <p style="margin: 5px 0;"><strong>Vendor:</strong> ${vendorName}</p>
+          <p style="margin: 5px 0;"><strong>Vendor Email:</strong> ${req.user.email}</p>
+          <p style="margin: 5px 0;"><strong>Status:</strong> Pending Approval</p>
+        </div>
+        <p><a href="https://deergayu.com/admin">Review in Admin Dashboard</a></p>
+      </div>
+    `;
+    sendAdminEmail(`New Product: ${name} — Pending Approval`, adminProductHtml)
+      .catch(e => console.error('Admin new product email error:', e));
+
     res.status(201).json({ id: docRef.id, ...productData });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -1026,6 +1154,23 @@ apiRouter.post('/checkout', verifyUser, async (req, res) => {
       </div>`;
       sendEmail(req.user.email, `Order Confirmed - Rs. ${grandTotal.toLocaleString()} | Deergayu`, '', customerHtml)
         .catch(e => console.error('Customer order email error:', e));
+
+      const adminOrderHtml = `<div style="font-family:Arial,sans-serif;padding:20px;color:#333">
+        <h2 style="color:#1565c0">New Order Placed</h2>
+        <p><strong>Customer:</strong> ${userName} (${req.user.email})</p>
+        <p><strong>Phone:</strong> ${phone || 'N/A'}</p>
+        <p><strong>Order Ref:</strong> ${orderIds.map(id => id.slice(-8).toUpperCase()).join(', ')}</p>
+        <p><strong>Total:</strong> Rs. ${grandTotal.toLocaleString()}</p>
+        <p><strong>Payment:</strong> ${paymentMethod}</p>
+        <p><strong>Delivery:</strong> ${deliveryAddress}</p>
+        <table style="border-collapse:collapse;width:100%;margin:16px 0">
+          <thead><tr style="background:#f5f5f5"><th style="padding:6px 12px;text-align:left">Item</th><th style="padding:6px 12px">Qty</th><th style="padding:6px 12px">Price</th></tr></thead>
+          <tbody>${allItemsHtml}</tbody>
+        </table>
+        <p><a href="https://deergayu.com/admin">View in Admin Dashboard</a></p>
+      </div>`;
+      sendAdminEmail(`New Order: Rs. ${grandTotal.toLocaleString()} — ${userName}`, adminOrderHtml)
+        .catch(e => console.error('Admin order email error:', e));
     } catch(emailErr) { console.error('Customer email prep error:', emailErr); }
     
     // Clear cart
@@ -1440,7 +1585,7 @@ const upload = multer({ storage: storageConfig });
 app.use('/uploads', express.static(uploadDir));
 
 // Add file upload API endpoint
-apiRouter.post('/upload', upload.single('image'), (req, res) => {
+apiRouter.post('/upload', verifyAdmin, upload.single('image'), (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ error: 'No file uploaded' });
@@ -1451,6 +1596,185 @@ apiRouter.post('/upload', upload.single('image'), (req, res) => {
   } catch (error) {
     console.error('File upload error:', error);
     res.status(500).json({ error: 'Failed to upload file' });
+  }
+});
+
+});
+
+// --- AYURVEDIC GUIDE ---
+const mapGuideDocs = (snapshot) => snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+const filterPublishedGuide = (items) =>
+  items.filter(item => !item.status || item.status === 'published');
+
+const isGuideAdmin = async (req) => {
+  const token = req.headers.authorization?.split('Bearer ')[1];
+  if (!token) return false;
+  try {
+    const decoded = await auth.verifyIdToken(token);
+    return decoded.email === 'yes.manujaya@gmail.com';
+  } catch {
+    return false;
+  }
+};
+
+apiRouter.get('/guide/remedies', async (req, res) => {
+  try {
+    const snapshot = await db.collection('herbal_remedies').get();
+    let remedies = mapGuideDocs(snapshot);
+    const admin = await isGuideAdmin(req);
+    if (!admin) remedies = filterPublishedGuide(remedies);
+    remedies.sort((a, b) => (a.order || 0) - (b.order || 0));
+    res.json(remedies);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+apiRouter.get('/guide/routines', async (req, res) => {
+  try {
+    const snapshot = await db.collection('daily_routines').get();
+    let routines = mapGuideDocs(snapshot);
+    const admin = await isGuideAdmin(req);
+    if (!admin) routines = filterPublishedGuide(routines);
+    routines.sort((a, b) => {
+      if ((a.condition || 'general') !== (b.condition || 'general')) {
+        return (a.condition || 'general').localeCompare(b.condition || 'general');
+      }
+      return (a.order || 0) - (b.order || 0);
+    });
+    res.json(routines);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+apiRouter.post('/guide/seed', verifyAdmin, async (req, res) => {
+  try {
+    const remedies = [
+      {
+        image: 'https://images.unsplash.com/photo-1596541223130-5d564415f0d4?auto=format&fit=crop&q=80&w=400',
+        category: 'cold_immunity', order: 1, status: 'published',
+        en: { name: 'Paspanguwa', ingredients: 'Coriander, Ginger, Pathpadagam, Katuwelbatu, Veniwelgeta', uses: 'Common cold, fever, body aches, and boosting immunity.', preparation: 'Boil all 5 ingredients in 4 cups of water until it reduces to 1 cup. Drink warm, optionally with jaggery.' },
+        si: { name: 'පස්පංගුව', ingredients: 'කොත්තමල්ලි, ඉඟුරු, පත්පාඩගම්, කටුවැල්බටු, වෙනිවැල්ගැට', uses: 'සෙම්ප්‍රතිශ්‍යාව, උණ, ඇඟපත වේදනාව සහ ප්‍රතිශක්තිය වැඩි කිරීමට.', preparation: 'මේ ඖෂධ 5ම වතුර කෝප්ප 4ක් දමා කෝප්ප 1කට සිඳෙන්නට හැර උණුවෙන්ම බොන්න.' },
+        ta: { name: 'பஸ்பங்குவ', ingredients: 'கொத்தமல்லி, இஞ்சி, பத்பாடகம், கட்டுவெல்படு, வெனிவெல்கெட', uses: 'ஜலதோஷம், காய்ச்சல், உடல் வலி மற்றும் நோய் எதிர்ப்பு சக்தியை அதிகரிக்கும்.', preparation: 'இந்த 5 பொருட்களையும் 4 கப் தண்ணீரில் 1 கப்பாக குறையும் வரை கொதிக்க வைக்கவும். சூடாக குடிக்கவும்.' }
+      },
+      {
+        image: 'https://images.unsplash.com/photo-1596040033229-a9821ebd058d?auto=format&fit=crop&q=80&w=400',
+        category: 'fever', order: 2, status: 'published',
+        en: { name: 'Koththamalli', ingredients: 'Coriander seeds, Ginger (optional)', uses: 'Mild fever, sore throat, indigestion, and as a cooling drink.', preparation: 'Roast coriander seeds lightly, crush them, and boil with water. Strain and drink warm.' },
+        si: { name: 'කොත්තමල්ලි', ingredients: 'කොත්තමල්ලි ඇට, ඉඟුරු', uses: 'සුළු උණ, උගුරේ අමාරුව, ආහාර අරුචිය සහ ඇඟ නිවීමට.', preparation: 'කොත්තමල්ලි ඇට මද ගින්නේ බැද, තලා වතුරෙන් තම්බා පෙරා උණුවෙන් බොන්න.' },
+        ta: { name: 'கொத்தமல்லி', ingredients: 'கொத்தமல்லி விதைகள், இஞ்சி', uses: 'லேசான காய்ச்சல், தொண்டை வலி, மற்றும் உடலை குளிர்விக்க.', preparation: 'கொத்தமல்லி விதைகளை லேசாக வறுத்து, தண்ணீரில் கொதிக்க வைத்து வடிகட்டி சூடாக குடிக்கவும்.' }
+      },
+      {
+        image: 'https://images.unsplash.com/photo-1611591437281-460bfbe1220a?auto=format&fit=crop&q=80&w=400',
+        category: 'pain_inflammation', order: 3, status: 'published',
+        en: { name: 'Veniwelgeta', ingredients: 'Yellow Vine (Coscinium fenestratum)', uses: 'Pain relief, reducing inflammation, wound healing.', preparation: 'Boil the dried stems in water for 15-20 minutes. Drink the bitter decoction.' },
+        si: { name: 'වෙනිවැල්ගැට', ingredients: 'වෙනිවැල්ගැට', uses: 'වේදනා නාශකයක් ලෙස, ඉදිමුම් අඩු කිරීමට සහ තුවාල සුව කිරීමට.', preparation: 'වියළි වෙනිවැල්ගැට කැබලි විනාඩි 15-20ක් පමණ තම්බා එහි තිත්ත කසාය පානය කරන්න.' },
+        ta: { name: 'வெனிவெல்கெட', ingredients: 'வெனிவெல்கெட', uses: 'வலி நிவாரணி, வீக்கத்தை குறைத்தல், காயங்களை ஆற்றுதல்.', preparation: 'காய்ந்த வெனிவெல்கெட துண்டுகளை 15-20 நிமிடங்கள் தண்ணீரில் கொதிக்க வைத்து கசப்பான கஷாயத்தை குடிக்கவும்.' }
+      },
+      {
+        image: 'https://images.unsplash.com/photo-1589363460779-cb495392ee5a?auto=format&fit=crop&q=80&w=400',
+        category: 'skin_blood', order: 4, status: 'published',
+        en: { name: 'Iramusu', ingredients: 'Indian Sarsaparilla (Hemidesmus indicus)', uses: 'Purifying blood, cooling the body, improving skin complexion.', preparation: 'Boil the dried roots in water and drink as a regular tea.' },
+        si: { name: 'ඉරමුසු', ingredients: 'ඉරමුසු', uses: 'රුධිරය පිරිසිදු කිරීමට, ශරීරය සිසිල් කිරීමට සහ සම පැහැපත් කිරීමට.', preparation: 'වියළි ඉරමුසු මුල් තම්බා සාමාන්‍ය තේ පානයක් ලෙස බොන්න.' },
+        ta: { name: 'இரமுசு', ingredients: 'நன்னாரி (இரமுசு)', uses: 'இரத்தத்தை சுத்திகரித்தல், உடலை குளிர்வித்தல், சருமத்தை மேம்படுத்துதல்.', preparation: 'காய்ந்த வேர்களை தண்ணீரில் கொதிக்க வைத்து தேநீர் போல குடிக்கவும்.' }
+      },
+      {
+        image: 'https://images.unsplash.com/photo-1512621776951-a57141f2eefd?auto=format&fit=crop&q=80&w=400',
+        category: 'memory', order: 5, status: 'published',
+        en: { name: 'Gotukola Kenda', ingredients: 'Gotukola leaves, Red rice, Coconut milk, Garlic, Ginger', uses: 'Enhancing memory, improving eyesight, and nourishing the body.', preparation: 'Blend Gotukola leaves, extract juice, and cook with boiled red rice gruel and coconut milk.' },
+        si: { name: 'ගොටුකොළ කැඳ', ingredients: 'ගොටුකොළ, රතු කැකුළු සහල්, පොල් කිරි, සුදුළූණු, ඉඟුරු', uses: 'මතක ශක්තිය වැඩි කිරීමට, ඇස් පෙනීම වර්ධනයට සහ ශරීරය පෝෂණය කිරීමට.', preparation: 'ගොටුකොළ කොටා යුෂ ගෙන, තම්බාගත් රතු කැකුළු සහල් සහ පොල් කිරි සමඟ මිශ්‍ර කර උයාගන්න.' },
+        ta: { name: 'வல்லாரை கஞ்சி', ingredients: 'வல்லாரை இலைகள், சிவப்பு அரிசி, தேங்காய் பால், பூண்டு, இஞ்சி', uses: 'நினைவாற்றலை அதிகரித்தல், கண்பார்வையை மேம்படுத்துதல், உடலை போஷித்தல்.', preparation: 'வல்லாரை இலைகளை அரைத்து சாறு எடுத்து, சமைத்த சிவப்பு அரிசி மற்றும் தேங்காய் பாலுடன் கலக்கவும்.' }
+      },
+      {
+        image: 'https://images.unsplash.com/photo-1606579294215-64bc63bba2c2?auto=format&fit=crop&q=80&w=400',
+        category: 'diabetes', order: 6, status: 'published',
+        en: { name: 'Karapincha', ingredients: 'Curry leaves', uses: 'Lowering cholesterol, improving digestion, and controlling diabetes.', preparation: 'Extract juice from fresh leaves and mix with a little lime and salt, or consume as a gruel.' },
+        si: { name: 'කරපිංචා', ingredients: 'කරපිංචා කොළ', uses: 'කොලෙස්ටරෝල් අඩු කිරීමට, දිරවීම පහසු කිරීමට සහ දියවැඩියාව පාලනයට.', preparation: 'නැවුම් කොළ කොටා යුෂ ගෙන දෙහි සහ ලුණු ස්වල්පයක් සමඟ පානය කරන්න.' },
+        ta: { name: 'கறிவேப்பிலை', ingredients: 'கறிவேப்பிலை', uses: 'கொலஸ்ட்ராலைக் குறைத்தல், செரிமானத்தை மேம்படுத்துதல், நீரிழிவு நோயைக் கட்டுப்படுத்துதல்.', preparation: 'புதிய இலைகளிலிருந்து சாறு எடுத்து சிறிதளவு எலுமிச்சை மற்றும் உப்புடன் கலந்து குடிக்கவும்.' }
+      }
+    ];
+
+    const routines = [
+      { condition: 'general', order: 1, icon: 'Sun', status: 'published', en: { time: '5:00 AM - 6:00 AM', title: 'Brahma Muhurta (Wake Up)', description: 'Wake up 1.5 hours before sunrise. Ideal for spiritual practices.', tips: 'Gently stretch in bed | Express gratitude | Avoid checking your phone immediately' }, si: { time: 'පෙ.ව. 5:00 - 6:00', title: 'බ්‍රහ්ම මුහුර්තය', description: 'හිරු උදාවට පැය 1.5කට පෙර අවදි වන්න.', tips: 'ඇඳේ සිටම ඇඟ මැලි කඩන්න | ස්වභාවධර්මයට ස්තූති කරන්න | දුරකථනය බැලීමෙන් වළකින්න' }, ta: { time: 'காலை 5:00 - 6:00', title: 'பிரம்மா முஹூர்த்தம்', description: 'சூரிய உதயத்திற்கு 1.5 மணி நேரத்திற்கு முன்பு எழுந்திருங்கள்.', tips: 'படுக்கையில் மெதுவாக நீட்டவும் | இயற்கைக்கு நன்றி தெரிவிக்கவும் | தொலைபேசியைத் தவிர்க்கவும்' } },
+      { condition: 'general', order: 2, icon: 'Droplet', status: 'published', en: { time: '6:00 AM - 6:30 AM', title: 'Purification & Cleansing', description: 'Cleanse the senses. Wash your face, scrape your tongue, and drink warm water.', tips: 'Use a copper tongue scraper | Drink warm lemon water | Brush teeth with herbal toothpaste' }, si: { time: 'පෙ.ව. 6:00 - 6:30', title: 'පිරිසිදු වීම', description: 'මුහුණ සෝදා, දිව මැද විස ඉවත් කරගන්න.', tips: 'තඹ දිව මදින උපකරණය | උණුසුම් දෙහි වතුර | ඖෂධීය දන්තාලේප' }, ta: { time: 'காலை 6:00 - 6:30', title: 'சுத்திகரிப்பு', description: 'முகம் கழுவி, நாக்கை சுத்தம் செய்து வெதுவெதுப்பான நீர் குடிக்கவும்.', tips: 'செம்பு நாக்கு வழிப்பான் | எலுமிச்சை நீர் | மூலிகை பற்பசை' } },
+      { condition: 'general', order: 3, icon: 'Activity', status: 'published', en: { time: '6:30 AM - 7:30 AM', title: 'Movement & Meditation', description: 'Gentle exercise like Yoga, followed by breathwork and meditation.', tips: 'Sun salutations | 10-15 minutes of meditation | Abhyanga (self-massage)' }, si: { time: 'පෙ.ව. 6:30 - 7:30', title: 'ව්‍යායාම සහ භාවනා', description: 'යෝගා වැනි සැහැල්ලු ව්‍යායාම.', tips: 'සූර්ය නමස්කාරය | විනාඩි 10-15ක භාවනාව | අභ්‍යංග' }, ta: { time: 'காலை 6:30 - 7:30', title: 'உடற்பயிற்சி & தியானம்', description: 'யோகா போன்ற மென்மையான உடற்பயிற்சி.', tips: 'சூரிய நமஸ்காரம் | 15 நிமிட தியானம் | அப்யங்கா' } },
+      { condition: 'diabetes', order: 1, icon: 'Coffee', status: 'published', en: { time: '6:30 AM', title: 'Morning Drink', description: 'Start your day with a drink to regulate blood sugar levels.', tips: 'Kothalahimbutu tea | Bitter gourd juice | Avoid sugar' }, si: { time: 'පෙ.ව. 6:30', title: 'උදෑසන පානය', description: 'රුධිරයේ සීනි මට්ටම පාලනය කිරීමට සුදුසු පානයකින් දවස අරඹන්න.', tips: 'කොතලහිඹුටු තේ | කරවිල යුෂ | සීනි භාවිතයෙන් වළකින්න' }, ta: { time: 'காலை 6:30', title: 'காலை பானம்', description: 'இரத்த சர்க்கரை அளவை கட்டுப்படுத்தும் பானத்துடன் நாளைத் தொடங்குங்கள்.', tips: 'கொத்தலஹிம்புடு தேநீர் | பாகற்காய் சாறு | சர்க்கரையைத் தவிர்க்கவும்' } },
+      { condition: 'hypertension', order: 1, icon: 'Activity', status: 'published', en: { time: '7:00 AM', title: 'Calming Yoga', description: 'Gentle yoga and breathing to reduce stress and lower blood pressure.', tips: 'Pranayama | Avoid rigorous cardio | Meditate for 15 minutes' }, si: { time: 'පෙ.ව. 7:00', title: 'සැහැල්ලු යෝගා', description: 'මානසික ආතතිය සහ රුධිර පීඩනය අඩු කිරීම.', tips: 'ප්‍රාණයාම | වෙහෙසකර ව්‍යායාම වලින් වළකින්න | විනාඩි 15ක භාවනාව' }, ta: { time: 'காலை 7:00', title: 'அமைதியான யோகா', description: 'மன அழுத்தம் மற்றும் இரத்த அழுத்தத்தைக் குறைக்க.', tips: 'பிராணயாமா | கடுமையான பயிற்சிகளைத் தவிர்க்கவும் | 15 நிமிடம் தியானம்' } }
+    ];
+
+    const batch = db.batch();
+    (await db.collection('herbal_remedies').get()).docs.forEach(doc => batch.delete(doc.ref));
+    (await db.collection('daily_routines').get()).docs.forEach(doc => batch.delete(doc.ref));
+    remedies.forEach(r => batch.set(db.collection('herbal_remedies').doc(), { ...r, createdAt: FieldValue.serverTimestamp() }));
+    routines.forEach(r => batch.set(db.collection('daily_routines').doc(), { ...r, createdAt: FieldValue.serverTimestamp() }));
+    await batch.commit();
+    res.json({ success: true, message: 'Guide content seeded successfully', counts: { remedies: remedies.length, routines: routines.length } });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+apiRouter.post('/guide/remedies', verifyAdmin, async (req, res) => {
+  try {
+    const remedy = { ...req.body, status: req.body.status || 'published', order: Number(req.body.order) || 0, createdAt: FieldValue.serverTimestamp(), updatedAt: new Date().toISOString() };
+    const docRef = await db.collection('herbal_remedies').add(remedy);
+    res.status(201).json({ id: docRef.id, ...remedy });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+apiRouter.put('/guide/remedies/:id', verifyAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const update = { ...req.body, updatedAt: new Date().toISOString() };
+    delete update.id;
+    await db.collection('herbal_remedies').doc(id).update(update);
+    res.json({ id, ...update });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+apiRouter.delete('/guide/remedies/:id', verifyAdmin, async (req, res) => {
+  try {
+    await db.collection('herbal_remedies').doc(req.params.id).delete();
+    res.json({ message: 'Remedy deleted successfully' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+apiRouter.post('/guide/routines', verifyAdmin, async (req, res) => {
+  try {
+    const routine = { ...req.body, status: req.body.status || 'published', order: Number(req.body.order) || 1, createdAt: FieldValue.serverTimestamp(), updatedAt: new Date().toISOString() };
+    const docRef = await db.collection('daily_routines').add(routine);
+    res.status(201).json({ id: docRef.id, ...routine });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+apiRouter.put('/guide/routines/:id', verifyAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const update = { ...req.body, updatedAt: new Date().toISOString() };
+    delete update.id;
+    await db.collection('daily_routines').doc(id).update(update);
+    res.json({ id, ...update });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+apiRouter.delete('/guide/routines/:id', verifyAdmin, async (req, res) => {
+  try {
+    await db.collection('daily_routines').doc(req.params.id).delete();
+    res.json({ message: 'Routine deleted successfully' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
   }
 });
 

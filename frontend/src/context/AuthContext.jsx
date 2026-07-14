@@ -69,6 +69,14 @@ export const AuthProvider = ({ children }) => {
     }
     
     await setDoc(doc(db, 'users', userCredential.user.uid), userData);
+
+    // Send welcome + admin notification emails (fire and forget)
+    fetch(`${API_URL}/api/auth/register-notify`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, email, role, profileDetails }),
+    }).catch(e => console.error('Register notify error:', e));
+
     return userCredential;
   };
 
