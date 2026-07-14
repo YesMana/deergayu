@@ -27,8 +27,24 @@ jobs:
         cd frontend
         npm ci || npm install
         npm run build
+        # Fail deploy early if Vite forgot hashed chunks
+        test -f dist/index.html
+        test -d dist/assets
+        ls dist/assets | grep -E '\.js$' | head
 
-    - name: Deploy Frontend to cPanel via FTP
+    # Replace assets/ completely so old hashes cannot mix with a new index.html
+    - name: Deploy Vite assets (clean slate)
+      uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+      with:
+        server: ${{ secrets.FTP_SERVER }}
+        username: ${{ secrets.FTP_USERNAME }}
+        password: ${{ secrets.FTP_PASSWORD }}
+        local-dir: ./frontend/dist/assets/
+        server-dir: ./assets/
+        dangerous-clean-slate: true
+
+    # Upload index.html, .htaccess, favicon — never wipe site root (protects /api, uploads, etc.)
+    - name: Deploy frontend shell files
       uses: SamKirkland/FTP-Deploy-Action@v4.3.5
       with:
         server: ${{ secrets.FTP_SERVER }}
@@ -36,8 +52,11 @@ jobs:
         password: ${{ secrets.FTP_PASSWORD }}
         local-dir: ./frontend/dist/
         server-dir: ./
-        # Replaces old hashed JS bundles so admin page does not crash
         dangerous-clean-slate: false
+        exclude: |
+          **/assets/**
+          **/.git*
+          **/node_modules/**
 
     - name: Deploy Backend to cPanel ./api/ via FTP
       uses: SamKirkland/FTP-Deploy-Action@v4.3.5
@@ -52,3 +71,4 @@ jobs:
           **/node_modules/**
           **/.env
           **/.env.*
+          **/uploads/**

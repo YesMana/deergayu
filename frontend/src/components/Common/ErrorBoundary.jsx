@@ -1,26 +1,44 @@
 import React from 'react';
 import { AlertTriangle } from 'lucide-react';
 
+const isChunkLoadError = (error) => {
+  const msg = String(error?.message || error || '');
+  return (
+    /Failed to fetch dynamically imported module/i.test(msg) ||
+    /Unable to preload CSS/i.test(msg) ||
+    /Loading chunk [\d]+ failed/i.test(msg) ||
+    /Importing a module script failed/i.test(msg)
+  );
+};
+
 class ErrorBoundary extends React.Component {
   constructor(props) {
     super(props);
-    this.state = { hasError: false, error: null, errorInfo: null };
+    this.state = { hasError: false, error: null, errorInfo: null, isChunkError: false };
   }
 
   static getDerivedStateFromError(error) {
-    // Update state so the next render will show the fallback UI.
-    return { hasError: true };
+    return { hasError: true, isChunkError: isChunkLoadError(error) };
   }
 
   componentDidCatch(error, errorInfo) {
-    // You can also log the error to an error reporting service here
-    console.error("ErrorBoundary caught an error:", error, errorInfo);
-    this.setState({ error, errorInfo });
+    console.error('ErrorBoundary caught an error:', error, errorInfo);
+    this.setState({ error, errorInfo, isChunkError: isChunkLoadError(error) });
+
+    // After a deploy, cached HTML can point at deleted asset hashes.
+    // One hard reload usually fixes it; don't loop forever.
+    if (isChunkLoadError(error)) {
+      const key = 'deergayu_chunk_reload';
+      const last = Number(sessionStorage.getItem(key) || 0);
+      if (Date.now() - last > 15000) {
+        sessionStorage.setItem(key, String(Date.now()));
+        window.location.reload();
+      }
+    }
   }
 
   render() {
     if (this.state.hasError) {
-      // You can render any custom fallback UI
       return (
         <div style={{
           display: 'flex',
@@ -33,17 +51,24 @@ class ErrorBoundary extends React.Component {
           color: 'var(--text-color)'
         }}>
           <AlertTriangle size={64} style={{ color: 'var(--error-color)', marginBottom: '1.5rem' }} />
-          <h1 style={{ fontSize: '2rem', color: 'var(--secondary-color)', marginBottom: '1rem' }}>Oops! Something went wrong.</h1>
+          <h1 style={{ fontSize: '2rem', color: 'var(--secondary-color)', marginBottom: '1rem' }}>
+            {this.state.isChunkError ? 'Site update in progress' : 'Oops! Something went wrong.'}
+          </h1>
           <p style={{ color: 'var(--text-secondary)', maxWidth: '500px', marginBottom: '2rem', lineHeight: '1.6' }}>
-            We're sorry, but an unexpected error occurred. Our team has been notified and is working on a fix.
+            {this.state.isChunkError
+              ? 'A new version was deployed. Please refresh to load the latest files.'
+              : "We're sorry, but an unexpected error occurred. Our team has been notified and is working on a fix."}
           </p>
           <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', justifyContent: 'center' }}>
             <button
               className="btn btn-primary"
-              onClick={() => this.setState({ hasError: false, error: null, errorInfo: null })}
+              onClick={() => {
+                sessionStorage.removeItem('deergayu_chunk_reload');
+                window.location.href = '/';
+              }}
               style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}
             >
-              Try Again
+              Go Home
             </button>
             <button
               className="btn btn-outline"
@@ -68,7 +93,7 @@ class ErrorBoundary extends React.Component {
       );
     }
 
-    return this.props.children; 
+    return this.props.children;
   }
 }
 
