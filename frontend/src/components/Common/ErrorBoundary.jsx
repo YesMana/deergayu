@@ -37,21 +37,30 @@ class ErrorBoundary extends React.Component {
           <p style={{ color: 'var(--text-secondary)', maxWidth: '500px', marginBottom: '2rem', lineHeight: '1.6' }}>
             We're sorry, but an unexpected error occurred. Our team has been notified and is working on a fix.
           </p>
-          <button 
-            className="btn btn-primary"
-            onClick={() => window.location.reload()}
-            style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}
-          >
-            Refresh Page
-          </button>
-          
-          {process.env.NODE_ENV === 'development' && this.state.error && (
+          <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', justifyContent: 'center' }}>
+            <button
+              className="btn btn-primary"
+              onClick={() => this.setState({ hasError: false, error: null, errorInfo: null })}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}
+            >
+              Try Again
+            </button>
+            <button
+              className="btn btn-outline"
+              onClick={() => window.location.reload()}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}
+            >
+              Refresh Page
+            </button>
+          </div>
+
+          {this.state.error && (
             <details style={{ marginTop: '2rem', textAlign: 'left', background: 'rgba(255,0,0,0.05)', padding: '1rem', borderRadius: '8px', maxWidth: '800px', overflow: 'auto' }}>
-              <summary style={{ cursor: 'pointer', color: 'var(--error-color)', fontWeight: 'bold' }}>Error Details (Dev Only)</summary>
+              <summary style={{ cursor: 'pointer', color: 'var(--error-color)', fontWeight: 'bold' }}>Error Details</summary>
               <pre style={{ marginTop: '1rem', fontSize: '0.85rem', color: 'var(--text-secondary)', whiteSpace: 'pre-wrap' }}>
                 {this.state.error.toString()}
                 <br />
-                {this.state.errorInfo.componentStack}
+                {this.state.errorInfo?.componentStack}
               </pre>
             </details>
           )}

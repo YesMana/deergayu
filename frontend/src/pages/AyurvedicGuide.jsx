@@ -488,8 +488,11 @@ const AyurvedicGuide = () => {
                           <div className="timeline-tips">
                             <h4><Info size={14} /> {data.tips_label}</h4>
                             <ul>
-                              {step?.tips?.split('|').map((tip, i) => (
-                                <li key={i}>{tip.trim()}</li>
+                              {(Array.isArray(step?.tips)
+                                ? step.tips
+                                : String(step?.tips || '').split('|')
+                              ).filter(Boolean).map((tip, i) => (
+                                <li key={i}>{String(tip).trim()}</li>
                               ))}
                             </ul>
                           </div>

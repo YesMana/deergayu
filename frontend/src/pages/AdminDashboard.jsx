@@ -13,6 +13,7 @@ import ManageAppointments from '../components/Admin/ManageAppointments';
 import ManageSettings from '../components/Admin/ManageSettings';
 import ManageVideos from '../components/Admin/ManageVideos';
 import ManageGuide from '../components/Admin/ManageGuide';
+import ErrorBoundary from '../components/Common/ErrorBoundary';
 
 import './AdminDashboard.css';
 
@@ -121,7 +122,11 @@ const AdminDashboard = () => {
         {activeTab === 'appointments' && <ManageAppointments />}
         {activeTab === 'settings' && <ManageSettings />}
         {activeTab === 'videos' && <ManageVideos />}
-        {activeTab === 'guide' && <ManageGuide />}
+        {activeTab === 'guide' && (
+          <ErrorBoundary key="guide">
+            <ManageGuide />
+          </ErrorBoundary>
+        )}
       </main>
     </div>
   );
