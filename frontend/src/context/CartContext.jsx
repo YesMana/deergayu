@@ -135,7 +135,7 @@ export const CartProvider = ({ children }) => {
     }
   };
 
-  const checkout = async (paymentMethod, deliveryAddress, phone, notes) => {
+  const checkout = async (paymentMethod, deliveryAddress, phone, notes, shippingZoneId) => {
     try {
       if (!auth.currentUser) throw new Error('Please log in to checkout');
       const token = await auth.currentUser.getIdToken();
@@ -145,7 +145,7 @@ export const CartProvider = ({ children }) => {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`
         },
-        body: JSON.stringify({ paymentMethod, deliveryAddress, phone, notes })
+        body: JSON.stringify({ paymentMethod, deliveryAddress, phone, notes, shippingZoneId })
       });
       if (!res.ok) {
         const errData = await res.json().catch(() => ({}));

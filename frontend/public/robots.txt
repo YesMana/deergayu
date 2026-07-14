@@ -1,0 +1,10 @@
+User-agent: *
+Allow: /
+Disallow: /admin
+Disallow: /vendor
+Disallow: /my-account
+Disallow: /my-orders
+Disallow: /my-appointments
+Disallow: /shop/cart
+Disallow: /login
+Sitemap: https://deergayu.com/sitemap.xml

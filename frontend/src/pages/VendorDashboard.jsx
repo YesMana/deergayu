@@ -876,6 +876,43 @@ const VendorDashboard = () => {
               )}
             </div>
 
+            {!isDoctor && (
+              <div className="dash-section" style={{ marginBottom: '1.5rem' }}>
+                <div className="dash-section-header">
+                  <h3>Payout statement</h3>
+                  <button
+                    type="button"
+                    className="btn btn-outline"
+                    style={{ fontSize: '0.8rem', padding: '0.35rem 0.75rem' }}
+                    onClick={() => {
+                      const win = window.open('', '_blank');
+                      if (!win) return;
+                      win.document.write(`<!DOCTYPE html><html><head><title>Deergayu Payout</title>
+                        <style>body{font-family:system-ui;padding:24px;color:#122018}table{width:100%;border-collapse:collapse;margin-top:16px}th,td{border:1px solid #ccc;padding:8px;text-align:left}</style>
+                        </head><body>
+                        <h1>Deergayu vendor payout statement</h1>
+                        <p>Vendor: ${user?.displayName || user?.email || ''}</p>
+                        <p>Generated: ${new Date().toLocaleString('en-LK')}</p>
+                        <table><tr><th>Metric</th><th>Amount</th></tr>
+                        <tr><td>Net earnings (delivered orders)</td><td>Rs. ${Number(totalRevenue).toLocaleString('en-LK')}</td></tr>
+                        <tr><td>This month</td><td>Rs. ${Number(monthRevenue).toLocaleString('en-LK')}</td></tr>
+                        <tr><td>Booking earnings</td><td>Rs. ${Number(earnings.bookingEarnings || 0).toLocaleString('en-LK')}</td></tr>
+                        </table>
+                        <p style="margin-top:24px;font-size:12px;color:#666">Amounts are vendor net after Deergayu platform commission. Contact info@deergayu.com for settlement.</p>
+                        </body></html>`);
+                      win.document.close();
+                      win.print();
+                    }}
+                  >
+                    Print / PDF
+                  </button>
+                </div>
+                <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', margin: 0 }}>
+                  Your net payout excludes platform commission. Use Print / PDF for a simple invoice-style statement.
+                </p>
+              </div>
+            )}
+
             {/* 2-col activity */}
             <div className="two-col">
               {/* Left Column: Recent Orders (Vendors) / Upcoming Appointments List (Doctors) */}

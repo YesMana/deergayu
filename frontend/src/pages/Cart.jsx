@@ -1,19 +1,21 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Trash2, ShoppingBag, ArrowRight, CheckCircle, Minus, Plus } from 'lucide-react';
 import { useCart } from '../context/CartContext';
 import { useToast } from '../context/ToastContext';
+import { auth } from '../firebase';
 import './Cart.css';
 
-// ── Update these with your real bank details ──────────────────
-const BANK_DETAILS = {
-  bank:        "People's Bank",
-  branch:      "Colombo 03",
+const API_URL = import.meta.env.VITE_API_URL || '';
+
+const DEFAULT_BANK = {
+  bank: "People's Bank",
+  branch: "Colombo 03",
   accountName: "Deergayu (Pvt) Ltd",
-  accountNo:   "123-4567-8901-00",
+  accountNo: "123-4567-8901-00",
 };
 
-const PAYMENT_OPTIONS = [
+const BASE_PAYMENT_OPTIONS = [
   { value: 'cash_on_delivery', label: 'Cash on Delivery', icon: '💵', desc: 'Pay when your order arrives at your door' },
   { value: 'qr_pay',           label: 'QR Pay',           icon: '📱', desc: 'Scan & pay instantly via any banking app' },
   { value: 'bank_transfer',    label: 'Bank Transfer',    icon: '🏦', desc: 'Transfer to our bank account directly' },
@@ -31,18 +33,110 @@ const Cart = () => {
   const [errMsg, setErrMsg]                   = useState('');
   const [orderResult, setOrderResult]         = useState(null);
 
-  const grandTotal = cartItems.reduce((sum, item) => sum + (item.price * (item.quantity || 1)), 0);
+  const [shippingZones, setShippingZones] = useState([]);
+  const [shippingZoneId, setShippingZoneId] = useState('');
+  const [bankDetails, setBankDetails] = useState(DEFAULT_BANK);
+  const [payhereEnabled, setPayhereEnabled] = useState(false);
+  const [payhereMsg, setPayhereMsg] = useState('');
+
+  useEffect(() => {
+    fetch(`${API_URL}/api/storefront-settings`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (!data) return;
+        const zones = data.shippingZones || [];
+        setShippingZones(zones);
+        if (zones.length) setShippingZoneId(zones[0].id);
+        if (data.bankDetails) setBankDetails({ ...DEFAULT_BANK, ...data.bankDetails });
+        setPayhereEnabled(Boolean(data.payhereEnabled));
+      })
+      .catch(() => {});
+  }, []);
+
+  const itemsTotal = cartItems.reduce((sum, item) => sum + (item.price * (item.quantity || 1)), 0);
+  const selectedZone = shippingZones.find((z) => z.id === shippingZoneId);
+  const shippingFee = Number(selectedZone?.fee) || 0;
+  const grandTotal = itemsTotal + shippingFee;
+
+  const paymentOptions = payhereEnabled
+    ? [...BASE_PAYMENT_OPTIONS, { value: 'payhere', label: 'Card (PayHere)', icon: '💳', desc: 'Pay securely with Visa / Mastercard' }]
+    : BASE_PAYMENT_OPTIONS;
+
+  const tryPayHere = async (data, total) => {
+    const orderId = data?.orderIds?.[0];
+    if (!orderId) {
+      setPayhereMsg('Order placed. Card payment needs merchant configuration — please use bank transfer or contact support.');
+      return;
+    }
+    try {
+      const token = await auth.currentUser.getIdToken();
+      const res = await fetch(`${API_URL}/api/payments/payhere/hash`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ orderId, amount: total, currency: 'LKR' }),
+      });
+      const hashData = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setPayhereMsg(hashData.error || 'Card pay needs merchant config. Your order is saved — pay via bank transfer or contact support.');
+        return;
+      }
+
+      const action = hashData.sandbox
+        ? 'https://sandbox.payhere.lk/pay/checkout'
+        : 'https://www.payhere.lk/pay/checkout';
+
+      const form = document.createElement('form');
+      form.method = 'POST';
+      form.action = action;
+      const fields = {
+        merchant_id: hashData.merchant_id,
+        return_url: hashData.return_url,
+        cancel_url: hashData.cancel_url,
+        notify_url: hashData.notify_url,
+        order_id: orderId,
+        items: 'Deergayu Order',
+        currency: 'LKR',
+        amount: Number(total).toFixed(2),
+        hash: hashData.hash,
+      };
+      Object.entries(fields).forEach(([key, val]) => {
+        const input = document.createElement('input');
+        input.type = 'hidden';
+        input.name = key;
+        input.value = val ?? '';
+        form.appendChild(input);
+      });
+      document.body.appendChild(form);
+      form.submit();
+    } catch {
+      setPayhereMsg('Could not start PayHere checkout. Your order is saved — please contact support or use another payment method.');
+    }
+  };
 
   const handleCheckout = async (e) => {
     e.preventDefault();
     setErrMsg('');
+    setPayhereMsg('');
     if (!deliveryAddress.trim()) { setErrMsg('Please enter a delivery address.'); return; }
     if (!phone.trim())           { setErrMsg('Please enter a phone number.');     return; }
+    if (shippingZones.length && !shippingZoneId) {
+      setErrMsg('Please select a shipping zone.');
+      return;
+    }
     try {
       setCheckingOut(true);
-      const data = await checkout(paymentMethod, deliveryAddress, phone, notes);
-      setOrderResult({ orderIds: data?.orderIds || [], total: grandTotal, method: paymentMethod });
+      const data = await checkout(paymentMethod, deliveryAddress, phone, notes, shippingZoneId || undefined);
+      const total = data?.shippingFee != null ? itemsTotal + Number(data.shippingFee) : grandTotal;
+      setOrderResult({
+        orderIds: data?.orderIds || [],
+        total,
+        method: paymentMethod,
+        shippingFee: data?.shippingFee ?? shippingFee,
+      });
       success('Order placed successfully! ✓');
+      if (data?.payhereReady) {
+        await tryPayHere(data, total);
+      }
     } catch (err) {
       const msg = err.message || 'Checkout failed. Please try again.';
       setErrMsg(msg);
@@ -80,6 +174,18 @@ const Cart = () => {
                 A confirmation email has been sent to you.
               </p>
 
+              {payhereMsg && (
+                <div style={{
+                  background: 'rgba(255,167,38,0.1)',
+                  border: '1px solid rgba(255,167,38,0.35)',
+                  borderRadius: 12, padding: '1rem',
+                  marginBottom: '1.5rem', textAlign: 'left',
+                  color: 'var(--text-secondary)', fontSize: '0.9rem'
+                }}>
+                  {payhereMsg}
+                </div>
+              )}
+
               {isOnline && (
                 <div style={{
                   background: 'rgba(212,175,55,0.08)',
@@ -105,10 +211,10 @@ const Cart = () => {
 
                   <div style={{ display: 'grid', gap: '0.5rem', fontSize: '0.88rem' }}>
                     {[
-                      ['Bank',         BANK_DETAILS.bank],
-                      ['Branch',       BANK_DETAILS.branch],
-                      ['Account Name', BANK_DETAILS.accountName],
-                      ['Account No.',  BANK_DETAILS.accountNo],
+                      ['Bank',         bankDetails.bank],
+                      ['Branch',       bankDetails.branch],
+                      ['Account Name', bankDetails.accountName],
+                      ['Account No.',  bankDetails.accountNo],
                       ['Amount',       `Rs. ${orderResult.total.toLocaleString()}`],
                       ['Reference No.', `#${ref} (required)`],
                     ].map(([label, val]) => (
@@ -120,7 +226,7 @@ const Cart = () => {
                   </div>
                   <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', margin: '1rem 0 0' }}>
                     ⚠️ Your order is reserved for 24 hours. Please include the reference number when transferring.
-                    Send your receipt to <strong>WhatsApp +94 77 XXX XXXX</strong> for faster confirmation.
+                    Send your receipt to <strong>WhatsApp +94 76 220 9299</strong> for faster confirmation.
                   </p>
                 </div>
               )}
@@ -201,13 +307,40 @@ const Cart = () => {
           {/* Checkout Panel */}
           <div className="checkout-panel glass-panel">
             <h2>Order Summary</h2>
-            <div className="order-summary-line"><span>Items ({cartCount})</span><span>Rs. {grandTotal.toLocaleString()}</span></div>
-            <div className="order-summary-line"><span>Delivery</span><span style={{ color: 'var(--primary-color)', fontWeight: 600 }}>Free</span></div>
+            <div className="order-summary-line"><span>Items ({cartCount})</span><span>Rs. {itemsTotal.toLocaleString()}</span></div>
+            <div className="order-summary-line">
+              <span>Delivery{selectedZone ? ` (${selectedZone.name})` : ''}</span>
+              <span style={{ color: 'var(--primary-color)', fontWeight: 600 }}>
+                {shippingFee > 0 ? `Rs. ${shippingFee.toLocaleString()}` : 'Free'}
+              </span>
+            </div>
             <div className="order-total-line"><span>Total</span><span>Rs. {grandTotal.toLocaleString()}</span></div>
 
             {errMsg && <div className="cart-error" style={{ marginTop: '0.75rem' }}>{errMsg}</div>}
 
             <form className="checkout-form" onSubmit={handleCheckout}>
+
+              {shippingZones.length > 0 && (
+                <div className="form-group" style={{ marginTop: '1.25rem' }}>
+                  <label>Shipping Zone *</label>
+                  <select
+                    value={shippingZoneId}
+                    onChange={(e) => setShippingZoneId(e.target.value)}
+                    required
+                    style={{
+                      width: '100%', padding: '0.75rem 1rem', borderRadius: 8,
+                      border: '1px solid rgba(255,255,255,0.12)',
+                      background: 'rgba(255,255,255,0.05)', color: 'var(--text-primary)'
+                    }}
+                  >
+                    {shippingZones.map((z) => (
+                      <option key={z.id} value={z.id}>
+                        {z.name} — Rs. {Number(z.fee || 0).toLocaleString()}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
 
               {/* Payment Method */}
               <div className="form-group" style={{ marginTop: '1.25rem' }}>
@@ -215,7 +348,7 @@ const Cart = () => {
                   Select Payment Method
                 </label>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                  {PAYMENT_OPTIONS.map(opt => (
+                  {paymentOptions.map(opt => (
                     <label key={opt.value} style={{
                       display: 'flex', alignItems: 'center', gap: '0.75rem',
                       padding: '0.85rem 1rem', borderRadius: 10, cursor: 'pointer',
@@ -240,7 +373,6 @@ const Cart = () => {
                   ))}
                 </div>
 
-                {/* Inline preview */}
                 {paymentMethod === 'qr_pay' && (
                   <div style={{ background: 'rgba(212,175,55,0.05)', border: '1px solid rgba(212,175,55,0.2)', borderRadius: 8, padding: '0.85rem', marginTop: '0.5rem', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
                     📱 QR code will be displayed after placing your order. Supports all Sri Lankan banking apps.
@@ -249,7 +381,12 @@ const Cart = () => {
                 {paymentMethod === 'bank_transfer' && (
                   <div style={{ background: 'rgba(212,175,55,0.05)', border: '1px solid rgba(212,175,55,0.2)', borderRadius: 8, padding: '0.85rem', marginTop: '0.5rem', fontSize: '0.8rem' }}>
                     <div style={{ color: 'var(--text-secondary)', marginBottom: 4 }}>Bank details will be shown after placing the order.</div>
-                    <div style={{ color: 'rgba(212,175,55,0.85)' }}>🏦 {BANK_DETAILS.bank} · <strong>{BANK_DETAILS.accountName}</strong></div>
+                    <div style={{ color: 'rgba(212,175,55,0.85)' }}>🏦 {bankDetails.bank} · <strong>{bankDetails.accountName}</strong></div>
+                  </div>
+                )}
+                {paymentMethod === 'payhere' && (
+                  <div style={{ background: 'rgba(212,175,55,0.05)', border: '1px solid rgba(212,175,55,0.2)', borderRadius: 8, padding: '0.85rem', marginTop: '0.5rem', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                    💳 You will be redirected to PayHere to complete card payment after placing the order.
                   </div>
                 )}
               </div>

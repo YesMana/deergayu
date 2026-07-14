@@ -16,6 +16,19 @@ const DEFAULT_SETTINGS = {
   autoApproveProducts: false,
   adminEmails: [SUPER_ADMIN_EMAIL],
   categories: DEFAULT_CATEGORIES,
+  shippingZones: [
+    { id: 'colombo', name: 'Colombo Metro', fee: 250 },
+    { id: 'western', name: 'Western Province', fee: 350 },
+    { id: 'island', name: 'Island-wide', fee: 500 },
+  ],
+  bankDetails: {
+    bank: "People's Bank",
+    branch: 'Colombo 03',
+    accountName: 'Deergayu (Pvt) Ltd',
+    accountNo: '123-4567-8901-00',
+  },
+  payhereEnabled: false,
+  contactEmail: 'info@deergayu.com',
 };
 
 async function getSettings(db) {
@@ -83,7 +96,9 @@ async function updateReviewAggregates(db, targetType, targetId) {
       : db.collection('users').doc(targetId).collection('reviews');
 
   const snap = await col.get();
-  const reviews = snap.docs.map((d) => d.data());
+  const reviews = snap.docs
+    .map((d) => d.data())
+    .filter((r) => !r.status || r.status === 'published');
   const count = reviews.length;
   const avg = count
     ? reviews.reduce((s, r) => s + (Number(r.rating) || 0), 0) / count

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { LayoutDashboard, Users, ShieldAlert, Package, ShoppingBag, Calendar, Settings, Video, BookOpen } from 'lucide-react';
+import { LayoutDashboard, Users, ShieldAlert, Package, ShoppingBag, Calendar, Settings, Video, BookOpen, Star } from 'lucide-react';
 import { collection, getCountFromServer, query, where } from 'firebase/firestore';
 import { db } from '../firebase';
 
@@ -13,6 +13,7 @@ import ManageAppointments from '../components/Admin/ManageAppointments';
 import ManageSettings from '../components/Admin/ManageSettings';
 import ManageVideos from '../components/Admin/ManageVideos';
 import ManageGuide from '../components/Admin/ManageGuide';
+import ManageReviews from '../components/Admin/ManageReviews';
 import ErrorBoundary from '../components/Common/ErrorBoundary';
 
 import './AdminDashboard.css';
@@ -54,6 +55,7 @@ const AdminDashboard = () => {
     { id: 'products',     label: 'Product Approvals', Icon: Package,         badge: pendingProducts },
     { id: 'orders',       label: 'All Orders',       Icon: ShoppingBag,     badge: pendingOrders },
     { id: 'appointments', label: 'Appointments',     Icon: Calendar },
+    { id: 'reviews',      label: 'Reviews',          Icon: Star },
     { id: 'settings',     label: 'Settings',         Icon: Settings },
     { id: 'videos',       label: 'Videos',           Icon: Video },
     { id: 'guide',        label: 'Ayurvedic Guide',  Icon: BookOpen },
@@ -96,7 +98,7 @@ const AdminDashboard = () => {
           ))}
 
           <li className="admin-nav-section-title">Services</li>
-          {navItems.slice(5, 6).map(({ id, label, Icon, badge }) => (
+          {navItems.slice(5, 7).map(({ id, label, Icon, badge }) => (
             <li key={id} className={activeTab === id ? 'active' : ''} onClick={() => setActiveTab(id)}>
               <Icon size={17} /> {label}
               {badge > 0 && <span className="nav-badge">{badge}</span>}
@@ -104,7 +106,7 @@ const AdminDashboard = () => {
           ))}
 
           <li className="admin-nav-section-title">System</li>
-          {navItems.slice(6).map(({ id, label, Icon, badge }) => (
+          {navItems.slice(7).map(({ id, label, Icon, badge }) => (
             <li key={id} className={activeTab === id ? 'active' : ''} onClick={() => setActiveTab(id)}>
               <Icon size={17} /> {label}
               {badge > 0 && <span className="nav-badge">{badge}</span>}
@@ -120,6 +122,7 @@ const AdminDashboard = () => {
         {activeTab === 'products'     && <ManageProducts />}
         {activeTab === 'orders'       && <ManageOrders />}
         {activeTab === 'appointments' && <ManageAppointments />}
+        {activeTab === 'reviews'      && <ManageReviews />}
         {activeTab === 'settings' && <ManageSettings />}
         {activeTab === 'videos' && <ManageVideos />}
         {activeTab === 'guide' && (

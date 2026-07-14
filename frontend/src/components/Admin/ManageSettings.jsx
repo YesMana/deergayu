@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { DollarSign, Activity, Mail, Tag, Shield, Send } from 'lucide-react';
+import { DollarSign, Activity, Mail, Tag, Shield, Send, Truck, CreditCard } from 'lucide-react';
 import { auth } from '../../firebase';
 import { useToast } from '../../context/ToastContext';
 
@@ -19,6 +19,18 @@ const DEFAULT_SETTINGS = {
     { id: 'wellness', name: 'Wellness', commissionPercent: 10 },
     { id: 'general', name: 'General', commissionPercent: 10 },
   ],
+  shippingZones: [
+    { id: 'colombo', name: 'Colombo Metro', fee: 250 },
+    { id: 'western', name: 'Western Province', fee: 350 },
+    { id: 'island', name: 'Island-wide', fee: 500 },
+  ],
+  bankDetails: {
+    bank: "People's Bank",
+    branch: 'Colombo 03',
+    accountName: 'Deergayu (Pvt) Ltd',
+    accountNo: '123-4567-8901-00',
+  },
+  payhereEnabled: false,
 };
 
 const ManageSettings = () => {
@@ -29,6 +41,7 @@ const ManageSettings = () => {
   const [broadcast, setBroadcast] = useState({ subject: '', message: '', audience: 'all' });
   const [sendingBroadcast, setSendingBroadcast] = useState(false);
   const [newCategory, setNewCategory] = useState({ name: '', commissionPercent: 10 });
+  const [shippingJson, setShippingJson] = useState(JSON.stringify(DEFAULT_SETTINGS.shippingZones, null, 2));
 
   const getToken = () => auth.currentUser?.getIdToken();
 
@@ -36,7 +49,11 @@ const ManageSettings = () => {
     try {
       const token = await getToken();
       const res = await fetch(`${API_URL}/api/settings`, { headers: { Authorization: `Bearer ${token}` } });
-      if (res.ok) setSettings({ ...DEFAULT_SETTINGS, ...(await res.json()) });
+      if (res.ok) {
+        const data = { ...DEFAULT_SETTINGS, ...(await res.json()) };
+        setSettings(data);
+        setShippingJson(JSON.stringify(data.shippingZones || DEFAULT_SETTINGS.shippingZones, null, 2));
+      }
     } catch (e) { console.error(e); }
   }, []);
 
@@ -45,14 +62,27 @@ const ManageSettings = () => {
   const handleSaveSettings = async () => {
     setSavingSettings(true);
     try {
+      let zones = settings.shippingZones;
+      try {
+        const parsed = JSON.parse(shippingJson);
+        if (!Array.isArray(parsed)) throw new Error('shippingZones must be an array');
+        zones = parsed;
+      } catch (e) {
+        error(e.message || 'Invalid shippingZones JSON');
+        setSavingSettings(false);
+        return;
+      }
+      const payload = { ...settings, shippingZones: zones };
       const token = await getToken();
       const res = await fetch(`${API_URL}/api/settings`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify(settings),
+        body: JSON.stringify(payload),
       });
-      if (res.ok) success('Settings saved!');
-      else error('Failed to save');
+      if (res.ok) {
+        setSettings(payload);
+        success('Settings saved!');
+      } else error('Failed to save');
     } catch (e) { error(e.message); } finally { setSavingSettings(false); }
   };
 
@@ -160,6 +190,59 @@ const ManageSettings = () => {
           <input placeholder="New category name" value={newCategory.name} onChange={(e) => setNewCategory({ ...newCategory, name: e.target.value })} className="form-control" style={{ maxWidth: 200 }} />
           <input type="number" placeholder="%" value={newCategory.commissionPercent} onChange={(e) => setNewCategory({ ...newCategory, commissionPercent: e.target.value })} className="form-control" style={{ maxWidth: 80 }} />
           <button className="btn btn-outline" onClick={addCategory}>+ Add Category</button>
+        </div>
+      </div>
+
+      {/* Shipping zones */}
+      <div className="dash-section">
+        <div className="dash-section-header"><h3><Truck size={15} /> Shipping Zones</h3></div>
+        <div className="settings-card" style={{ margin: '0 1rem 1rem' }}>
+          <p>Shown at checkout. Edit as JSON array of {'{ id, name, fee }'}.</p>
+          <textarea
+            className="form-control"
+            rows={6}
+            value={shippingJson}
+            onChange={(e) => setShippingJson(e.target.value)}
+            style={{ fontFamily: 'monospace', fontSize: '0.82rem' }}
+          />
+        </div>
+      </div>
+
+      {/* Bank + PayHere */}
+      <div className="dash-section">
+        <div className="dash-section-header"><h3><CreditCard size={15} /> Payments</h3></div>
+        <div className="settings-grid">
+          <div className="settings-card">
+            <h4>Bank Details</h4>
+            <p>Shown after bank transfer / QR checkout</p>
+            {['bank', 'branch', 'accountName', 'accountNo'].map((key) => (
+              <div className="form-group" key={key} style={{ marginBottom: '0.65rem' }}>
+                <label style={{ textTransform: 'capitalize' }}>{key.replace(/([A-Z])/g, ' $1')}</label>
+                <input
+                  className="form-control"
+                  value={settings.bankDetails?.[key] || ''}
+                  onChange={(e) => setSettings({
+                    ...settings,
+                    bankDetails: { ...(settings.bankDetails || {}), [key]: e.target.value },
+                  })}
+                />
+              </div>
+            ))}
+          </div>
+          <div className="settings-card">
+            <h4>PayHere Card Payments</h4>
+            <p>Enable when PAYHERE_MERCHANT_ID is set on the server</p>
+            <div className="toggle-group">
+              <div
+                className={`toggle-option ${settings.payhereEnabled ? 'active' : ''}`}
+                onClick={() => setSettings({ ...settings, payhereEnabled: true })}
+              >✓ Enabled</div>
+              <div
+                className={`toggle-option ${!settings.payhereEnabled ? 'active' : ''}`}
+                onClick={() => setSettings({ ...settings, payhereEnabled: false })}
+              >✗ Disabled</div>
+            </div>
+          </div>
         </div>
       </div>
 

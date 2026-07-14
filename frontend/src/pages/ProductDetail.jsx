@@ -7,6 +7,10 @@ import { useCart } from '../context/CartContext';
 import { useToast } from '../context/ToastContext';
 import { ShoppingCart, Star, Heart, ArrowLeft, UserCircle } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
+import SEO from '../components/SEO';
+import { resolveMediaUrl } from '../components/Admin/AdminUtils';
+
+const API_URL = import.meta.env.VITE_API_URL || '';
 
 const ProductDetail = () => {
   const { id } = useParams();
@@ -20,6 +24,8 @@ const ProductDetail = () => {
   const [loading, setLoading] = useState(true);
   const [reviews, setReviews] = useState([]);
   const [selectedImage, setSelectedImage] = useState(0); // index into images array
+  const [wishlisted, setWishlisted] = useState(false);
+  const [wishlistBusy, setWishlistBusy] = useState(false);
   
   // Review form state
   const [rating, setRating] = useState(5);
@@ -57,6 +63,65 @@ const ProductDetail = () => {
     fetchProductAndReviews();
   }, [id, navigate, error]);
 
+  useEffect(() => {
+    if (!user) {
+      setWishlisted(false);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const token = await user.getIdToken();
+        const res = await fetch(`${API_URL}/api/wishlist`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!res.ok) return;
+        const data = await res.json();
+        if (!cancelled) setWishlisted((data.items || []).includes(id));
+      } catch (e) {
+        console.error('Wishlist fetch error:', e);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [user, id]);
+
+  const handleWishlist = async () => {
+    if (!user) {
+      error('Please log in to use the wishlist.');
+      navigate('/login?returnUrl=/product/' + id);
+      return;
+    }
+    setWishlistBusy(true);
+    try {
+      const token = await user.getIdToken();
+      const method = wishlisted ? 'DELETE' : 'POST';
+      let res = await fetch(`${API_URL}/api/wishlist/${id}`, {
+        method,
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      // Backend currently toggles via POST; fall back if DELETE is unavailable
+      if (!res.ok && method === 'DELETE') {
+        res = await fetch(`${API_URL}/api/wishlist/${id}`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}` },
+        });
+      }
+      if (!res.ok) throw new Error('Wishlist update failed');
+      const data = await res.json().catch(() => ({}));
+      if (typeof data.added === 'boolean') {
+        setWishlisted(data.added);
+        success(data.added ? 'Added to wishlist!' : 'Removed from wishlist');
+      } else {
+        setWishlisted(!wishlisted);
+        success(wishlisted ? 'Removed from wishlist' : 'Added to wishlist!');
+      }
+    } catch (err) {
+      error(err.message || 'Failed to update wishlist');
+    } finally {
+      setWishlistBusy(false);
+    }
+  };
+
   const handleAddToCart = async () => {
     try {
       if (product.stock === 0) return;
@@ -88,7 +153,6 @@ const ProductDetail = () => {
     setSubmittingReview(true);
     try {
       const token = await user.getIdToken();
-      const API_URL = import.meta.env.VITE_API_URL || '';
       const res = await fetch(`${API_URL}/api/reviews`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
@@ -115,8 +179,39 @@ const ProductDetail = () => {
 
   if (!product) return null;
 
+  const productImageRaw = product.imageUrl || product.image || '';
+  const productImage = resolveMediaUrl(productImageRaw) || productImageRaw || 'https://deergayu.com/weda-gedara.png';
+  const productUrl = `https://deergayu.com/product/${id}`;
+  const productDesc = product.description || `${product.name} — authentic Ayurvedic product on Deergayu.`;
+  const productJsonLd = {
+    '@context': 'https://schema.org',
+    '@type': 'Product',
+    name: product.name,
+    description: productDesc,
+    image: productImage,
+    url: productUrl,
+    brand: { '@type': 'Brand', name: product.vendorName || 'Deergayu' },
+    offers: {
+      '@type': 'Offer',
+      priceCurrency: 'LKR',
+      price: String(product.price ?? 0),
+      availability: product.stock === 0
+        ? 'https://schema.org/OutOfStock'
+        : 'https://schema.org/InStock',
+    },
+  };
+
   return (
     <div className="product-detail-page" style={{ paddingTop: '100px', minHeight: '100vh', background: 'var(--bg-color)', color: 'var(--text-primary)' }}>
+      <SEO
+        title={`${product.name} | Deergayu Shop`}
+        description={productDesc.slice(0, 160)}
+        image={productImage}
+        url={productUrl}
+        canonical={productUrl}
+        type="product"
+        jsonLd={productJsonLd}
+      />
       <div className="container">
         
         <button onClick={() => navigate(-1)} className="btn btn-outline" style={{ marginBottom: '2rem', display: 'flex', alignItems: 'center', gap: '0.5rem', border: 'none' }}>
@@ -132,7 +227,7 @@ const ProductDetail = () => {
               const allImages = [
                 product.imageUrl || product.image,
                 ...(product.images || []).filter(img => img !== product.imageUrl && img !== product.image)
-              ].filter(Boolean);
+              ].filter(Boolean).map(img => resolveMediaUrl(img) || img);
               const dedupedImages = [...new Set(allImages)];
               const mainImg = dedupedImages[selectedImage] || dedupedImages[0] || 'https://images.unsplash.com/photo-1611078516086-6ab28122db63?w=800&q=80';
               
@@ -174,8 +269,21 @@ const ProductDetail = () => {
           <div className="product-info-container">
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
               <h1 style={{ fontSize: '2.5rem', marginBottom: '0.5rem', color: 'var(--secondary-color)' }}>{product.name}</h1>
-              <button className="btn btn-icon" onClick={() => success('Added to wishlist!')} style={{ background: 'rgba(255, 107, 107, 0.1)', color: '#ff6b6b', border: 'none', padding: '0.5rem', borderRadius: '50%', cursor: 'pointer' }}>
-                <Heart size={24} />
+              <button
+                className="btn btn-icon"
+                onClick={handleWishlist}
+                disabled={wishlistBusy}
+                aria-label={wishlisted ? 'Remove from wishlist' : 'Add to wishlist'}
+                style={{
+                  background: wishlisted ? 'rgba(255, 107, 107, 0.25)' : 'rgba(255, 107, 107, 0.1)',
+                  color: '#ff6b6b',
+                  border: 'none',
+                  padding: '0.5rem',
+                  borderRadius: '50%',
+                  cursor: wishlistBusy ? 'wait' : 'pointer',
+                }}
+              >
+                <Heart size={24} fill={wishlisted ? 'currentColor' : 'none'} />
               </button>
             </div>
             
@@ -184,9 +292,9 @@ const ProductDetail = () => {
             <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '2rem' }}>
               <div style={{ display: 'flex', alignItems: 'center', color: '#f1c40f' }}>
                 {[1,2,3,4,5].map(star => (
-                  <Star key={star} size={18} fill={star <= (product.rating || 4.5) ? "currentColor" : "none"} />
+                  <Star key={star} size={18} fill={star <= (product.rating || product.averageRating || 4.5) ? "currentColor" : "none"} />
                 ))}
-                <span style={{ color: 'var(--text-secondary)', marginLeft: '0.5rem', fontSize: '0.9rem' }}>({reviews.length} reviews)</span>
+                <span style={{ color: 'var(--text-secondary)', marginLeft: '0.5rem', fontSize: '0.9rem' }}>({product.reviewCount ?? reviews.length} reviews)</span>
               </div>
               <span className="type-badge" style={{ background: 'rgba(76, 175, 80, 0.1)', color: '#4caf50', padding: '0.3rem 0.6rem', borderRadius: '4px', fontSize: '0.8rem' }}>{product.category}</span>
               {product.stock === 0 && <span className="type-badge" style={{ background: 'rgba(255, 107, 107, 0.1)', color: '#ff6b6b', padding: '0.3rem 0.6rem', borderRadius: '4px', fontSize: '0.8rem' }}>Out of Stock</span>}

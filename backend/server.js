@@ -144,6 +144,61 @@ apiRouter.get('/health', (req, res) => {
   res.json({ status: 'OK', message: 'Deergayu API is running', timestamp: new Date().toISOString() });
 });
 
+// Auth identity — includes adminEmails list (for multi-admin UI access)
+apiRouter.get('/auth/me', verifyUser, async (req, res) => {
+  try {
+    const userDoc = await db.collection('users').doc(req.user.uid).get();
+    const data = userDoc.exists ? userDoc.data() : {};
+    const admin = await isAdminUser(db, req.user);
+    res.json({
+      uid: req.user.uid,
+      email: req.user.email,
+      role: admin ? 'admin' : (data.role || 'user'),
+      status: data.status || 'approved',
+      name: data.name || null,
+      isAdmin: admin,
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Public storefront settings (shipping, bank, payhere flag)
+apiRouter.get('/storefront-settings', async (req, res) => {
+  try {
+    const settings = await getSettings(db);
+    res.json({
+      shippingZones: settings.shippingZones || DEFAULT_SETTINGS.shippingZones,
+      bankDetails: settings.bankDetails || DEFAULT_SETTINGS.bankDetails,
+      payhereEnabled: Boolean(settings.payhereEnabled && process.env.PAYHERE_MERCHANT_ID),
+      contactEmail: settings.contactEmail || DEFAULT_SETTINGS.contactEmail,
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Sitemap data for SEO (products + static pages)
+apiRouter.get('/sitemap-data', async (req, res) => {
+  try {
+    const snap = await db.collection('products').where('status', '==', 'approved').limit(500).get();
+    const products = snap.docs.map((d) => ({
+      id: d.id,
+      updatedAt: d.data().updatedAt || d.data().createdAt || null,
+    }));
+    res.json({
+      baseUrl: 'https://deergayu.com',
+      static: [
+        '/', '/shop', '/channeling', '/ayurvedic-guide', '/videos', '/astrology',
+        '/contact', '/privacy', '/terms', '/refund-policy',
+      ],
+      products,
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // ============================================================
 // AUTHENTICATION APIs
 // ============================================================
@@ -275,6 +330,10 @@ apiRouter.post('/contact', async (req, res) => {
   `;
 
   try {
+    await db.collection('contact_messages').add({
+      name, email, phone: phone || '', subject: topic, message,
+      status: 'new', createdAt: new Date().toISOString(),
+    });
     sendAdminEmail(`Contact: ${topic} — ${name}`, adminHtml)
       .catch(e => console.error('Admin contact email error:', e));
     sendEmail(email, 'We received your message — Deergayu', '', userHtml)
@@ -283,6 +342,15 @@ apiRouter.post('/contact', async (req, res) => {
   } catch (error) {
     console.error('Contact form error:', error);
     res.status(500).json({ error: 'Failed to send message' });
+  }
+});
+
+apiRouter.get('/admin/contact-messages', verifyAdmin, async (req, res) => {
+  try {
+    const snap = await db.collection('contact_messages').orderBy('createdAt', 'desc').limit(100).get();
+    res.json(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+  } catch (error) {
+    res.status(500).json({ error: error.message });
   }
 });
 
@@ -949,7 +1017,7 @@ apiRouter.get('/reviews/:targetType/:targetId', async (req, res) => {
         ? db.collection('products').doc(targetId).collection('reviews')
         : db.collection('users').doc(targetId).collection('reviews');
     const snap = await col.orderBy('createdAt', 'desc').limit(50).get();
-    res.json(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+    res.json(snap.docs.map((d) => ({ id: d.id, ...d.data() })).filter((r) => !r.status || r.status === 'published'));
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -987,6 +1055,92 @@ apiRouter.post('/reviews', verifyUser, async (req, res) => {
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
+});
+
+// Admin: list recent reviews
+apiRouter.get('/admin/reviews', verifyAdmin, async (req, res) => {
+  try {
+    const [productsSnap, usersSnap] = await Promise.all([
+      db.collection('products').limit(80).get(),
+      db.collection('users').where('role', 'in', ['doctor', 'clinic', 'organization', 'vendor']).limit(80).get(),
+    ]);
+    const reviews = [];
+    for (const docSnap of productsSnap.docs) {
+      const rSnap = await docSnap.ref.collection('reviews').orderBy('createdAt', 'desc').limit(5).get();
+      rSnap.docs.forEach((r) => reviews.push({
+        id: r.id, targetType: 'product', targetId: docSnap.id,
+        targetName: docSnap.data().name || docSnap.id, ...r.data(),
+      }));
+    }
+    for (const docSnap of usersSnap.docs) {
+      const rSnap = await docSnap.ref.collection('reviews').orderBy('createdAt', 'desc').limit(5).get();
+      rSnap.docs.forEach((r) => reviews.push({
+        id: r.id, targetType: 'provider', targetId: docSnap.id,
+        targetName: docSnap.data().name || docSnap.data().email || docSnap.id, ...r.data(),
+      }));
+    }
+    reviews.sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || '')));
+    res.json(reviews.slice(0, 100));
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+apiRouter.post('/admin/reviews/:targetType/:targetId/:reviewId/status', verifyAdmin, async (req, res) => {
+  const { targetType, targetId, reviewId } = req.params;
+  const { status } = req.body;
+  if (!['product', 'provider'].includes(targetType)) {
+    return res.status(400).json({ error: 'Invalid target type' });
+  }
+  if (!['published', 'hidden', 'rejected'].includes(status)) {
+    return res.status(400).json({ error: 'Invalid status' });
+  }
+  try {
+    const col =
+      targetType === 'product'
+        ? db.collection('products').doc(targetId).collection('reviews')
+        : db.collection('users').doc(targetId).collection('reviews');
+    await col.doc(reviewId).update({ status, moderatedAt: new Date().toISOString() });
+    await updateReviewAggregates(db, targetType, targetId);
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+apiRouter.post('/payments/payhere/hash', verifyUser, async (req, res) => {
+  try {
+    const merchantId = process.env.PAYHERE_MERCHANT_ID;
+    const merchantSecret = process.env.PAYHERE_MERCHANT_SECRET;
+    if (!merchantId || !merchantSecret) {
+      return res.status(503).json({ error: 'PayHere is not configured yet. Set PAYHERE_MERCHANT_ID and PAYHERE_MERCHANT_SECRET.' });
+    }
+    const { orderId, amount, currency = 'LKR' } = req.body;
+    if (!orderId || !amount) return res.status(400).json({ error: 'orderId and amount required' });
+    const crypto = require('crypto');
+    const amountFormatted = Number(amount).toFixed(2);
+    const hashedSecret = crypto.createHash('md5').update(merchantSecret).digest('hex').toUpperCase();
+    const hash = crypto
+      .createHash('md5')
+      .update(merchantId + orderId + amountFormatted + currency + hashedSecret)
+      .digest('hex')
+      .toUpperCase();
+    res.json({
+      merchant_id: merchantId,
+      hash,
+      sandbox: process.env.PAYHERE_SANDBOX === 'true',
+      return_url: process.env.PAYHERE_RETURN_URL || 'https://deergayu.com/my-orders',
+      cancel_url: process.env.PAYHERE_CANCEL_URL || 'https://deergayu.com/shop/cart',
+      notify_url: process.env.PAYHERE_NOTIFY_URL || 'https://deergayu.com/api/payments/payhere/notify',
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+apiRouter.post('/payments/payhere/notify', async (req, res) => {
+  console.log('PayHere IPN:', req.body);
+  res.status(200).send('OK');
 });
 
 // Update product
@@ -1278,7 +1432,7 @@ apiRouter.delete('/cart/:productId', verifyUser, async (req, res) => {
 
 // Checkout - create order
 apiRouter.post('/checkout', verifyUser, async (req, res) => {
-  const { paymentMethod, deliveryAddress, phone, notes } = req.body;
+  const { paymentMethod, deliveryAddress, phone, notes, shippingZoneId } = req.body;
   
   try {
     // Get cart
@@ -1288,6 +1442,10 @@ apiRouter.post('/checkout', verifyUser, async (req, res) => {
     }
     
     const items = cartDoc.data().items;
+    const settings = await getSettings(db);
+    const zones = settings.shippingZones || DEFAULT_SETTINGS.shippingZones;
+    const zone = zones.find((z) => z.id === shippingZoneId) || zones[0] || { id: 'island', name: 'Island-wide', fee: 500 };
+    const shippingFee = Number(zone.fee) || 0;
 
     // Enrich cart items with basePrice from product records
     const enrichedItems = await Promise.all(
@@ -1315,10 +1473,16 @@ apiRouter.post('/checkout', verifyUser, async (req, res) => {
     });
     
     const orderIds = [];
+    const vendorIds = Object.keys(vendorGroups);
+    // Split shipping across vendor orders (first order carries full fee for simplicity)
+    let shippingAssigned = false;
     
     // Create an order per vendor
     for (const [vendorId, group] of Object.entries(vendorGroups)) {
-      const totalPrice = group.items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+      const itemsTotal = group.items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+      const orderShipping = !shippingAssigned ? shippingFee : 0;
+      shippingAssigned = true;
+      const totalPrice = itemsTotal + orderShipping;
       const { vendorEarnings, platformFee } = calcOrderEarnings(group.items);
       
       const orderData = {
@@ -1328,10 +1492,13 @@ apiRouter.post('/checkout', verifyUser, async (req, res) => {
         vendorId,
         vendorName: group.vendorName,
         items: group.items,
+        itemsTotal,
+        shippingFee: orderShipping,
+        shippingZone: zone,
         totalPrice,
         vendorEarnings: Math.round(vendorEarnings),
         platformFee: Math.round(platformFee),
-        status: 'pending',
+        status: paymentMethod === 'payhere' ? 'awaiting_payment' : 'pending',
         paymentMethod: paymentMethod || 'cash_on_delivery',
         deliveryAddress: deliveryAddress || '',
         phone: phone || '',
@@ -1419,7 +1586,13 @@ apiRouter.post('/checkout', verifyUser, async (req, res) => {
     // Clear cart
     await db.collection('carts').doc(req.user.uid).set({ items: [], updatedAt: new Date().toISOString() });
     
-    res.json({ message: 'Order placed successfully', orderIds });
+    res.json({
+      message: 'Order placed successfully',
+      orderIds,
+      shippingFee,
+      shippingZone: zone,
+      payhereReady: paymentMethod === 'payhere',
+    });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -1441,7 +1614,7 @@ apiRouter.get('/my-orders', verifyUser, async (req, res) => {
 
 // Book appointment
 apiRouter.post('/appointments', verifyUser, async (req, res) => {
-  const { providerId, providerName, date, time, notes } = req.body;
+  const { providerId, providerName, date, time, notes, consultationType } = req.body;
   
   if (!providerId || !date || !time) {
     return res.status(400).json({ error: 'providerId, date, and time are required' });
@@ -1473,6 +1646,7 @@ apiRouter.post('/appointments', verifyUser, async (req, res) => {
       date,
       time,
       status: 'pending',
+      consultationType: consultationType === 'video' ? 'video' : 'in_person',
       notes: notes || '',
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
@@ -1822,7 +1996,17 @@ const storageConfig = multer.diskStorage({
   }
 });
 
-const upload = multer({ storage: storageConfig });
+const upload = multer({
+  storage: storageConfig,
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
+  fileFilter: (req, file, cb) => {
+    const allowed = /jpeg|jpg|png|webp|gif/;
+    const ext = allowed.test(path.extname(file.originalname).toLowerCase());
+    const mime = allowed.test(file.mimetype);
+    if (ext && mime) return cb(null, true);
+    cb(new Error('Only image files (JPEG, PNG, WEBP, GIF) are allowed'));
+  },
+});
 
 // Serve uploaded files — explicit route works reliably on cPanel/Passenger
 function serveUploadFile(req, res) {
@@ -1851,18 +2035,24 @@ function publicUploadUrl(req, filename) {
 }
 
 // Add file upload API endpoint
-apiRouter.post('/upload', verifyUser, upload.single('image'), (req, res) => {
-  try {
-    if (!req.file) {
-      return res.status(400).json({ error: 'No file uploaded' });
+apiRouter.post('/upload', verifyUser, (req, res) => {
+  upload.single('image')(req, res, (err) => {
+    if (err) {
+      const msg = err.code === 'LIMIT_FILE_SIZE' ? 'Image must be under 5MB' : (err.message || 'Upload failed');
+      return res.status(400).json({ error: msg });
     }
-    const relativePath = `/uploads/${req.file.filename}`;
-    const url = publicUploadUrl(req, req.file.filename);
-    res.json({ url, path: relativePath });
-  } catch (error) {
-    console.error('File upload error:', error);
-    res.status(500).json({ error: 'Failed to upload file' });
-  }
+    try {
+      if (!req.file) {
+        return res.status(400).json({ error: 'No file uploaded' });
+      }
+      const relativePath = `/uploads/${req.file.filename}`;
+      const url = publicUploadUrl(req, req.file.filename);
+      res.json({ url, path: relativePath });
+    } catch (error) {
+      console.error('File upload error:', error);
+      res.status(500).json({ error: 'Failed to upload file' });
+    }
+  });
 });
 
 // --- AYURVEDIC GUIDE ---
@@ -2043,231 +2233,7 @@ apiRouter.delete('/guide/routines/:id', verifyAdmin, async (req, res) => {
 });
 
 app.use('/api', apiRouter);
-// Note: removed duplicate '/' mount to avoid route conflicts
-
-// --- AYURVEDIC GUIDE ENDPOINTS ---
-
-// Seed initial demo data
-app.post('/api/guide/seed', async (req, res) => {
-  try {
-    const remedies = [
-      {
-        image: 'https://images.unsplash.com/photo-1596541223130-5d564415f0d4?auto=format&fit=crop&q=80&w=400',
-        en: { name: 'Paspanguwa', ingredients: 'Coriander, Ginger, Pathpadagam, Katuwelbatu, Veniwelgeta', uses: 'Common cold, fever, body aches, and boosting immunity.', preparation: 'Boil all 5 ingredients in 4 cups of water until it reduces to 1 cup. Drink warm, optionally with jaggery.' },
-        si: { name: 'පස්පංගුව', ingredients: 'කොත්තමල්ලි, ඉඟුරු, පත්පාඩගම්, කටුවැල්බටු, වෙනිවැල්ගැට', uses: 'සෙම්ප්‍රතිශ්‍යාව, උණ, ඇඟපත වේදනාව සහ ප්‍රතිශක්තිය වැඩි කිරීමට.', preparation: 'මේ ඖෂධ 5ම වතුර කෝප්ප 4ක් දමා කෝප්ප 1කට සිඳෙන්නට හැර උණුවෙන්ම බොන්න.' },
-        ta: { name: 'பஸ்பங்குவ', ingredients: 'கொத்தமல்லி, இஞ்சி, பத்பாடகம், கட்டுவெல்படு, வெனிவெல்கெட', uses: 'ஜலதோஷம், காய்ச்சல், உடல் வலி மற்றும் நோய் எதிர்ப்பு சக்தியை அதிகரிக்கும்.', preparation: 'இந்த 5 பொருட்களையும் 4 கப் தண்ணீரில் 1 கப்பாக குறையும் வரை கொதிக்க வைக்கவும். சூடாக குடிக்கவும்.' }
-      },
-      {
-        image: 'https://images.unsplash.com/photo-1596040033229-a9821ebd058d?auto=format&fit=crop&q=80&w=400',
-        en: { name: 'Koththamalli', ingredients: 'Coriander seeds, Ginger (optional)', uses: 'Mild fever, sore throat, indigestion, and as a cooling drink.', preparation: 'Roast coriander seeds lightly, crush them, and boil with water. Strain and drink warm.' },
-        si: { name: 'කොත්තමල්ලි', ingredients: 'කොත්තමල්ලි ඇට, ඉඟුරු', uses: 'සුළු උණ, උගුරේ අමාරුව, ආහාර අරුචිය සහ ඇඟ නිවීමට.', preparation: 'කොත්තමල්ලි ඇට මද ගින්නේ බැද, තලා වතුරෙන් තම්බා පෙරා උණුවෙන් බොන්න.' },
-        ta: { name: 'கொத்தமல்லி', ingredients: 'கொத்தமல்லி விதைகள், இஞ்சி', uses: 'லேசான காய்ச்சல், தொண்டை வலி, மற்றும் உடலை குளிர்விக்க.', preparation: 'கொத்தமல்லி விதைகளை லேசாக வறுத்து, தண்ணீரில் கொதிக்க வைத்து வடிகட்டி சூடாக குடிக்கவும்.' }
-      },
-      {
-        image: 'https://images.unsplash.com/photo-1611591437281-460bfbe1220a?auto=format&fit=crop&q=80&w=400',
-        en: { name: 'Veniwelgeta', ingredients: 'Yellow Vine (Coscinium fenestratum)', uses: 'Pain relief, reducing inflammation, wound healing, and treating tetanus.', preparation: 'Boil the dried stems in water for 15-20 minutes. Drink the bitter decoction.' },
-        si: { name: 'වෙනිවැල්ගැට', ingredients: 'වෙනිවැල්ගැට', uses: 'වේදනා නාශකයක් ලෙස, ඉදිමුම් අඩු කිරීමට සහ තුවාල සුව කිරීමට.', preparation: 'වියළි වෙනිවැල්ගැට කැබලි විනාඩි 15-20ක් පමණ තම්බා එහි තිත්ත කසාය පානය කරන්න.' },
-        ta: { name: 'வெனிவெல்கெட', ingredients: 'வெனிவெல்கெட', uses: 'வலி நிவாரணி, வீக்கத்தை குறைத்தல், காயங்களை ஆற்றுதல்.', preparation: 'காய்ந்த வெனிவெல்கெட துண்டுகளை 15-20 நிமிடங்கள் தண்ணீரில் கொதிக்க வைத்து கசப்பான கஷாயத்தை குடிக்கவும்.' }
-      },
-      {
-        image: 'https://images.unsplash.com/photo-1589363460779-cb495392ee5a?auto=format&fit=crop&q=80&w=400',
-        en: { name: 'Iramusu', ingredients: 'Indian Sarsaparilla (Hemidesmus indicus)', uses: 'Purifying blood, cooling the body, improving skin complexion.', preparation: 'Boil the dried roots in water and drink as a regular tea.' },
-        si: { name: 'ඉරමුසු', ingredients: 'ඉරමුසු', uses: 'රුධිරය පිරිසිදු කිරීමට, ශරීරය සිසිල් කිරීමට සහ සම පැහැපත් කිරීමට.', preparation: 'වියළි ඉරමුසු මුල් තම්බා සාමාන්‍ය තේ පානයක් ලෙස බොන්න.' },
-        ta: { name: 'இரமுசு', ingredients: 'நன்னாரி (இரமுசு)', uses: 'இரத்தத்தை சுத்திகரித்தல், உடலை குளிர்வித்தல், மற்றும் சருமத்தை மேம்படுத்துதல்.', preparation: 'காய்ந்த வேர்களை தண்ணீரில் கொதிக்க வைத்து தேநீர் போல குடிக்கவும்.' }
-      },
-      {
-        image: 'https://images.unsplash.com/photo-1512621776951-a57141f2eefd?auto=format&fit=crop&q=80&w=400',
-        en: { name: 'Gotukola Kenda', ingredients: 'Gotukola leaves, Red rice, Coconut milk, Garlic, Ginger', uses: 'Enhancing memory, improving eyesight, and nourishing the body.', preparation: 'Blend Gotukola leaves, extract juice, and cook with boiled red rice gruel and coconut milk.' },
-        si: { name: 'ගොටුකොළ කැඳ', ingredients: 'ගොටුකොළ, රතු කැකුළු සහල්, පොල් කිරි, සුදුළූණු, ඉඟුරු', uses: 'මතක ශක්තිය වැඩි කිරීමට, ඇස් පෙනීම වර්ධනයට සහ ශරීරය පෝෂණය කිරීමට.', preparation: 'ගොටුකොළ කොටා යුෂ ගෙන, තම්බාගත් රතු කැකුළු සහල් සහ පොල් කිරි සමඟ මිශ්‍ර කර උයාගන්න.' },
-        ta: { name: 'வல்லாரை கஞ்சி', ingredients: 'வல்லாரை இலைகள், சிவப்பு அரிசி, தேங்காய் பால், பூண்டு, இஞ்சி', uses: 'நினைவாற்றலை அதிகரித்தல், கண்பார்வையை மேம்படுத்துதல் மற்றும் உடலை போஷித்தல்.', preparation: 'வல்லாரை இலைகளை அரைத்து சாறு எடுத்து, சமைத்த சிவப்பு அரிசி மற்றும் தேங்காய் பாலுடன் கலக்கவும்.' }
-      },
-      {
-        image: 'https://images.unsplash.com/photo-1606579294215-64bc63bba2c2?auto=format&fit=crop&q=80&w=400',
-        en: { name: 'Karapincha', ingredients: 'Curry leaves', uses: 'Lowering cholesterol, improving digestion, and controlling diabetes.', preparation: 'Extract juice from fresh leaves and mix with a little lime and salt, or consume as a gruel.' },
-        si: { name: 'කරපිංචා', ingredients: 'කරපිංචා කොළ', uses: 'කොලෙස්ටරෝල් අඩු කිරීමට, දිරවීම පහසු කිරීමට සහ දියවැඩියාව පාලනයට.', preparation: 'නැවුම් කොළ කොටා යුෂ ගෙන දෙහි සහ ලුණු ස්වල්පයක් සමඟ පානය කරන්න, නැතහොත් කැඳ ලෙස සාදාගන්න.' },
-        ta: { name: 'கறிவேப்பிலை', ingredients: 'கறிவேப்பிலை', uses: 'கொலஸ்ட்ராலைக் குறைத்தல், செரிமானத்தை மேம்படுத்துதல் மற்றும் நீரிழிவு நோயைக் கட்டுப்படுத்துதல்.', preparation: 'புதிய இலைகளிலிருந்து சாறு எடுத்து சிறிதளவு எலுமிச்சை மற்றும் உப்புடன் கலந்து குடிக்கவும்.' }
-      }
-    ];
-
-    const routines = [
-      {
-        condition: 'general', order: 1, icon: 'Sun',
-        en: { time: '5:00 AM - 6:00 AM', title: 'Brahma Muhurta (Wake Up)', description: 'Wake up 1.5 hours before sunrise. This is the most peaceful time of day, ideal for spiritual practices.', tips: 'Gently stretch in bed | Express gratitude | Avoid checking your phone immediately' },
-        si: { time: 'පෙ.ව. 5:00 - 6:00', title: 'බ්‍රහ්ම මුහුර්තය (අවදි වීම)', description: 'හිරු උදාවට පැය 1.5කට පෙර අවදි වන්න. මෙය දවසේ නිස්කලංකම වේලාව වන අතර ආධ්‍යාත්මික කටයුතු සඳහා ඉතා යෝග්‍ය වේ.', tips: 'ඇඳේ සිටම ඇඟ මැලි කඩන්න | ස්වභාවධර්මයට ස්තූති කරන්න | අවදි වූ ගමන් ජංගම දුරකථනය බැලීමෙන් වළකින්න' },
-        ta: { time: 'காலை 5:00 - 6:00', title: 'பிரம்மா முஹூர்த்தம் (எழுதல்)', description: 'சூரிய உதயத்திற்கு 1.5 மணி நேரத்திற்கு முன்பு எழுந்திருங்கள். இது நாளின் மிகவும் அமைதியான நேரம்.', tips: 'படுக்கையில் மெதுவாக நீட்டவும் | இயற்கைக்கு நன்றி தெரிவிக்கவும் | உடனடியாக தொலைபேசியைப் பார்ப்பதைத் தவிர்க்கவும்' }
-      },
-      {
-        condition: 'general', order: 2, icon: 'Droplet',
-        en: { time: '6:00 AM - 6:30 AM', title: 'Purification & Cleansing', description: 'Cleanse the senses. Wash your face, scrape your tongue to remove toxins, and drink warm water.', tips: 'Use a copper tongue scraper | Drink warm lemon water | Brush teeth with herbal toothpaste' },
-        si: { time: 'පෙ.ව. 6:00 - 6:30', title: 'පිරිසිදු වීම', description: 'මුහුණ සෝදා, දිව මැද විස ඉවත් කරගන්න. ආහාර දිරවීම උත්තේජනය කිරීම සඳහා උණුසුම් ජලය වීදුරුවක් පානය කරන්න.', tips: 'තඹ දිව මදින උපකරණයක් භාවිතා කරන්න | උණුසුම් දෙහි වතුර බොන්න | ඖෂධීය දන්තාලේප භාවිතා জ্ঞකරන්න' },
-        ta: { time: 'காலை 6:00 - 6:30', title: 'சுத்திகரிப்பு', description: 'முகம் கழுவி, நாக்கை சுத்தம் செய்து நச்சுக்களை அகற்றவும். செரிமானத்தைத் தூண்ட வெதுவெதுப்பான நீரைக் குடிக்கவும்.', tips: 'செம்பு நாக்கு வழிப்பான் பயன்படுத்தவும் | வெதுவெதுப்பான எலுமிச்சை நீர் குடிக்கவும் | மூலிகை பற்பசை பயன்படுத்தவும்' }
-      },
-      {
-        condition: 'general', order: 3, icon: 'Activity',
-        en: { time: '6:30 AM - 7:30 AM', title: 'Movement & Meditation', description: 'Engage in gentle exercise like Yoga, followed by breathwork and meditation.', tips: 'Sun salutations | 10-15 minutes of meditation | Abhyanga (self-massage)' },
-        si: { time: 'පෙ.ව. 6:30 - 7:30', title: 'ව්‍යායාම සහ භාවනා', description: 'යෝගා වැනි සැහැල්ලු ව්‍යායාමවල නිරත වන්න, ඉන්පසු ප්‍රාණයාම සහ භාවනා කරන්න.', tips: 'සූර්ය නමස්කාරය | විනාඩි 10-15ක නිහඬ භාවනාව | ස්නානයට පෙර ඇඟේ තෙල් ගෑම (අභ්‍යංග)' },
-        ta: { time: 'காலை 6:30 - 7:30', title: 'உடற்பயிற்சி & தியானம்', description: 'யோகா போன்ற மென்மையான உடற்பயிற்சிகளை மேற்கொள்ளவும், பின்னர் மூச்சுப் பயிற்சி மற்றும் தியானம்.', tips: 'சூரிய நமஸ்காரம் | 10-15 நிமிட தியானம் | குளிப்பதற்கு முன் எண்ணெய் மசாஜ் (அப்யங்கா)' }
-      },
-      {
-        condition: 'general', order: 4, icon: 'Coffee',
-        en: { time: '7:30 AM - 8:30 AM', title: 'Light Breakfast', description: 'Eat a nourishing, warm breakfast appropriate for your Dosha.', tips: 'Warm oatmeal or herbal gruel | Avoid cold or heavy foods | Eat only when genuinely hungry' },
-        si: { time: 'පෙ.ව. 7:30 - 8:30', title: 'සැහැල්ලු උදෑසන ආහාරය', description: 'ඔබේ දෝෂයට ගැලපෙන පෝෂ්‍යදායී, උණුසුම් උදෑසන ආහාරයක් ගන්න.', tips: 'ඖෂධීය කැඳ වීදුරුවක් | සීතල හෝ බර ආහාර වලින් වළකින්න | බඩගිනි නම් පමණක් ආහාර ගන්න' },
-        ta: { time: 'காலை 7:30 - 8:30', title: 'காலை உணவு', description: 'உங்கள் தோஷத்திற்கு ஏற்ற சத்தான, சூடான காலை உணவை உண்ணுங்கள்.', tips: 'மூலிகை கஞ்சி | குளிர்ந்த அல்லது கனமான உணவுகளைத் தவிர்க்கவும் | பசியாக இருக்கும்போது மட்டுமே சாப்பிடவும்' }
-      },
-      {
-        condition: 'general', order: 5, icon: 'Sun',
-        en: { time: '12:00 PM - 1:00 PM', title: 'Lunch (Main Meal)', description: 'Pitta dosha is at its peak. This should be your largest and most complex meal of the day.', tips: 'Include all 6 tastes | Eat in a calm environment | Sit for 10 minutes after eating' },
-        si: { time: 'ප.ව. 12:00 - 1:00', title: 'ප්‍රධාන ආහාරය (දිවා ආහාරය)', description: 'දිවා කාලයේ ඔබේ ආහාර දිරවීමේ ගින්න (අග්නි) උපරිම වේ. මෙය දවසේ විශාලතම ආහාර වේල විය යුතුය.', tips: 'රස 6ම (පැණි, ඇඹුල්, ලුණු, තිත්ත, කහට, සැර) ඇතුළත් කරගන්න | නිදහස් පරිසරයක ආහාර ගන්න | කෑමෙන් පසු විනාඩි 10ක් විවේක ගන්න' },
-        ta: { time: 'பகல் 12:00 - 1:00', title: 'மதிய உணவு', description: 'பகல் நேரத்தில் உங்கள் செரிமான தீ உச்சத்தில் இருக்கும். இது நாளின் மிகப்பெரிய உணவாக இருக்க வேண்டும்.', tips: '6 சுவைகளையும் சேர்க்கவும் | அமைதியான சூழலில் சாப்பிடவும் | சாப்பிட்ட பிறகு 10 நிமிடம் ஓய்வெடுக்கவும்' }
-      },
-      {
-        condition: 'general', order: 6, icon: 'Moon',
-        en: { time: '6:00 PM - 7:00 PM', title: 'Light Dinner', description: 'As the sun goes down, your digestive fire weakens. Eat a light, warm dinner.', tips: 'Soups, steamed vegetables | Avoid heavy proteins | Take a short, gentle walk after eating' },
-        si: { time: 'ප.ව. 6:00 - 7:00', title: 'රාත්‍රී ආහාරය', description: 'හිරු බැස යන විට ආහාර දිරවීම දුර්වල වේ. නින්දට පැය 2-3කට පෙර සැහැල්ලු රාත්‍රී ආහාරයක් ගන්න.', tips: 'සුප්, තැම්බූ එළවළු | බර ප්‍රෝටීන් සහිත ආහාර වලින් වළකින්න | කෑමෙන් පසු කෙටි ඇවිදීමක නිරත වන්න' },
-        ta: { time: 'மாலை 6:00 - 7:00', title: 'இரவு உணவு', description: 'சூரியன் மறையும் போது செரிமானம் பலவீனமடைகிறது. இலகுவான இரவு உணவை உண்ணுங்கள்.', tips: 'சூப், வேகவைத்த காய்கறிகள் | கனமான புரதங்களைத் தவிர்க்கவும் | சாப்பிட்ட பிறகு சிறிது நேரம் நடக்கவும்' }
-      },
-      {
-        condition: 'general', order: 7, icon: 'Moon',
-        en: { time: '9:30 PM - 10:00 PM', title: 'Rest & Sleep', description: 'Wind down your day. Promote deep, restorative sleep.', tips: 'Drink warm milk with nutmeg | Read a calming book | Ensure the room is dark and cool' },
-        si: { time: 'ප.ව. 9:30 - 10:00', title: 'නින්ද සහ විවේකය', description: 'දවස අවසන් කරන්න. කඵ දෝෂය ප්‍රමුඛ වන මේ වේලාව ගැඹුරු නින්දකට උදව් වේ.', tips: 'සාදික්කා හෝ කහ මිශ්‍ර උණු කිරි වීදුරුවක් බොන්න | සන්සුන් පොතක් කියවන්න | කාමරය අඳුරුව සහ සිසිල්ව තබාගන්න' },
-        ta: { time: 'இரவு 9:30 - 10:00', title: 'ஓய்வு & தூக்கம்', description: 'ஆழ்ந்த உறக்கத்திற்கு தயாராகுங்கள்.', tips: 'ஜாதிக்காய் கலந்த சூடான பால் குடிக்கவும் | புத்தகம் படிக்கவும் | அறையை இருட்டாகவும் குளிர்ந்தும் வைத்திருக்கவும்' }
-      },
-      {
-        condition: 'diabetes', order: 1, icon: 'Coffee',
-        en: { time: '6:30 AM', title: 'Morning Drink', description: 'Start your day with a drink to regulate blood sugar levels.', tips: 'Kothalahimbutu tea | Bitter gourd juice | Avoid sugar' },
-        si: { time: 'පෙ.ව. 6:30', title: 'උදෑසන පානය', description: 'රුධිරයේ සීනි මට්ටම පාලනය කිරීමට සුදුසු පානයකින් දවස අරඹන්න.', tips: 'කොතලහිඹුටු තේ | කරවිල යුෂ | සීනි භාවිතයෙන් වළකින්න' },
-        ta: { time: 'காலை 6:30', title: 'காலை பானம்', description: 'இரத்த சர்க்கரை அளவை கட்டுப்படுத்தும் பானத்துடன் நாளைத் தொடங்குங்கள்.', tips: 'கொத்தலஹிம்புடு தேநீர் | பாகற்காய் சாறு | சர்க்கரையைத் தவிர்க்கவும்' }
-      },
-      {
-        condition: 'hypertension', order: 1, icon: 'Activity',
-        en: { time: '7:00 AM', title: 'Calming Yoga', description: 'Gentle yoga and breathing exercises to reduce stress and lower blood pressure.', tips: 'Pranayama | Avoid rigorous cardio | Meditate for 15 minutes' },
-        si: { time: 'පෙ.ව. 7:00', title: 'සැහැල්ලු යෝගා ව්‍යායාම', description: 'මානසික ආතතිය සහ රුධිර පීඩනය අඩු කිරීම සඳහා සැහැල්ලු යෝගා සහ ප්‍රාණයාම කරන්න.', tips: 'ප්‍රාණයාම | වෙහෙසකර ව්‍යායාම වලින් වළකින්න | විනාඩි 15ක භාවනාව' },
-        ta: { time: 'காலை 7:00', title: 'அமைதியான யோகா', description: 'மன அழுத்தம் மற்றும் இரத்த அழுத்தத்தைக் குறைக்க மென்மையான யோகா மற்றும் மூச்சுப் பயிற்சி.', tips: 'பிராணயாமா | கடுமையான பயிற்சிகளைத் தவிர்க்கவும் | 15 நிமிடம் தியானம்' }
-      }
-    ];
-
-    const batch = db.batch();
-    
-    // Delete existing herbal_remedies
-    const remediesSnapshot = await db.collection('herbal_remedies').get();
-    remediesSnapshot.docs.forEach(doc => {
-      batch.delete(doc.ref);
-    });
-
-    // Delete existing daily_routines
-    const routinesSnapshot = await db.collection('daily_routines').get();
-    routinesSnapshot.docs.forEach(doc => {
-      batch.delete(doc.ref);
-    });
-
-    remedies.forEach(r => {
-      const ref = db.collection('herbal_remedies').doc();
-      batch.set(ref, { ...r, createdAt: FieldValue.serverTimestamp() });
-    });
-    routines.forEach(r => {
-      const ref = db.collection('daily_routines').doc();
-      batch.set(ref, { ...r, createdAt: FieldValue.serverTimestamp() });
-    });
-    await batch.commit();
-    res.json({ success: true, message: 'Seeded successfully' });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// Get all herbal remedies
-app.get('/api/guide/remedies', async (req, res) => {
-  try {
-    const snapshot = await db.collection('herbal_remedies').orderBy('createdAt', 'asc').get();
-    const remedies = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-    res.json(remedies);
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// Add a herbal remedy
-app.post('/api/guide/remedies', async (req, res) => {
-  try {
-    const remedy = {
-      ...req.body,
-      createdAt: FieldValue.serverTimestamp()
-    };
-    const docRef = await db.collection('herbal_remedies').add(remedy);
-    res.status(201).json({ id: docRef.id, ...remedy });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// Update a herbal remedy
-app.put('/api/guide/remedies/:id', async (req, res) => {
-  try {
-    const { id } = req.params;
-    await db.collection('herbal_remedies').doc(id).update(req.body);
-    res.json({ id, ...req.body });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// Delete a herbal remedy
-app.delete('/api/guide/remedies/:id', async (req, res) => {
-  try {
-    const { id } = req.params;
-    await db.collection('herbal_remedies').doc(id).delete();
-    res.json({ message: 'Remedy deleted successfully' });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// Get all daily routines
-app.get('/api/guide/routines', async (req, res) => {
-  try {
-    const snapshot = await db.collection('daily_routines').orderBy('order', 'asc').get();
-    const routines = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-    res.json(routines);
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// Add a daily routine
-app.post('/api/guide/routines', async (req, res) => {
-  try {
-    const routine = {
-      ...req.body,
-      createdAt: FieldValue.serverTimestamp()
-    };
-    const docRef = await db.collection('daily_routines').add(routine);
-    res.status(201).json({ id: docRef.id, ...routine });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// Update a daily routine
-app.put('/api/guide/routines/:id', async (req, res) => {
-  try {
-    const { id } = req.params;
-    await db.collection('daily_routines').doc(id).update(req.body);
-    res.json({ id, ...req.body });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// Delete a daily routine
-app.delete('/api/guide/routines/:id', async (req, res) => {
-  try {
-    const { id } = req.params;
-    await db.collection('daily_routines').doc(id).delete();
-    res.json({ message: 'Routine deleted successfully' });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
+// Duplicate unauthenticated guide endpoints removed (use apiRouter + verifyAdmin).
 
 // Test Endpoint
 app.get('/api/test', (req, res) => {

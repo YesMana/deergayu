@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Leaf, Sun, Coffee, Droplet, Moon, Activity, Info, BookOpen, Clock } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import { resolveMediaUrl } from '../components/Admin/AdminUtils';
+import SEO from '../components/SEO';
 import './AyurvedicGuide.css';
 
 const fadeUpVariant = {
@@ -358,6 +359,12 @@ const AyurvedicGuide = () => {
 
   return (
     <div className="ayurvedic-guide-page page-transition">
+      <SEO
+        title="Ayurvedic Wellness Guide | Deergayu"
+        description="Discover traditional Sri Lankan Ayurvedic remedies, herbal wisdom, and daily routines (Dinacharya) on Deergayu."
+        url="https://deergayu.com/ayurvedic-guide"
+        canonical="https://deergayu.com/ayurvedic-guide"
+      />
       <div className="guide-hero">
         <motion.div 
           className="container"

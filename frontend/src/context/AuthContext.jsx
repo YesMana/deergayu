@@ -45,6 +45,24 @@ export const AuthProvider = ({ children }) => {
             console.error("Error fetching user role:", e);
             currentUser.role = 'user';
           }
+
+          // Multi-admin: confirm via backend if not already admin (checks adminEmails list)
+          if (currentUser.role !== 'admin') {
+            try {
+              const token = await currentUser.getIdToken();
+              const res = await fetch(`${API_URL}/api/auth/me`, {
+                headers: { Authorization: `Bearer ${token}` },
+              });
+              if (res.ok) {
+                const me = await res.json();
+                if (me.isAdmin || me.role === 'admin') {
+                  currentUser.role = 'admin';
+                }
+              }
+            } catch (e) {
+              console.error('Error checking admin status:', e);
+            }
+          }
         }
       }
       setUser(currentUser);

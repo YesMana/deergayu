@@ -48,11 +48,15 @@ const Channeling = () => {
   const [bookingDate, setBookingDate] = useState('');
   const [bookingTime, setBookingTime] = useState('');
   const [bookingNotes, setBookingNotes] = useState('');
+  const [consultMode, setConsultMode] = useState('in_person'); // in_person | video
+
   const [bookingPhone, setBookingPhone] = useState('');
   const [isBooking, setIsBooking] = useState(false);
   const [availableSlots, setAvailableSlots] = useState([]);
   const [bookedSlots, setBookedSlots] = useState([]);
   const [loadingSlots, setLoadingSlots] = useState(false);
+  const [providerReviews, setProviderReviews] = useState([]);
+  const [loadingReviews, setLoadingReviews] = useState(false);
 
   const { data: providers = [], isLoading: loading } = useQuery({
     queryKey: ['channeling_providers'],
@@ -111,13 +115,22 @@ const Channeling = () => {
     return matchType && matchProvince && matchDistrict && matchSpecialty && matchSearch;
   });
 
-  const handleBookClick = (provider) => {
+  const handleBookClick = (provider, mode = 'in_person') => {
     if (!user) {
       error("Please login to book an appointment.");
       navigate('/login?returnUrl=/channeling');
       return;
     }
+    setConsultMode(mode);
+    setBookingNotes(mode === 'video' ? 'Video consultation requested. Doctor will share Google Meet / Zoom link after confirmation.' : '');
     setSelectedProvider(provider);
+    setProviderReviews([]);
+    setLoadingReviews(true);
+    fetch(`${API_URL}/api/reviews/provider/${provider.id}`)
+      .then((r) => (r.ok ? r.json() : []))
+      .then((data) => setProviderReviews(Array.isArray(data) ? data.slice(0, 5) : []))
+      .catch(() => setProviderReviews([]))
+      .finally(() => setLoadingReviews(false));
   };
 
   const handleBookingSubmit = async (e) => {
@@ -130,6 +143,7 @@ const Channeling = () => {
     setIsBooking(true);
     try {
       const token = await auth.currentUser.getIdToken();
+      const notesPrefix = consultMode === 'video' ? '[Video consult] ' : '';
       const res = await fetch(`${API_URL}/api/appointments`, {
         method: 'POST',
         headers: {
@@ -142,7 +156,8 @@ const Channeling = () => {
           date: bookingDate,
           time: bookingTime,
           phone: bookingPhone,
-          notes: bookingNotes
+          notes: `${notesPrefix}${bookingNotes || ''}`.trim(),
+          consultationType: consultMode,
         })
       });
 
@@ -253,12 +268,19 @@ const Channeling = () => {
           {loading ? (
             <div style={{ textAlign: 'center', padding: '4rem', color: 'var(--text-secondary)' }}>Loading experts...</div>
           ) : filteredProviders.length > 0 ? (
-            filteredProviders.map(provider => (
+            filteredProviders.map(provider => {
+              const avg = provider.averageRating ?? provider.rating;
+              const count = provider.reviewCount;
+              return (
               <div key={provider.id} className="provider-card glass-panel">
                 <div className="provider-image-wrapper">
                   <img src={provider.profileDetails?.profileImageUrl || provider.profileDetails?.image || "https://images.unsplash.com/photo-1612349317150-e413f6a5b16d?w=500&q=80"} alt={provider.name} className="provider-image" />
                   <div className="provider-rating">
-                    <Star size={14} className="star-icon" fill="currentColor" /> {provider.rating || '4.9'}
+                    <Star size={14} className="star-icon" fill="currentColor" />{' '}
+                    {avg != null ? Number(avg).toFixed(1) : '—'}
+                    {count != null && count > 0 && (
+                      <span style={{ marginLeft: 4, opacity: 0.85 }}>({count})</span>
+                    )}
                   </div>
                 </div>
                 
@@ -293,16 +315,17 @@ const Channeling = () => {
                 
                 <div className="provider-actions">
                   <div className="action-buttons">
-                    <button className="btn btn-outline btn-full" onClick={() => alert("Video consultations coming soon!")}>
+                    <button className="btn btn-outline btn-full" onClick={() => handleBookClick(provider, 'video')}>
                       <Video size={18} /> {t('ch_btn_video')}
                     </button>
-                    <button className="btn btn-primary btn-full" onClick={() => handleBookClick(provider)}>
+                    <button className="btn btn-primary btn-full" onClick={() => handleBookClick(provider, 'in_person')}>
                       <CalendarIcon size={18} /> {t('ch_btn_book')}
                     </button>
                   </div>
                 </div>
               </div>
-            ))
+            );
+            })
           ) : (
             <div className="no-results" style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '4rem' }}>
               <p>{t('ch_no_results')}</p>
@@ -378,6 +401,39 @@ const Channeling = () => {
 
             {/* Body */}
             <div style={{ padding: '2rem' }}>
+              {(loadingReviews || providerReviews.length > 0) && (
+                <div style={{
+                  marginBottom: '1.5rem',
+                  padding: '1rem',
+                  borderRadius: 12,
+                  background: 'rgba(255,255,255,0.04)',
+                  border: '1px solid rgba(212,175,55,0.2)'
+                }}>
+                  <div style={{ fontSize: '0.85rem', color: 'rgba(212,175,55,0.85)', marginBottom: '0.65rem', fontWeight: 600 }}>
+                    Patient Reviews
+                    {(selectedProvider.averageRating ?? selectedProvider.rating) != null && (
+                      <span style={{ marginLeft: 8, color: '#f1c40f' }}>
+                        ★ {Number(selectedProvider.averageRating ?? selectedProvider.rating).toFixed(1)}
+                        {selectedProvider.reviewCount != null ? ` · ${selectedProvider.reviewCount}` : ''}
+                      </span>
+                    )}
+                  </div>
+                  {loadingReviews ? (
+                    <p style={{ color: 'rgba(255,255,255,0.45)', fontSize: '0.85rem', margin: 0 }}>Loading reviews…</p>
+                  ) : providerReviews.length === 0 ? null : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
+                      {providerReviews.map((r) => (
+                        <div key={r.id} style={{ fontSize: '0.82rem', color: 'rgba(255,255,255,0.7)' }}>
+                          <span style={{ color: '#f1c40f' }}>{'★'.repeat(Math.min(5, Number(r.rating) || 0))}</span>
+                          {' '}
+                          <strong style={{ color: '#fff' }}>{r.userName || 'User'}</strong>
+                          {r.comment ? ` — ${r.comment}` : ''}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
               <form onSubmit={handleBookingSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
 
                 {/* Step 1 */}

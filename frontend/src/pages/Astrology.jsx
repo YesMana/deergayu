@@ -2,6 +2,7 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '../context/LanguageContext';
 import { Star, Moon, Sun, Sparkles } from 'lucide-react';
+import SEO from '../components/SEO';
 
 const Astrology = () => {
   const { lang } = useLanguage();
@@ -87,6 +88,12 @@ const Astrology = () => {
 
   return (
     <div className="astrology-page" style={{ paddingTop: '5rem', minHeight: '100vh', paddingBottom: '4rem' }}>
+      <SEO
+        title="Traditional Astrology & Rituals | Deergayu"
+        description="Horoscope reading, yanthra, nekath, and vasthu services from authentic Sri Lankan Vedic astrologers on Deergayu."
+        url="https://deergayu.com/astrology"
+        canonical="https://deergayu.com/astrology"
+      />
       
       {/* Hero Section */}
       <section style={{ textAlign: 'center', padding: '4rem 1.5rem', background: 'radial-gradient(circle at center, rgba(212, 175, 55, 0.15) 0%, transparent 70%)' }}>

@@ -1,6 +1,7 @@
 import { Suspense, lazy } from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import Navbar from './components/Navbar';
+import Footer from './components/Footer';
 import LanguagePopup from './components/Common/LanguagePopup';
 import AyurBot from './components/AI/AyurBot';
 import ProtectedRoute from './components/Auth/ProtectedRoute';
@@ -29,6 +30,10 @@ const CustomerDashboard = lazy(() => import('./pages/CustomerDashboard'));
 const NotFound = lazy(() => import('./pages/NotFound'));
 const Videos = lazy(() => import('./pages/Videos'));
 const Astrology = lazy(() => import('./pages/Astrology'));
+const Privacy = lazy(() => import('./pages/Privacy'));
+const Terms = lazy(() => import('./pages/Terms'));
+const RefundPolicy = lazy(() => import('./pages/RefundPolicy'));
+const Contact = lazy(() => import('./pages/Contact'));
 
 function App() {
   return (
@@ -53,6 +58,10 @@ function App() {
                       <Route path="/ayurvedic-guide" element={<AyurvedicGuide />} />
                       <Route path="/videos" element={<Videos />} />
                       <Route path="/astrology" element={<Astrology />} />
+                      <Route path="/privacy" element={<Privacy />} />
+                      <Route path="/terms" element={<Terms />} />
+                      <Route path="/refund-policy" element={<RefundPolicy />} />
+                      <Route path="/contact" element={<Contact />} />
                       <Route path="/login" element={<Login />} />
                       
                       {/* Protected User Routes */}
@@ -78,6 +87,7 @@ function App() {
                     </Routes>
                   </Suspense>
                 </main>
+                <Footer />
               </div>
               </ErrorBoundary>
               </Router>

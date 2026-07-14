@@ -1,0 +1,167 @@
+.legal-page {
+  padding-top: 2rem;
+  padding-bottom: 4rem;
+  min-height: 80vh;
+  color: var(--text-primary);
+}
+
+.legal-page .legal-hero {
+  text-align: center;
+  margin-bottom: 2.5rem;
+}
+
+.legal-page .legal-hero h1 {
+  font-family: var(--font-heading);
+  font-size: clamp(1.8rem, 4vw, 2.5rem);
+  color: var(--secondary-color);
+  margin-bottom: 0.75rem;
+}
+
+.legal-page .legal-hero p {
+  color: var(--text-secondary);
+  max-width: 640px;
+  margin: 0 auto;
+  line-height: 1.6;
+}
+
+.legal-content {
+  max-width: 780px;
+  margin: 0 auto;
+  padding: 2rem 2.25rem;
+  line-height: 1.75;
+}
+
+.legal-content h2 {
+  font-family: var(--font-heading);
+  font-size: 1.25rem;
+  color: var(--primary-light);
+  margin: 2rem 0 0.75rem;
+}
+
+.legal-content h2:first-child {
+  margin-top: 0;
+}
+
+.legal-content p,
+.legal-content li {
+  color: var(--text-secondary);
+  margin-bottom: 0.85rem;
+}
+
+.legal-content ul {
+  padding-left: 1.25rem;
+  margin-bottom: 1rem;
+}
+
+.legal-content a {
+  color: var(--secondary-light);
+}
+
+.legal-meta {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  margin-bottom: 1.5rem;
+}
+
+/* Contact form */
+.contact-layout {
+  display: grid;
+  grid-template-columns: 1fr 1.2fr;
+  gap: 2rem;
+  max-width: 960px;
+  margin: 0 auto;
+}
+
+.contact-info {
+  padding: 1.75rem;
+}
+
+.contact-info h2 {
+  font-family: var(--font-heading);
+  color: var(--secondary-color);
+  margin-bottom: 1rem;
+  font-size: 1.35rem;
+}
+
+.contact-info p {
+  color: var(--text-secondary);
+  line-height: 1.6;
+  margin-bottom: 1rem;
+}
+
+.contact-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin-bottom: 1rem;
+}
+
+.contact-detail span {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.contact-detail a,
+.contact-detail strong {
+  color: var(--text-primary);
+  font-size: 1.05rem;
+  text-decoration: none;
+}
+
+.contact-form {
+  padding: 1.75rem;
+}
+
+.contact-form .form-group {
+  margin-bottom: 1rem;
+}
+
+.contact-form label {
+  display: block;
+  margin-bottom: 0.4rem;
+  font-size: 0.88rem;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.contact-form input,
+.contact-form textarea,
+.contact-form select {
+  width: 100%;
+  padding: 0.75rem 1rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--glass-border);
+  background: var(--input-bg);
+  color: var(--text-primary);
+  font-family: var(--font-body);
+  font-size: 0.95rem;
+}
+
+.contact-form input:focus,
+.contact-form textarea:focus,
+.contact-form select:focus {
+  outline: none;
+  border-color: var(--primary-color);
+}
+
+.contact-form textarea {
+  resize: vertical;
+  min-height: 120px;
+}
+
+.contact-form .btn {
+  width: 100%;
+  margin-top: 0.5rem;
+}
+
+@media (max-width: 768px) {
+  .contact-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .legal-content {
+    padding: 1.5rem 1.25rem;
+  }
+}

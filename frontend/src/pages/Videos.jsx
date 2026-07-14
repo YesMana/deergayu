@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Search, Play, ExternalLink } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
+import SEO from '../components/SEO';
 
 const API_URL = import.meta.env.VITE_API_URL || '';
 
@@ -184,6 +185,12 @@ const Videos = () => {
 
   return (
     <div className="container" style={{ paddingTop: '8rem', paddingBottom: '4rem', minHeight: '80vh' }}>
+      <SEO
+        title="Ayurvedic Video Library | Deergayu"
+        description="Watch Ayurvedic wellness guides, herbal tips, yoga, and lifestyle videos from Deergayu experts in Sri Lanka."
+        url="https://deergayu.com/videos"
+        canonical="https://deergayu.com/videos"
+      />
       
       {/* Header */}
       <div style={{ textAlign: 'center', marginBottom: '3rem' }}>
