@@ -1,7 +1,7 @@
 import React from 'react';
 import { 
   LayoutDashboard, Users, ShieldAlert, Package, ShoppingBag, 
-  Calendar, Video, Settings 
+  Calendar, Video, Settings, BookOpen 
 } from 'lucide-react';
 import { auth } from '../../firebase';
 import { useNavigate } from 'react-router-dom';
@@ -26,6 +26,7 @@ const AdminSidebar = ({ activeTab, setActiveTab }) => {
     { id: 'orders', icon: ShoppingBag, label: 'Orders' },
     { id: 'appointments', icon: Calendar, label: 'Appointments' },
     { id: 'videos', icon: Video, label: 'Videos' },
+    { id: 'guide', icon: BookOpen, label: 'Ayurvedic Guide' },
     { id: 'settings', icon: Settings, label: 'Settings' }
   ];
 

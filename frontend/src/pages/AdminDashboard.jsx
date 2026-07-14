@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { LayoutDashboard, Users, ShieldAlert, Package, ShoppingBag, Calendar, Settings, Video } from 'lucide-react';
+import { LayoutDashboard, Users, ShieldAlert, Package, ShoppingBag, Calendar, Settings, Video, BookOpen } from 'lucide-react';
 import { collection, getCountFromServer, query, where } from 'firebase/firestore';
 import { db } from '../firebase';
 
@@ -12,6 +12,7 @@ import ManageOrders from '../components/Admin/ManageOrders';
 import ManageAppointments from '../components/Admin/ManageAppointments';
 import ManageSettings from '../components/Admin/ManageSettings';
 import ManageVideos from '../components/Admin/ManageVideos';
+import ManageGuide from '../components/Admin/ManageGuide';
 
 import './AdminDashboard.css';
 
@@ -54,6 +55,7 @@ const AdminDashboard = () => {
     { id: 'appointments', label: 'Appointments',     Icon: Calendar },
     { id: 'settings',     label: 'Settings',         Icon: Settings },
     { id: 'videos',       label: 'Videos',           Icon: Video },
+    { id: 'guide',        label: 'Ayurvedic Guide',  Icon: BookOpen },
   ];
 
   return (
@@ -117,8 +119,9 @@ const AdminDashboard = () => {
         {activeTab === 'products'     && <ManageProducts />}
         {activeTab === 'orders'       && <ManageOrders />}
         {activeTab === 'appointments' && <ManageAppointments />}
-        {activeTab === 'settings'     && <ManageSettings />}
-        {activeTab === 'videos'       && <ManageVideos />}
+        {activeTab === 'settings' && <ManageSettings />}
+        {activeTab === 'videos' && <ManageVideos />}
+        {activeTab === 'guide' && <ManageGuide />}
       </main>
     </div>
   );

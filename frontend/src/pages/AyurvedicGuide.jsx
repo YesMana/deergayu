@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Leaf, Sun, Coffee, Droplet, Moon, Activity, Info, BookOpen, Clock } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
@@ -310,8 +310,42 @@ const guideData = {
 
 const AyurvedicGuide = () => {
   const [activeTab, setActiveTab] = useState('remedies');
+  const [dbRemedies, setDbRemedies] = useState([]);
+  const [dbRoutines, setDbRoutines] = useState([]);
+  const [loading, setLoading] = useState(true);
   const { lang } = useLanguage();
   const data = guideData[lang] || guideData.en;
+
+  useEffect(() => {
+    const fetchContent = async () => {
+      try {
+        const [remRes, routRes] = await Promise.all([
+          fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/guide/remedies`),
+          fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/guide/routines`)
+        ]);
+        const remData = await remRes.json();
+        const routData = await routRes.json();
+        setDbRemedies(remData);
+        setDbRoutines(routData);
+      } catch (error) {
+        console.error("Failed to fetch guide content:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchContent();
+  }, []);
+
+  const getIconComponent = (iconName, props) => {
+    switch(iconName) {
+      case 'Sun': return <Sun {...props} />;
+      case 'Moon': return <Moon {...props} />;
+      case 'Droplet': return <Droplet {...props} />;
+      case 'Coffee': return <Coffee {...props} />;
+      case 'Activity': return <Activity {...props} />;
+      default: return <Info {...props} />;
+    }
+  };
 
   return (
     <div className="ayurvedic-guide-page page-transition">
@@ -364,31 +398,33 @@ const AyurvedicGuide = () => {
                   </div>
                   
                   <div className="remedies-grid">
-                    {data.remedies.map((remedy) => (
-                      <motion.div key={remedy.id} className="remedy-card glass-panel glass-panel-hover" variants={fadeUpVariant} initial="hidden" whileInView="visible" viewport={{ once: true }}>
-                        <div className="remedy-image" style={{ backgroundImage: `url(${remedy.image})` }}>
+                    {loading ? <div className="loading-spinner">Loading...</div> : dbRemedies.map((item) => {
+                      const remedy = item[lang] || item.en;
+                      return (
+                      <motion.div key={item.id} className="remedy-card glass-panel glass-panel-hover" variants={fadeUpVariant} initial="hidden" whileInView="visible" viewport={{ once: true }}>
+                        <div className="remedy-image" style={{ backgroundImage: `url(${item.image})` }}>
                           <div className="remedy-badge">{data.badge}</div>
                         </div>
                         <div className="remedy-content">
-                          <h3>{remedy.name}</h3>
+                          <h3>{remedy?.name}</h3>
                           
                           <div className="remedy-info-group">
                             <h4><Leaf size={16} /> {data.ingredients_label}</h4>
-                            <p>{remedy.ingredients.join(', ')}</p>
+                            <p>{remedy?.ingredients}</p>
                           </div>
                           
                           <div className="remedy-info-group">
                             <h4><Activity size={16} /> {data.bestfor_label}</h4>
-                            <p>{remedy.uses}</p>
+                            <p>{remedy?.uses}</p>
                           </div>
                           
                           <div className="remedy-info-group highlight">
                             <h4><BookOpen size={16} /> {data.prep_label}</h4>
-                            <p>{remedy.preparation}</p>
+                            <p>{remedy?.preparation}</p>
                           </div>
                         </div>
                       </motion.div>
-                    ))}
+                    )})}
                   </div>
                 </motion.div>
               )}
@@ -407,9 +443,12 @@ const AyurvedicGuide = () => {
                   </div>
                   
                   <div className="routine-timeline">
-                    {data.routine.map((step, index) => (
+                    {loading ? <div className="loading-spinner">Loading...</div> : dbRoutines.map((item, index) => {
+                      const step = item[lang] || item.en;
+                      const iconColor = item.icon === 'Sun' ? '#ff9800' : item.icon === 'Moon' ? '#5c6bc0' : undefined;
+                      return (
                       <motion.div 
-                        key={index} 
+                        key={item.id} 
                         className="timeline-item"
                         variants={fadeUpVariant} 
                         initial="hidden" 
@@ -418,25 +457,25 @@ const AyurvedicGuide = () => {
                         transition={{ delay: index * 0.1 }}
                       >
                         <div className="timeline-marker">
-                          <div className="timeline-icon glass-panel">{step.icon}</div>
-                          {index !== data.routine.length - 1 && <div className="timeline-line"></div>}
+                          <div className="timeline-icon glass-panel">{getIconComponent(item.icon, { size: 24, color: iconColor })}</div>
+                          {index !== dbRoutines.length - 1 && <div className="timeline-line"></div>}
                         </div>
                         <div className="timeline-content glass-panel glass-panel-hover">
-                          <div className="timeline-time">{step.time}</div>
-                          <h3>{step.title}</h3>
-                          <p>{step.description}</p>
+                          <div className="timeline-time">{step?.time}</div>
+                          <h3>{step?.title}</h3>
+                          <p>{step?.description}</p>
                           
                           <div className="timeline-tips">
                             <h4><Info size={14} /> {data.tips_label}</h4>
                             <ul>
-                              {step.tips.map((tip, i) => (
-                                <li key={i}>{tip}</li>
+                              {step?.tips?.split('|').map((tip, i) => (
+                                <li key={i}>{tip.trim()}</li>
                               ))}
                             </ul>
                           </div>
                         </div>
                       </motion.div>
-                    ))}
+                    )})}
                   </div>
                 </motion.div>
               )}

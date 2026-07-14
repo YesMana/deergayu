@@ -1457,6 +1457,111 @@ apiRouter.post('/upload', upload.single('image'), (req, res) => {
 app.use('/api', apiRouter);
 // Note: removed duplicate '/' mount to avoid route conflicts
 
+// --- AYURVEDIC GUIDE ENDPOINTS ---
+
+// Get all herbal remedies
+app.get('/api/guide/remedies', async (req, res) => {
+  try {
+    const snapshot = await db.collection('herbal_remedies').orderBy('createdAt', 'asc').get();
+    const remedies = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    res.json(remedies);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Add a herbal remedy
+app.post('/api/guide/remedies', async (req, res) => {
+  try {
+    const remedy = {
+      ...req.body,
+      createdAt: FieldValue.serverTimestamp()
+    };
+    const docRef = await db.collection('herbal_remedies').add(remedy);
+    res.status(201).json({ id: docRef.id, ...remedy });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Update a herbal remedy
+app.put('/api/guide/remedies/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    await db.collection('herbal_remedies').doc(id).update(req.body);
+    res.json({ id, ...req.body });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Delete a herbal remedy
+app.delete('/api/guide/remedies/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    await db.collection('herbal_remedies').doc(id).delete();
+    res.json({ message: 'Remedy deleted successfully' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Get all daily routines
+app.get('/api/guide/routines', async (req, res) => {
+  try {
+    const snapshot = await db.collection('daily_routines').orderBy('order', 'asc').get();
+    const routines = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    res.json(routines);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Add a daily routine
+app.post('/api/guide/routines', async (req, res) => {
+  try {
+    const routine = {
+      ...req.body,
+      createdAt: FieldValue.serverTimestamp()
+    };
+    const docRef = await db.collection('daily_routines').add(routine);
+    res.status(201).json({ id: docRef.id, ...routine });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Update a daily routine
+app.put('/api/guide/routines/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    await db.collection('daily_routines').doc(id).update(req.body);
+    res.json({ id, ...req.body });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Delete a daily routine
+app.delete('/api/guide/routines/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    await db.collection('daily_routines').doc(id).delete();
+    res.json({ message: 'Routine deleted successfully' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Test Endpoint
+app.get('/api/test', (req, res) => {
+  res.status(404).json({
+    error: 'Route not found',
+    method: req.method,
+    path: req.path
+  });
+});
+
 app.all('{*path}', (req, res) => {
   res.status(404).json({
     error: 'Route not found',
