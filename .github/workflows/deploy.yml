@@ -7,6 +7,8 @@ on:
     paths:
       - 'frontend/**'
       - 'backend/**'
+      - '.github/workflows/deploy.yml'
+  workflow_dispatch:
 
 jobs:
   build-and-deploy:
@@ -20,10 +22,10 @@ jobs:
       with:
         node-version: '20'
 
-    - name: Install Dependencies & Build
+    - name: Install Dependencies & Build Frontend
       run: |
         cd frontend
-        npm install
+        npm ci || npm install
         npm run build
 
     - name: Deploy Frontend to cPanel via FTP
@@ -34,8 +36,10 @@ jobs:
         password: ${{ secrets.FTP_PASSWORD }}
         local-dir: ./frontend/dist/
         server-dir: ./
+        # Replaces old hashed JS bundles so admin page does not crash
+        dangerous-clean-slate: false
 
-    - name: Deploy Backend to cPanel via FTP
+    - name: Deploy Backend to cPanel ./api/ via FTP
       uses: SamKirkland/FTP-Deploy-Action@v4.3.5
       with:
         server: ${{ secrets.FTP_SERVER }}
@@ -47,3 +51,4 @@ jobs:
           **/.htaccess
           **/node_modules/**
           **/.env
+          **/.env.*
