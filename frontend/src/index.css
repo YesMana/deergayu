@@ -2,56 +2,57 @@
 
 :root[data-theme='light'] {
   --primary-color: #2e7d32;
-  --primary-light: #4caf50;
+  --primary-light: #43a047;
   --primary-dark: #1b5e20;
   --secondary-color: #b8860b;
   --secondary-light: #d4af37;
   --accent-color: #ff7043;
-  --background-color: #fdfbf7;
+  --background-color: #f3f7f4;
   --surface-color: #ffffff;
-  --surface-alt: #f5f0e8;
-  --text-primary: #2c1e16;
-  --text-secondary: #5d4037;
-  --text-muted: #8d6e63;
-  --glass-bg: rgba(255, 255, 255, 0.85);
-  --glass-border: rgba(212, 175, 55, 0.3);
-  --divider: rgba(0, 0, 0, 0.08);
+  --surface-alt: #e8f0ea;
+  --text-primary: #142019;
+  --text-secondary: #3d5346;
+  --text-muted: #6b8575;
+  --glass-bg: rgba(255, 255, 255, 0.88);
+  --glass-border: rgba(46, 125, 50, 0.22);
+  --divider: rgba(20, 40, 28, 0.08);
   --card-bg: #ffffff;
-  --navbar-bg: rgba(253, 251, 247, 0.9);
+  --navbar-bg: rgba(243, 247, 244, 0.92);
   --input-bg: #ffffff;
 }
 
 :root[data-theme='dark'], :root {
-  --primary-color: #4caf50;
-  --primary-light: #66bb6a;
-  --primary-dark: #2e7d32;
-  --secondary-color: #d4af37;
-  --secondary-light: #f3d568;
+  /* Forest green — sitewide Ayurvedic palette */
+  --primary-color: #3d8b55;
+  --primary-light: #5cbf75;
+  --primary-dark: #2a5a3a;
+  --secondary-color: #c4a35a;
+  --secondary-light: #e0c878;
   --accent-color: #ff7043;
-  --background-color: #1a1108;
-  --surface-color: #2a1c0f;
-  --surface-alt: #361f0f;
-  --text-primary: #fdfbf7;
-  --text-secondary: #d7ccc8;
-  --text-muted: #a1887f;
-  --glass-bg: rgba(42, 28, 15, 0.75);
-  --glass-border: rgba(212, 175, 55, 0.2);
-  --divider: rgba(255, 255, 255, 0.08);
-  --card-bg: #2a1c0f;
-  --navbar-bg: rgba(26, 17, 8, 0.92);
-  --input-bg: rgba(255,255,255,0.05);
+  --background-color: #0a1410;
+  --surface-color: #122018;
+  --surface-alt: #1a2e22;
+  --text-primary: #e8f0ea;
+  --text-secondary: #b7cfc0;
+  --text-muted: #9bb5a4;
+  --glass-bg: rgba(18, 32, 24, 0.78);
+  --glass-border: rgba(61, 139, 85, 0.28);
+  --divider: rgba(232, 240, 234, 0.08);
+  --card-bg: #122018;
+  --navbar-bg: rgba(10, 20, 16, 0.92);
+  --input-bg: rgba(255, 255, 255, 0.05);
   --error-color: #ef5350;
-  --success-color: #66bb6a;
+  --success-color: #5cbf75;
   --warning-color: #ffa726;
   --info-color: #29b6f6;
 
-  --shadow-xs: 0 1px 3px rgba(0, 0, 0, 0.3);
-  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.3);
+  --shadow-xs: 0 1px 3px rgba(0, 0, 0, 0.35);
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.35);
   --shadow-md: 0 6px 20px rgba(0, 0, 0, 0.4);
   --shadow-lg: 0 12px 40px rgba(0, 0, 0, 0.5);
   --shadow-xl: 0 24px 64px rgba(0, 0, 0, 0.6);
-  --shadow-glow: 0 0 30px rgba(76, 175, 80, 0.25);
-  --shadow-gold: 0 0 30px rgba(212, 175, 55, 0.2);
+  --shadow-glow: 0 0 30px rgba(61, 139, 85, 0.28);
+  --shadow-gold: 0 0 30px rgba(196, 163, 90, 0.2);
 
   --radius-xs: 4px;
   --radius-sm: 8px;
@@ -84,12 +85,23 @@ html {
 body {
   font-family: var(--font-body);
   background-color: var(--background-color);
+  background-image:
+    radial-gradient(ellipse 80% 50% at 50% -10%, rgba(61, 139, 85, 0.16), transparent 55%),
+    radial-gradient(ellipse 55% 40% at 100% 30%, rgba(42, 90, 58, 0.1), transparent 50%),
+    radial-gradient(ellipse 45% 35% at 0% 85%, rgba(26, 46, 34, 0.4), transparent 45%);
+  background-attachment: fixed;
   color: var(--text-primary);
   line-height: 1.6;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   transition: background-color 0.3s ease, color 0.3s ease;
   overflow-x: hidden;
+}
+
+:root[data-theme='light'] body {
+  background-image:
+    radial-gradient(ellipse 80% 50% at 50% -10%, rgba(46, 125, 50, 0.08), transparent 55%),
+    radial-gradient(ellipse 50% 40% at 100% 80%, rgba(184, 134, 11, 0.06), transparent 50%);
 }
 
 a {
@@ -191,12 +203,12 @@ button {
   font-weight: 700;
   letter-spacing: 0.15em;
   text-transform: uppercase;
-  color: var(--secondary-color);
-  background: rgba(212, 175, 55, 0.1);
+  color: var(--primary-light);
+  background: rgba(61, 139, 85, 0.12);
   padding: 0.35rem 1rem;
   border-radius: var(--radius-full);
   margin-bottom: 0.75rem;
-  border: 1px solid rgba(212, 175, 55, 0.25);
+  border: 1px solid rgba(61, 139, 85, 0.28);
 }
 
 .section-title {
