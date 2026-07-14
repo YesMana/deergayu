@@ -40,6 +40,8 @@ const ManageSettings = () => {
   const [newAdminEmail, setNewAdminEmail] = useState('');
   const [broadcast, setBroadcast] = useState({ subject: '', message: '', audience: 'all' });
   const [sendingBroadcast, setSendingBroadcast] = useState(false);
+  const [emailStatus, setEmailStatus] = useState(null);
+  const [testingEmail, setTestingEmail] = useState(false);
   const [newCategory, setNewCategory] = useState({ name: '', commissionPercent: 10 });
   const [shippingJson, setShippingJson] = useState(JSON.stringify(DEFAULT_SETTINGS.shippingZones, null, 2));
 
@@ -58,6 +60,36 @@ const ManageSettings = () => {
   }, []);
 
   useEffect(() => { fetchSettings(); }, [fetchSettings]);
+
+  useEffect(() => {
+    fetch(`${API_URL}/api/email/status`)
+      .then((r) => r.json())
+      .then(setEmailStatus)
+      .catch(() => setEmailStatus(null));
+  }, []);
+
+  const handleEmailTest = async () => {
+    setTestingEmail(true);
+    try {
+      const token = await getToken();
+      const res = await fetch(`${API_URL}/api/admin/email-test`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({}),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.send?.ok) {
+        error(data.error || data.send?.error || data.verify?.error || 'SMTP test failed — check cPanel Node env vars');
+        console.error('email-test', data);
+      } else {
+        success(`Test email sent to ${data.to}`);
+      }
+    } catch (e) {
+      error(e.message);
+    } finally {
+      setTestingEmail(false);
+    }
+  };
 
   const handleSaveSettings = async () => {
     setSavingSettings(true);
@@ -266,6 +298,31 @@ const ManageSettings = () => {
             <input type="email" placeholder="Add admin email" value={newAdminEmail} onChange={(e) => setNewAdminEmail(e.target.value)} className="form-control" style={{ maxWidth: 280 }} />
             <button className="btn btn-outline" onClick={addAdminEmail}>Add Admin</button>
           </div>
+        </div>
+      </div>
+
+      {/* SMTP status */}
+      <div className="dash-section">
+        <div className="dash-section-header"><h3><Mail size={15} /> Outbound Email (SMTP)</h3></div>
+        <div className="settings-card" style={{ margin: '0 1rem 1rem' }}>
+          {emailStatus ? (
+            <p style={{ color: 'var(--text-secondary)', marginTop: 0 }}>
+              Mode: <strong>{emailStatus.mode}</strong>
+              {' · '}Configured: <strong>{emailStatus.configured ? 'Yes' : 'No — SMTP_PASS missing'}</strong>
+              {' · '}From: <strong>{emailStatus.user}</strong>
+              {' · '}Host: <strong>{emailStatus.host}:{emailStatus.port}</strong>
+              <br />
+              <span style={{ fontSize: '0.85rem' }}>{emailStatus.okHint}</span>
+            </p>
+          ) : (
+            <p style={{ color: 'var(--text-secondary)' }}>Loading email status…</p>
+          )}
+          <button type="button" className="btn btn-primary" onClick={handleEmailTest} disabled={testingEmail}>
+            {testingEmail ? 'Testing…' : 'Send test email to ADMIN_EMAIL'}
+          </button>
+          <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: 0 }}>
+            If this fails: cPanel → Node.js App → set SMTP_HOST=mail.deergayu.com, SMTP_PORT=465, SMTP_USER=info@deergayu.com, SMTP_PASS=(mailbox password) → Restart.
+          </p>
         </div>
       </div>
 

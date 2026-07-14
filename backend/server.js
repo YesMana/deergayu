@@ -4,7 +4,7 @@ const admin = require('firebase-admin');
 const { getFirestore, FieldValue } = require('firebase-admin/firestore');
 const { getAuth } = require('firebase-admin/auth');
 const dotenv = require('dotenv');
-const { sendEmail, sendAdminEmail } = require('./emailService');
+const { sendEmail, sendAdminEmail, verifySmtp, getEmailStatus, ADMIN_EMAIL } = require('./emailService');
 const {
   getSettings,
   isAdminUser,
@@ -142,6 +142,46 @@ const apiRouter = express.Router();
 // ============================================================
 apiRouter.get('/health', (req, res) => {
   res.json({ status: 'OK', message: 'Deergayu API is running', timestamp: new Date().toISOString() });
+});
+
+// Public-safe email config probe (no secrets)
+apiRouter.get('/email/status', (req, res) => {
+  const s = getEmailStatus();
+  res.json({
+    configured: s.configured,
+    mode: s.mode,
+    host: s.host,
+    port: s.port,
+    user: s.user,
+    adminEmail: s.adminEmail,
+    // Never expose lastError details publicly if they leak paths — keep short
+    okHint: s.configured
+      ? 'SMTP password is set. Use admin email-test to verify connection.'
+      : 'SMTP_PASS missing — emails go nowhere real (Ethereal test mode).',
+  });
+});
+
+// Admin: verify SMTP + optionally send a real test message
+apiRouter.post('/admin/email-test', verifyAdmin, async (req, res) => {
+  try {
+    const verify = await verifySmtp();
+    if (!verify.ok) return res.status(500).json(verify);
+
+    const to = (req.body?.to || ADMIN_EMAIL || '').trim();
+    const result = await sendEmail(
+      to,
+      'Deergayu SMTP test',
+      'If you received this, outbound email from info@deergayu.com is working.',
+      `<div style="font-family:Arial,sans-serif;padding:20px">
+        <h2 style="color:#2e7d32">Deergayu SMTP test OK</h2>
+        <p>Outbound mail from <strong>info@deergayu.com</strong> is working.</p>
+        <p>Sent at ${new Date().toISOString()}</p>
+      </div>`
+    );
+    res.json({ verify, send: result, to });
+  } catch (error) {
+    res.status(500).json({ ok: false, error: error.message });
+  }
 });
 
 // Auth identity — includes adminEmails list (for multi-admin UI access)
@@ -334,11 +374,20 @@ apiRouter.post('/contact', async (req, res) => {
       name, email, phone: phone || '', subject: topic, message,
       status: 'new', createdAt: new Date().toISOString(),
     });
-    sendAdminEmail(`Contact: ${topic} — ${name}`, adminHtml)
-      .catch(e => console.error('Admin contact email error:', e));
-    sendEmail(email, 'We received your message — Deergayu', '', userHtml)
-      .catch(e => console.error('Contact confirmation email error:', e));
-    res.json({ message: 'Message sent successfully' });
+    const adminResult = await sendAdminEmail(`Contact: ${topic} — ${name}`, adminHtml);
+    const userResult = await sendEmail(email, 'We received your message — Deergayu', '', userHtml);
+
+    const emailsOk = Boolean(adminResult?.ok && userResult?.ok);
+    if (!emailsOk) {
+      console.error('Contact email failure', { adminResult, userResult });
+      return res.status(502).json({
+        message: 'Message saved, but email delivery failed. Please check SMTP settings.',
+        saved: true,
+        email: { admin: adminResult, user: userResult },
+      });
+    }
+
+    res.json({ message: 'Message sent successfully', saved: true, emailOk: true });
   } catch (error) {
     console.error('Contact form error:', error);
     res.status(500).json({ error: 'Failed to send message' });

@@ -1,75 +1,103 @@
 const nodemailer = require('nodemailer');
 
 let transporter;
+let transporterMeta = { mode: 'uninitialized', host: null, user: null, lastError: null };
 
 const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'yes.manujaya@gmail.com';
 const SUPPORT_EMAIL = process.env.SUPPORT_EMAIL || 'info@deergayu.com';
 
-async function createTransporter() {
-  const smtpHost = process.env.SMTP_HOST || 'deergayu.com';
-  const smtpPort = Number(process.env.SMTP_PORT) || 465;
-  const smtpUser = process.env.SMTP_USER || 'info@deergayu.com';
-  const smtpPass = process.env.SMTP_PASS;
+function resolveSmtpConfig() {
+  // Prefer explicit SMTP_* ; also accept Rudraksha-style SMTP_EMAIL / SMTP_PASSWORD
+  const user = process.env.SMTP_USER || process.env.SMTP_EMAIL || 'info@deergayu.com';
+  const pass = process.env.SMTP_PASS || process.env.SMTP_PASSWORD || '';
+  // Namecheap/cPanel shared hosting often needs mail.domain.com or the server hostname
+  const host =
+    process.env.SMTP_HOST ||
+    process.env.MAIL_HOST ||
+    'mail.deergayu.com';
+  const port = Number(process.env.SMTP_PORT || 465);
+  const secure = process.env.SMTP_SECURE
+    ? process.env.SMTP_SECURE === 'true'
+    : port === 465;
 
-  if (smtpUser && smtpPass) {
-    // Use real SMTP if provided
+  return { user, pass, host, port, secure };
+}
+
+async function createTransporter() {
+  const { user, pass, host, port, secure } = resolveSmtpConfig();
+
+  if (user && pass) {
     transporter = nodemailer.createTransport({
-      host: smtpHost,
-      port: smtpPort,
-      secure: smtpPort == 465,
-      auth: {
-        user: smtpUser,
-        pass: smtpPass
-      }
+      host,
+      port,
+      secure,
+      auth: { user, pass },
+      // Helpful on shared cPanel / Namecheap when certs mismatch slightly
+      tls: {
+        rejectUnauthorized: process.env.SMTP_TLS_REJECT_UNAUTHORIZED === 'true',
+        minVersion: 'TLSv1.2',
+      },
+      connectionTimeout: 20000,
+      greetingTimeout: 15000,
+      socketTimeout: 30000,
     });
+    transporterMeta = { mode: 'smtp', host, user, port, secure, lastError: null };
+    console.log(`[Email] SMTP transporter ready → ${user} @ ${host}:${port} (secure=${secure})`);
   } else {
-    // Generate test SMTP service account from ethereal.email
+    // No password → Ethereal (NOT real delivery). Warn loudly.
+    console.warn('[Email] SMTP_PASS / SMTP_PASSWORD missing — using Ethereal TEST mail (not delivered to real inboxes)');
     const testAccount = await nodemailer.createTestAccount();
     transporter = nodemailer.createTransport({
-      host: "smtp.ethereal.email",
+      host: 'smtp.ethereal.email',
       port: 587,
-      secure: false, // true for 465, false for other ports
-      auth: {
-        user: testAccount.user, // generated ethereal user
-        pass: testAccount.pass, // generated ethereal password
-      },
+      secure: false,
+      auth: { user: testAccount.user, pass: testAccount.pass },
     });
-    console.log(`[Email Service] Using Ethereal test account: ${testAccount.user}`);
+    transporterMeta = {
+      mode: 'ethereal',
+      host: 'smtp.ethereal.email',
+      user: testAccount.user,
+      lastError: 'SMTP_PASS not set on server',
+    };
   }
 }
 
-createTransporter();
+createTransporter().catch((e) => {
+  console.error('[Email] Failed to init transporter:', e.message);
+  transporterMeta.lastError = e.message;
+});
 
 /**
- * Sends an email
- * @param {string} to - Recipient email
- * @param {string} subject - Email subject
- * @param {string} text - Email plain text body
- * @param {string} html - Email HTML body
+ * @returns {Promise<{ ok: boolean, messageId?: string, previewUrl?: string, error?: string }>}
  */
 const sendEmail = async (to, subject, text, html) => {
   if (!transporter) await createTransporter();
 
   try {
+    const fromUser = process.env.SMTP_USER || process.env.SMTP_EMAIL || 'info@deergayu.com';
     const info = await transporter.sendMail({
-      from: `"Deergayu Platform" <${process.env.SMTP_USER || 'info@deergayu.com'}>`,
+      from: `"Deergayu" <${fromUser}>`,
       to,
+      replyTo: fromUser,
       subject,
-      text,
+      text: text || undefined,
       html,
     });
 
-    console.log("Message sent: %s", info.messageId);
-    
-    // Preview only available when sending through an Ethereal account
-    if (!process.env.SMTP_USER) {
-      console.log("Preview URL: %s", nodemailer.getTestMessageUrl(info));
-    }
-    
-    return true;
+    const previewUrl = nodemailer.getTestMessageUrl(info) || undefined;
+    if (previewUrl) console.log('[Email] Ethereal preview:', previewUrl);
+    console.log('[Email] Sent:', info.messageId, '→', to);
+
+    return {
+      ok: true,
+      messageId: info.messageId,
+      previewUrl,
+      mode: transporterMeta.mode,
+    };
   } catch (error) {
-    console.error("Error sending email:", error);
-    return false;
+    console.error('[Email] Send failed:', error.message);
+    transporterMeta.lastError = error.message;
+    return { ok: false, error: error.message, mode: transporterMeta.mode };
   }
 };
 
@@ -77,4 +105,65 @@ const sendAdminEmail = async (subject, html, text = '') => {
   return sendEmail(ADMIN_EMAIL, subject, text, html);
 };
 
-module.exports = { sendEmail, sendAdminEmail, ADMIN_EMAIL, SUPPORT_EMAIL };
+async function verifySmtp() {
+  if (!transporter) await createTransporter();
+  const { user, pass, host, port, secure } = resolveSmtpConfig();
+  if (!pass) {
+    return {
+      ok: false,
+      configured: false,
+      mode: transporterMeta.mode,
+      error: 'SMTP_PASS (or SMTP_PASSWORD) is not set on the Node app',
+      hint: 'cPanel → Setup Node.js App → Environment Variables → add SMTP_PASS → Restart',
+    };
+  }
+  try {
+    await transporter.verify();
+    return {
+      ok: true,
+      configured: true,
+      mode: 'smtp',
+      host,
+      port,
+      secure,
+      user,
+      adminEmail: ADMIN_EMAIL,
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      configured: true,
+      mode: 'smtp',
+      host,
+      port,
+      secure,
+      user,
+      error: error.message,
+      hint:
+        'Try SMTP_HOST=mail.deergayu.com or server221.web-hosting.com, port 465. Confirm info@deergayu.com password in Email Accounts.',
+    };
+  }
+}
+
+function getEmailStatus() {
+  const { user, pass, host, port, secure } = resolveSmtpConfig();
+  return {
+    mode: transporterMeta.mode,
+    configured: Boolean(pass),
+    host,
+    port,
+    secure,
+    user,
+    adminEmail: ADMIN_EMAIL,
+    lastError: transporterMeta.lastError,
+  };
+}
+
+module.exports = {
+  sendEmail,
+  sendAdminEmail,
+  verifySmtp,
+  getEmailStatus,
+  ADMIN_EMAIL,
+  SUPPORT_EMAIL,
+};
