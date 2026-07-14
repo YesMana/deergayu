@@ -1559,6 +1559,19 @@ app.post('/api/guide/seed', async (req, res) => {
     ];
 
     const batch = db.batch();
+    
+    // Delete existing herbal_remedies
+    const remediesSnapshot = await db.collection('herbal_remedies').get();
+    remediesSnapshot.docs.forEach(doc => {
+      batch.delete(doc.ref);
+    });
+
+    // Delete existing daily_routines
+    const routinesSnapshot = await db.collection('daily_routines').get();
+    routinesSnapshot.docs.forEach(doc => {
+      batch.delete(doc.ref);
+    });
+
     remedies.forEach(r => {
       const ref = db.collection('herbal_remedies').doc();
       batch.set(ref, { ...r, createdAt: FieldValue.serverTimestamp() });

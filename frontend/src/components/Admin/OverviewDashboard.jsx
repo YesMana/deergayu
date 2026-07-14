@@ -174,15 +174,15 @@ export default function OverviewDashboard({ setActiveTab }) {
               </div>
             ) : (
               recentOrders.map(o => (
-                <div key={o.id} className="recent-item">
-                  <div className="recent-item-icon">
-                    <ShoppingBag size={14} color="#26c6da" />
+                <div key={o.id} className="activity-item">
+                  <div className="activity-avatar">
+                    <ShoppingBag size={14} />
                   </div>
-                  <div className="recent-item-content">
+                  <div className="activity-info">
                     <div className="title">Order #{o.id?.slice(-6).toUpperCase()}</div>
                     <div className="meta">{o.customerName} · {fmtDate(o.createdAt)}</div>
                   </div>
-                  <div className="recent-item-right">
+                  <div className="activity-right">
                     <div className="amt">{fmtCurrency(o.totalPrice)}</div>
                     <StatusPill status={o.status} />
                   </div>
@@ -206,15 +206,15 @@ export default function OverviewDashboard({ setActiveTab }) {
               </div>
             ) : (
               recentAppts.map(a => (
-                <div key={a.id} className="recent-item">
-                  <div className="recent-item-icon">
-                    <Calendar size={14} color="#ffa726" />
+                <div key={a.id} className="activity-item">
+                  <div className="activity-avatar" style={{ background: 'linear-gradient(135deg, #ffa726, #e65100)' }}>
+                    <Calendar size={14} color="#fff" />
                   </div>
-                  <div className="recent-item-content">
+                  <div className="activity-info">
                     <div className="title">{a.customerName}</div>
                     <div className="meta">{a.date} at {a.time}</div>
                   </div>
-                  <div className="recent-item-right">
+                  <div className="activity-right" style={{ textAlign: 'right' }}>
                     <div className="meta" style={{ marginBottom: '0.2rem' }}>Dr. {a.providerName}</div>
                     <StatusPill status={a.status} />
                   </div>

@@ -290,28 +290,41 @@ const ManageGuide = () => {
 
   return (
     <div className="manage-guide">
-      <div className="admin-header">
-        <h2>Ayurvedic Guide Content Management</h2>
+      <div className="admin-page-header">
+        <div>
+          <h1>Ayurvedic Guide</h1>
+          <p className="page-subtitle">Manage herbal remedies and daily routines</p>
+        </div>
         {!isEditing && (
           <div style={{ display: 'flex', gap: '10px' }}>
-            <button className="btn-secondary" onClick={handleSeedData}>
+            <button className="btn btn-outline" onClick={handleSeedData} style={{ borderColor: '#d4af37', color: '#d4af37' }}>
               Seed Demo Data
             </button>
-            <button className="btn-primary" onClick={handleAddNew}>
-              <Plus size={18} /> Add New {activeTab === 'remedies' ? 'Remedy' : 'Routine'}
+            <button className="btn btn-primary" onClick={handleAddNew} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <Plus size={16} /> Add New {activeTab === 'remedies' ? 'Remedy' : 'Routine'}
             </button>
           </div>
         )}
       </div>
 
       {!isEditing && (
-        <div className="admin-tabs">
-          <button className={activeTab === 'remedies' ? 'active' : ''} onClick={() => setActiveTab('remedies')}>
-            <Leaf size={16} /> Herbal Remedies
-          </button>
-          <button className={activeTab === 'routines' ? 'active' : ''} onClick={() => setActiveTab('routines')}>
-            <Clock size={16} /> Daily Routines
-          </button>
+        <div className="table-toolbar" style={{ marginBottom: '1.5rem', background: 'var(--surface-color)', padding: '1rem', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.06)' }}>
+          <div className="filter-chips" style={{ display: 'flex', gap: '0.5rem' }}>
+            <button 
+              className={`filter-chip ${activeTab === 'remedies' ? 'active' : ''}`} 
+              onClick={() => setActiveTab('remedies')}
+              style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}
+            >
+              <Leaf size={14} /> Herbal Remedies
+            </button>
+            <button 
+              className={`filter-chip ${activeTab === 'routines' ? 'active' : ''}`} 
+              onClick={() => setActiveTab('routines')}
+              style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}
+            >
+              <Clock size={14} /> Daily Routines
+            </button>
+          </div>
         </div>
       )}
 
