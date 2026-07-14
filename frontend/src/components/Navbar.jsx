@@ -61,8 +61,8 @@ const Navbar = () => {
       setIsListening(false);
       if (transcript.includes('appoint') || transcript.includes('doctor') || transcript.includes('channel')) {
         navigate('/channeling');
-      } else if (transcript.includes('symptom') || transcript.includes('check')) {
-        navigate('/symptom-checker');
+      } else if (transcript.includes('ayurveda') || transcript.includes('guide')) {
+        navigate('/ayurvedic-guide');
       } else {
         navigate(`/shop?q=${encodeURIComponent(transcript)}`);
       }
@@ -107,7 +107,7 @@ const Navbar = () => {
           <li><Link to="/" className={location.pathname === '/' ? 'active' : ''}>{t('nav_home')}</Link></li>
           <li><Link to="/shop" className={location.pathname.startsWith('/shop') ? 'active' : ''}>{t('nav_shop')}</Link></li>
           <li><Link to="/channeling" className={location.pathname === '/channeling' ? 'active' : ''}>{t('nav_channeling')}</Link></li>
-          <li><Link to="/symptom-checker" className={location.pathname === '/symptom-checker' ? 'active' : ''}>{t('nav_symptoms')}</Link></li>
+          <li><Link to="/ayurvedic-guide" className={location.pathname === '/ayurvedic-guide' ? 'active' : ''}>Ayurvedic Guide</Link></li>
           <li><Link to="/astrology" className={location.pathname === '/astrology' ? 'active' : ''}>{t('nav_astrology')}</Link></li>
           <li><Link to="/videos" className={location.pathname === '/videos' ? 'active' : ''}>{t('nav_videos')}</Link></li>
         </ul>
@@ -228,7 +228,7 @@ const Navbar = () => {
           <li><Link to="/">{t('nav_home')}</Link></li>
           <li><Link to="/shop">{t('nav_shop')}</Link></li>
           <li><Link to="/channeling">{t('nav_channeling')}</Link></li>
-          <li><Link to="/symptom-checker">{t('nav_symptoms')}</Link></li>
+          <li><Link to="/ayurvedic-guide">Ayurvedic Guide</Link></li>
           <li><Link to="/astrology">{t('nav_astrology')}</Link></li>
           <li><Link to="/videos">{t('nav_videos')}</Link></li>
           {user && (

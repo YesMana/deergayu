@@ -252,9 +252,9 @@ const CustomerDashboard = () => {
                 <span>Book a Doctor</span>
                 <ChevronRight size={16} color="var(--text-muted)" />
               </Link>
-              <Link to="/symptom-checker" className="quick-link-card glass-panel glass-panel-hover">
-                <AlertCircle size={28} color="var(--info-color)" />
-                <span>AI Symptom Checker</span>
+              <Link to="/ayurvedic-guide" className="quick-link-card glass-panel glass-panel-hover">
+                <Leaf size={28} color="var(--primary-color)" />
+                <span>Ayurvedic Guide</span>
                 <ChevronRight size={16} color="var(--text-muted)" />
               </Link>
             </div>

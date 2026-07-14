@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Search, Filter, ShoppingCart, Heart } from 'lucide-react';
-import { collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '../firebase';
+import { useInfiniteProductsQuery } from '../hooks/queries/useProducts';
 import { useCart } from '../context/CartContext';
 import { useToast } from '../context/ToastContext';
 import { useNavigate, useLocation } from 'react-router-dom';
@@ -10,33 +10,23 @@ import './Shop.css';
 
 const Shop = () => {
   const [searchTerm, setSearchTerm] = useState('');
-  const [products, setProducts] = useState([]);
-  const [loading, setLoading] = useState(true);
   const [selectedCategory, setSelectedCategory] = useState('All');
   
   const { addToCart } = useCart();
   const { success, error } = useToast();
   const navigate = useNavigate();
 
-  useEffect(() => {
-    const fetchApprovedProducts = async () => {
-      try {
-        const q = query(collection(db, 'products'), where('status', '==', 'approved'));
-        const querySnapshot = await getDocs(q);
-        const fetchedProducts = querySnapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data()
-        }));
-        setProducts(fetchedProducts);
-      } catch (err) {
-        console.error("Error fetching approved products:", err);
-      } finally {
-        setLoading(false);
-      }
-    };
+  const {
+    data,
+    fetchNextPage,
+    hasNextPage,
+    isFetching,
+    isFetchingNextPage,
+    status
+  } = useInfiniteProductsQuery({ pageSize: 12, status: 'approved' });
 
-    fetchApprovedProducts();
-  }, []);
+  // Flatten infinite pages into a single products array
+  const products = data ? data.pages.flatMap(page => page.products) : [];
 
   const handleAddToCart = async (product) => {
     try {
@@ -99,8 +89,10 @@ const Shop = () => {
 
       <div className="container shop-content">
         <div className="product-grid">
-          {loading ? (
+          {status === 'pending' ? (
             <div style={{ padding: '2rem', textAlign: 'center', width: '100%', color: 'var(--text-secondary)' }}>Loading products...</div>
+          ) : status === 'error' ? (
+            <div style={{ padding: '2rem', textAlign: 'center', width: '100%', color: '#ff6b6b' }}>Error loading products.</div>
           ) : filteredProducts.length === 0 ? (
             <div style={{ padding: '2rem', textAlign: 'center', width: '100%', color: 'var(--text-secondary)' }}>No products match your search.</div>
           ) : 
@@ -138,6 +130,19 @@ const Shop = () => {
             </div>
           ))}
         </div>
+        
+        {hasNextPage && (
+          <div style={{ textAlign: 'center', marginTop: '3rem' }}>
+            <button 
+              className="btn btn-outline"
+              onClick={() => fetchNextPage()}
+              disabled={isFetchingNextPage}
+              style={{ minWidth: '200px' }}
+            >
+              {isFetchingNextPage ? 'Loading more...' : 'Load More Products'}
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

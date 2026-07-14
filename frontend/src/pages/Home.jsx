@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Leaf, Calendar, Star, Users, Package, Activity, Shield, ChevronRight, MapPin, Search, CheckCircle } from 'lucide-react';
+import { Leaf, UserCircle, MessageSquare, Star, ChevronRight, Activity, Calendar, Shield, Award, BookOpen, Package, Search, CheckCircle } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import { motion } from 'framer-motion';
 import SEO from '../components/SEO';
@@ -203,10 +203,10 @@ const Home = () => {
             </motion.div>
 
             <motion.div className="service-card glass-panel glass-panel-hover" variants={fadeUpVariant}>
-              <div className="service-icon-wrapper"><Activity size={32} /></div>
-              <h3>AI Symptom Checker</h3>
-              <p>Describe your symptoms and get AI-powered Ayurvedic recommendations plus real doctor and product matches.</p>
-              <Link to="/symptom-checker" className="service-link">Check Symptoms <ChevronRight size={16} /></Link>
+              <div className="service-icon-wrapper"><BookOpen size={32} /></div>
+              <h3>Ayurvedic Guide</h3>
+              <p>Explore traditional Sri Lankan herbal remedies (අත් බෙහෙත්) and learn the daily Ayurvedic routine (දිනචරියාව).</p>
+              <Link to="/ayurvedic-guide" className="service-link">Read Guide <ChevronRight size={16} /></Link>
             </motion.div>
 
             <motion.div className="service-card glass-panel glass-panel-hover" variants={fadeUpVariant}>

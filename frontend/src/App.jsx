@@ -18,7 +18,7 @@ const Home = lazy(() => import('./pages/Home'));
 const Shop = lazy(() => import('./pages/Shop'));
 const ProductDetail = lazy(() => import('./pages/ProductDetail'));
 const Channeling = lazy(() => import('./pages/Channeling'));
-const SymptomChecker = lazy(() => import('./pages/SymptomChecker'));
+const AyurvedicGuide = lazy(() => import('./pages/AyurvedicGuide'));
 const AdminDashboard = lazy(() => import('./pages/AdminDashboard'));
 const VendorDashboard = lazy(() => import('./pages/VendorDashboard'));
 const Login = lazy(() => import('./pages/Login'));
@@ -50,7 +50,7 @@ function App() {
                       <Route path="/shop" element={<Shop />} />
                       <Route path="/product/:id" element={<ProductDetail />} />
                       <Route path="/channeling" element={<Channeling />} />
-                      <Route path="/symptom-checker" element={<SymptomChecker />} />
+                      <Route path="/ayurvedic-guide" element={<AyurvedicGuide />} />
                       <Route path="/videos" element={<Videos />} />
                       <Route path="/astrology" element={<Astrology />} />
                       <Route path="/login" element={<Login />} />

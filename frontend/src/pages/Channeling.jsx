@@ -5,6 +5,7 @@ import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { auth } from '../firebase';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import SEO from '../components/SEO';
 import './Channeling.css';
 
@@ -23,7 +24,7 @@ const sriLankaData = {
   "Online": ["Online"]
 };
 
-const docSpecialties = ["Sarwanga Roga (General)", "Kadum Bindum (Orthopedic)", "Sarpa Visha (Toxicology)", "Panchakarma", "Skin Diseases (Dermatology)", "Manasa Roga (Psychiatry)", "Kaumarabhritya (Pediatrics)", "Prasuti & Stri Roga (Gynecology)", "Shalakya Tantra (ENT & Eye)", "Shalya Tantra (Surgery)"];
+const docSpecialties = ["Sarwanga Roga (General)", "Kadum Bindum (Orthopedic)", "Sarpa Visha (Toxicology)", "Panchakarma", "Skin Diseases (Dermatology)", "Manasa Roga (Psychiatry)", "Kaumarabhritya (Pediatrics)", "Prasuti & Stri Roga (Gynecology)", "Shalakya Tantra (ENT & Eye)", "Shalya Tantra (Surgery)", "Yantra / Mantra", "Yaga Homa", "Kem Kram", "Traditional Herbal Medicine"];
 const astroSpecialties = ["Horoscope Reading", "Yanthra Preparation", "Auspicious Times", "Vasthu Vidya"];
 
 const Channeling = () => {
@@ -31,9 +32,6 @@ const Channeling = () => {
   const { user } = useAuth();
   const { success, error, info } = useToast();
   const navigate = useNavigate();
-  
-  const [providers, setProviders] = useState([]);
-  const [loading, setLoading] = useState(true);
   
   const [searchParams] = useSearchParams();
   const initialTab = searchParams.get('tab') || 'all';
@@ -56,23 +54,15 @@ const Channeling = () => {
   const [bookedSlots, setBookedSlots] = useState([]);
   const [loadingSlots, setLoadingSlots] = useState(false);
 
-  useEffect(() => {
-    fetchProviders();
-  }, []);
-
-  const fetchProviders = async () => {
-    try {
+  const { data: providers = [], isLoading: loading } = useQuery({
+    queryKey: ['channeling_providers'],
+    queryFn: async () => {
       const res = await fetch(`${API_URL}/api/providers`);
-      if (res.ok) {
-        const data = await res.json();
-        setProviders(data);
-      }
-    } catch (err) {
-      console.error('Error fetching providers:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
+      if (!res.ok) throw new Error('Network response was not ok');
+      return res.json();
+    },
+    staleTime: 5 * 60 * 1000,
+  });
 
   useEffect(() => {
     if (bookingDate && selectedProvider) {
@@ -109,12 +99,14 @@ const Channeling = () => {
     const province = details.province || '';
     const district = details.address || '';
 
-    const matchType = filterType === 'all' || (filterType === 'doctor' && (type === 'doctor' || type === 'Ayurvedic Physician' || p.role === 'doctor' || p.role === 'clinic')) || (filterType === 'astrologer' && (type === 'astrologer' || type === 'Vedic Astrologer'));
+    const matchType = filterType === 'all' || (filterType === 'doctor' && (type === 'doctor' || type === 'Ayurvedic Physician' || type === 'traditional' || p.role === 'doctor' || p.role === 'clinic')) || (filterType === 'astrologer' && (type === 'astrologer' || type === 'Vedic Astrologer'));
     const matchProvince = provinceFilter === 'all' || province === provinceFilter;
     const matchDistrict = districtFilter === 'all' || district.includes(districtFilter);
-    const matchSpecialty = specialtyFilter === 'all' || specialty === specialtyFilter || (details.astrologyServices && details.astrologyServices.includes(specialtyFilter));
+    const matchSpecialty = specialtyFilter === 'all' || 
+                           (Array.isArray(specialty) ? specialty.includes(specialtyFilter) : specialty === specialtyFilter || specialty.includes(specialtyFilter)) || 
+                           (details.astrologyServices && details.astrologyServices.includes(specialtyFilter));
     const matchSearch = p.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                        specialty.toLowerCase().includes(searchQuery.toLowerCase());
+                        (Array.isArray(specialty) ? specialty.join(' ').toLowerCase().includes(searchQuery.toLowerCase()) : specialty.toLowerCase().includes(searchQuery.toLowerCase()));
                         
     return matchType && matchProvince && matchDistrict && matchSpecialty && matchSearch;
   });
@@ -283,10 +275,18 @@ const Channeling = () => {
                           {t(service)}
                         </span>
                       ))
+                    ) : Array.isArray(provider.profileDetails?.specialty) ? (
+                      provider.profileDetails.specialty.map(service => (
+                        <span key={service} className="detail-tag" style={{background: 'rgba(76,175,80,0.15)', border: '1px solid rgba(76,175,80,0.3)', color: '#4caf50'}}>
+                          {t(service)}
+                        </span>
+                      ))
                     ) : (
                       <span className="detail-tag">{t(provider.profileDetails?.specialty || 'General')}</span>
                     )}
-                    <span className="detail-tag">{provider.profileDetails?.experience || '10+ Years'}</span>
+                    {provider.profileDetails?.experience && (
+                      <span className="detail-tag">{provider.profileDetails.experience} Experience</span>
+                    )}
                     <span className="detail-tag flex-center"><MapPin size={14}/> {t(provider.profileDetails?.address || 'Sri Lanka')}</span>
                   </div>
                 </div>

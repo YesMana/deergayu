@@ -241,10 +241,17 @@ apiRouter.post('/symptom-check', async (req, res) => {
     }
 
     // Fetch real data from DB in parallel
-    const [providersSnap, productsSnap] = await Promise.all([
-      db.collection('users').where('role', 'in', ['doctor', 'clinic', 'organization']).where('status', '==', 'approved').get(),
-      db.collection('products').where('status', '==', 'approved').get()
-    ]);
+    let providersSnap = { docs: [] };
+    let productsSnap = { docs: [] };
+    
+    try {
+      [providersSnap, productsSnap] = await Promise.all([
+        db.collection('users').where('role', 'in', ['doctor', 'clinic', 'organization']).where('status', '==', 'approved').get(),
+        db.collection('products').where('status', '==', 'approved').get()
+      ]);
+    } catch (dbErr) {
+      console.warn('Symptom Checker: Could not fetch from DB (Firebase may not be configured locally). Proceeding with AI only.');
+    }
 
     const providersList = providersSnap.docs.map(d => {
       const data = d.data();
@@ -296,13 +303,21 @@ If no matching doctors/products exist for this symptom, return empty arrays. Do 
 
     // Find matching provider IDs from DB
     const matchedProviders = providersSnap.docs
-      .filter(d => aiData.recommendedDoctors?.some(name => d.data().name?.toLowerCase().includes(name.toLowerCase()) || name.toLowerCase().includes(d.data().name?.toLowerCase())))
+      .filter(d => {
+        const docName = d.data().name;
+        if (!docName || typeof docName !== 'string') return false;
+        return aiData.recommendedDoctors?.some(name => docName.toLowerCase().includes(name.toLowerCase()) || name.toLowerCase().includes(docName.toLowerCase()));
+      })
       .map(d => ({ id: d.id, ...d.data(), profileDetails: d.data().profileDetails || {} }))
       .slice(0, 3);
 
     // Find matching product IDs from DB
     const matchedProducts = productsSnap.docs
-      .filter(d => aiData.recommendedProducts?.some(name => d.data().name?.toLowerCase().includes(name.toLowerCase()) || name.toLowerCase().includes(d.data().name?.toLowerCase())))
+      .filter(d => {
+        const docName = d.data().name;
+        if (!docName || typeof docName !== 'string') return false;
+        return aiData.recommendedProducts?.some(name => docName.toLowerCase().includes(name.toLowerCase()) || name.toLowerCase().includes(docName.toLowerCase()));
+      })
       .map(d => ({ id: d.id, ...d.data() }))
       .slice(0, 3);
 

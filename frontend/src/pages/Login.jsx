@@ -24,6 +24,7 @@ const Login = () => {
   const [doctorType, setDoctorType] = useState('Ayurvedic Physician');
   const [specialty, setSpecialty] = useState('');
   const [astrologyServices, setAstrologyServices] = useState([]);
+  const [traditionalSpecialties, setTraditionalSpecialties] = useState([]);
   const [experience, setExperience] = useState('');
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
@@ -90,13 +91,13 @@ const Login = () => {
         }
         
         const actualRole = role === 'astrologer' ? 'doctor' : role;
-        const finalDoctorType = role === 'astrologer' ? 'Vedic Astrologer' : 'Ayurvedic Physician';
+        const finalDoctorType = role === 'astrologer' ? 'Vedic Astrologer' : doctorType;
 
         const profileDetails = actualRole !== 'user' ? {
           address,
           telephone,
           doctorType: finalDoctorType,
-          specialty: role === 'astrologer' ? 'Yantra & Mantra' : specialty,
+          specialty: role === 'astrologer' ? 'Yantra & Mantra' : (doctorType === 'traditional' ? traditionalSpecialties : specialty),
           astrologyServices: role === 'astrologer' ? astrologyServices : [],
           experience
         } : null;
@@ -251,6 +252,37 @@ const Login = () => {
                           }} style={{ width: 'auto', margin: 0 }} />
                           Vasthu Vidya (වාස්තු විද්‍යාව)
                         </label>
+                    </div>
+                    ) : doctorType === 'traditional' ? (
+                      <div className="astrology-checkboxes" style={{ display: 'grid', gap: '0.5rem', background: 'var(--input-bg)', padding: '1rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--glass-border)' }}>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', margin: 0 }}>
+                          <input type="checkbox" value="Yantra / Mantra" checked={traditionalSpecialties.includes("Yantra / Mantra")} onChange={(e) => {
+                            if(e.target.checked) setTraditionalSpecialties([...traditionalSpecialties, e.target.value]);
+                            else setTraditionalSpecialties(traditionalSpecialties.filter(s => s !== e.target.value));
+                          }} style={{ width: 'auto', margin: 0 }} />
+                          Yantra / Mantra (යන්ත්‍ර මන්ත්‍ර)
+                        </label>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', margin: 0 }}>
+                          <input type="checkbox" value="Yaga Homa" checked={traditionalSpecialties.includes("Yaga Homa")} onChange={(e) => {
+                            if(e.target.checked) setTraditionalSpecialties([...traditionalSpecialties, e.target.value]);
+                            else setTraditionalSpecialties(traditionalSpecialties.filter(s => s !== e.target.value));
+                          }} style={{ width: 'auto', margin: 0 }} />
+                          Yaga Homa (යාග හෝම)
+                        </label>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', margin: 0 }}>
+                          <input type="checkbox" value="Kem Kram" checked={traditionalSpecialties.includes("Kem Kram")} onChange={(e) => {
+                            if(e.target.checked) setTraditionalSpecialties([...traditionalSpecialties, e.target.value]);
+                            else setTraditionalSpecialties(traditionalSpecialties.filter(s => s !== e.target.value));
+                          }} style={{ width: 'auto', margin: 0 }} />
+                          Kem Kram (කෙම් ක්‍රම)
+                        </label>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', margin: 0 }}>
+                          <input type="checkbox" value="Traditional Herbal Medicine" checked={traditionalSpecialties.includes("Traditional Herbal Medicine")} onChange={(e) => {
+                            if(e.target.checked) setTraditionalSpecialties([...traditionalSpecialties, e.target.value]);
+                            else setTraditionalSpecialties(traditionalSpecialties.filter(s => s !== e.target.value));
+                          }} style={{ width: 'auto', margin: 0 }} />
+                          Traditional Herbal Medicine (දේශීය ඖෂධ)
+                        </label>
                       </div>
                     ) : (
                       <input 
@@ -258,7 +290,7 @@ const Login = () => {
                         value={specialty}
                         onChange={(e) => setSpecialty(e.target.value)}
                         placeholder="e.g. Herbal Products, Therapy Center..."
-                        required 
+                        required={role !== 'doctor'} 
                       />
                     )}
                   </div>

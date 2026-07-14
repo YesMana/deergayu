@@ -70,7 +70,7 @@ const NotFound = () => {
         {[
           { to: '/shop', label: '🛍️ Shop' },
           { to: '/channeling', label: '📅 Book Appointment' },
-          { to: '/symptom-checker', label: '🩺 Symptom Checker' },
+          { to: '/ayurvedic-guide', label: '🌿 Ayurvedic Guide' },
         ].map(link => (
           <Link key={link.to} to={link.to} style={{
             color: 'var(--primary-color)',
