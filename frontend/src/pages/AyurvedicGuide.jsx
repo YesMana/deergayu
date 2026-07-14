@@ -310,11 +310,19 @@ const guideData = {
 
 const AyurvedicGuide = () => {
   const [activeTab, setActiveTab] = useState('remedies');
+  const [activeCondition, setActiveCondition] = useState('general');
   const [dbRemedies, setDbRemedies] = useState([]);
   const [dbRoutines, setDbRoutines] = useState([]);
   const [loading, setLoading] = useState(true);
   const { lang } = useLanguage();
   const data = guideData[lang] || guideData.en;
+
+  const conditions = [
+    { id: 'general', en: 'General Wellness', si: 'සාමාන්‍ය සෞඛ්‍යය', ta: 'பொது நல்வாழ்வு' },
+    { id: 'diabetes', en: 'Diabetes', si: 'දියවැඩියාව', ta: 'நீரிழிவு' },
+    { id: 'hypertension', en: 'High Blood Pressure', si: 'අධිරුධිර පීඩනය', ta: 'உயர் இரத்த அழுத்தம்' },
+    { id: 'cholesterol', en: 'High Cholesterol', si: 'කොලෙස්ටරෝල්', ta: 'கொலஸ்ட்ரால்' }
+  ];
 
   useEffect(() => {
     const fetchContent = async () => {
@@ -441,9 +449,21 @@ const AyurvedicGuide = () => {
                     <h2>{data.routine_title}</h2>
                     <p>{data.routine_subtitle}</p>
                   </div>
+
+                  <div className="condition-filters" style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', justifyContent: 'center', marginBottom: '30px' }}>
+                    {conditions.map(c => (
+                      <button 
+                        key={c.id} 
+                        className={`filter-chip ${activeCondition === c.id ? 'active' : ''}`}
+                        onClick={() => setActiveCondition(c.id)}
+                      >
+                        {c[lang]}
+                      </button>
+                    ))}
+                  </div>
                   
                   <div className="routine-timeline">
-                    {loading ? <div className="loading-spinner">Loading...</div> : dbRoutines.map((item, index) => {
+                    {loading ? <div className="loading-spinner">Loading...</div> : dbRoutines.filter(r => (r.condition || 'general') === activeCondition).sort((a,b) => a.order - b.order).map((item, index, filteredArr) => {
                       const step = item[lang] || item.en;
                       const iconColor = item.icon === 'Sun' ? '#ff9800' : item.icon === 'Moon' ? '#5c6bc0' : undefined;
                       return (
@@ -458,7 +478,7 @@ const AyurvedicGuide = () => {
                       >
                         <div className="timeline-marker">
                           <div className="timeline-icon glass-panel">{getIconComponent(item.icon, { size: 24, color: iconColor })}</div>
-                          {index !== dbRoutines.length - 1 && <div className="timeline-line"></div>}
+                          {index !== filteredArr.length - 1 && <div className="timeline-line"></div>}
                         </div>
                         <div className="timeline-content glass-panel glass-panel-hover">
                           <div className="timeline-time">{step?.time}</div>

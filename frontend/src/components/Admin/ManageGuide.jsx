@@ -18,6 +18,7 @@ const ManageGuide = () => {
   };
   
   const initialRoutineState = {
+    condition: 'general',
     order: 1,
     icon: 'Sun',
     en: { time: '', title: '', description: '', tips: '' },
@@ -223,6 +224,20 @@ const ManageGuide = () => {
       
       <div className="form-row">
         <div className="form-group">
+          <label>Condition Category</label>
+          <select 
+            value={currentFormData.condition || 'general'} 
+            onChange={(e) => setCurrentFormData({...currentFormData, condition: e.target.value})}
+            required
+            className="input-field"
+          >
+            <option value="general">General Wellness (සාමාන්‍ය සෞඛ්‍යය)</option>
+            <option value="diabetes">Diabetes (දියවැඩියාව)</option>
+            <option value="hypertension">High Blood Pressure (අධිරුධිර පීඩනය)</option>
+            <option value="cholesterol">High Cholesterol (කොලෙස්ටරෝල්)</option>
+          </select>
+        </div>
+        <div className="form-group">
           <label>Order Number</label>
           <input 
             type="number" 
@@ -322,7 +337,8 @@ const ManageGuide = () => {
                   ) : (
                     <>
                       <th>Order</th>
-                      <th>Time (EN)</th>
+                      <th>Condition</th>
+                      <th>Time</th>
                       <th>Title (EN)</th>
                       <th>Actions</th>
                     </>
@@ -330,7 +346,10 @@ const ManageGuide = () => {
                 </tr>
               </thead>
               <tbody>
-                {(activeTab === 'remedies' ? remedies : routines).map((item) => (
+                {(activeTab === 'remedies' ? remedies : routines.sort((a,b) => {
+                   if (a.condition !== b.condition) return a.condition.localeCompare(b.condition);
+                   return a.order - b.order;
+                })).map((item) => (
                   <tr key={item.id}>
                     {activeTab === 'remedies' ? (
                       <>
@@ -343,6 +362,7 @@ const ManageGuide = () => {
                     ) : (
                       <>
                         <td>{item.order}</td>
+                        <td><span className="badge">{item.condition || 'general'}</span></td>
                         <td>{item.en?.time}</td>
                         <td>{item.en?.title}</td>
                       </>

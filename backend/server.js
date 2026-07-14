@@ -1503,46 +1503,58 @@ app.post('/api/guide/seed', async (req, res) => {
 
     const routines = [
       {
-        order: 1, icon: 'Sun',
+        condition: 'general', order: 1, icon: 'Sun',
         en: { time: '5:00 AM - 6:00 AM', title: 'Brahma Muhurta (Wake Up)', description: 'Wake up 1.5 hours before sunrise. This is the most peaceful time of day, ideal for spiritual practices.', tips: 'Gently stretch in bed | Express gratitude | Avoid checking your phone immediately' },
         si: { time: 'පෙ.ව. 5:00 - 6:00', title: 'බ්‍රහ්ම මුහුර්තය (අවදි වීම)', description: 'හිරු උදාවට පැය 1.5කට පෙර අවදි වන්න. මෙය දවසේ නිස්කලංකම වේලාව වන අතර ආධ්‍යාත්මික කටයුතු සඳහා ඉතා යෝග්‍ය වේ.', tips: 'ඇඳේ සිටම ඇඟ මැලි කඩන්න | ස්වභාවධර්මයට ස්තූති කරන්න | අවදි වූ ගමන් ජංගම දුරකථනය බැලීමෙන් වළකින්න' },
         ta: { time: 'காலை 5:00 - 6:00', title: 'பிரம்மா முஹூர்த்தம் (எழுதல்)', description: 'சூரிய உதயத்திற்கு 1.5 மணி நேரத்திற்கு முன்பு எழுந்திருங்கள். இது நாளின் மிகவும் அமைதியான நேரம்.', tips: 'படுக்கையில் மெதுவாக நீட்டவும் | இயற்கைக்கு நன்றி தெரிவிக்கவும் | உடனடியாக தொலைபேசியைப் பார்ப்பதைத் தவிர்க்கவும்' }
       },
       {
-        order: 2, icon: 'Droplet',
+        condition: 'general', order: 2, icon: 'Droplet',
         en: { time: '6:00 AM - 6:30 AM', title: 'Purification & Cleansing', description: 'Cleanse the senses. Wash your face, scrape your tongue to remove toxins, and drink warm water.', tips: 'Use a copper tongue scraper | Drink warm lemon water | Brush teeth with herbal toothpaste' },
         si: { time: 'පෙ.ව. 6:00 - 6:30', title: 'පිරිසිදු වීම', description: 'මුහුණ සෝදා, දිව මැද විස ඉවත් කරගන්න. ආහාර දිරවීම උත්තේජනය කිරීම සඳහා උණුසුම් ජලය වීදුරුවක් පානය කරන්න.', tips: 'තඹ දිව මදින උපකරණයක් භාවිතා කරන්න | උණුසුම් දෙහි වතුර බොන්න | ඖෂධීය දන්තාලේප භාවිතා জ্ঞකරන්න' },
         ta: { time: 'காலை 6:00 - 6:30', title: 'சுத்திகரிப்பு', description: 'முகம் கழுவி, நாக்கை சுத்தம் செய்து நச்சுக்களை அகற்றவும். செரிமானத்தைத் தூண்ட வெதுவெதுப்பான நீரைக் குடிக்கவும்.', tips: 'செம்பு நாக்கு வழிப்பான் பயன்படுத்தவும் | வெதுவெதுப்பான எலுமிச்சை நீர் குடிக்கவும் | மூலிகை பற்பசை பயன்படுத்தவும்' }
       },
       {
-        order: 3, icon: 'Activity',
+        condition: 'general', order: 3, icon: 'Activity',
         en: { time: '6:30 AM - 7:30 AM', title: 'Movement & Meditation', description: 'Engage in gentle exercise like Yoga, followed by breathwork and meditation.', tips: 'Sun salutations | 10-15 minutes of meditation | Abhyanga (self-massage)' },
         si: { time: 'පෙ.ව. 6:30 - 7:30', title: 'ව්‍යායාම සහ භාවනා', description: 'යෝගා වැනි සැහැල්ලු ව්‍යායාමවල නිරත වන්න, ඉන්පසු ප්‍රාණයාම සහ භාවනා කරන්න.', tips: 'සූර්ය නමස්කාරය | විනාඩි 10-15ක නිහඬ භාවනාව | ස්නානයට පෙර ඇඟේ තෙල් ගෑම (අභ්‍යංග)' },
         ta: { time: 'காலை 6:30 - 7:30', title: 'உடற்பயிற்சி & தியானம்', description: 'யோகா போன்ற மென்மையான உடற்பயிற்சிகளை மேற்கொள்ளவும், பின்னர் மூச்சுப் பயிற்சி மற்றும் தியானம்.', tips: 'சூரிய நமஸ்காரம் | 10-15 நிமிட தியானம் | குளிப்பதற்கு முன் எண்ணெய் மசாஜ் (அப்யங்கா)' }
       },
       {
-        order: 4, icon: 'Coffee',
+        condition: 'general', order: 4, icon: 'Coffee',
         en: { time: '7:30 AM - 8:30 AM', title: 'Light Breakfast', description: 'Eat a nourishing, warm breakfast appropriate for your Dosha.', tips: 'Warm oatmeal or herbal gruel | Avoid cold or heavy foods | Eat only when genuinely hungry' },
         si: { time: 'පෙ.ව. 7:30 - 8:30', title: 'සැහැල්ලු උදෑසන ආහාරය', description: 'ඔබේ දෝෂයට ගැලපෙන පෝෂ්‍යදායී, උණුසුම් උදෑසන ආහාරයක් ගන්න.', tips: 'ඖෂධීය කැඳ වීදුරුවක් | සීතල හෝ බර ආහාර වලින් වළකින්න | බඩගිනි නම් පමණක් ආහාර ගන්න' },
         ta: { time: 'காலை 7:30 - 8:30', title: 'காலை உணவு', description: 'உங்கள் தோஷத்திற்கு ஏற்ற சத்தான, சூடான காலை உணவை உண்ணுங்கள்.', tips: 'மூலிகை கஞ்சி | குளிர்ந்த அல்லது கனமான உணவுகளைத் தவிர்க்கவும் | பசியாக இருக்கும்போது மட்டுமே சாப்பிடவும்' }
       },
       {
-        order: 5, icon: 'Sun',
+        condition: 'general', order: 5, icon: 'Sun',
         en: { time: '12:00 PM - 1:00 PM', title: 'Lunch (Main Meal)', description: 'Pitta dosha is at its peak. This should be your largest and most complex meal of the day.', tips: 'Include all 6 tastes | Eat in a calm environment | Sit for 10 minutes after eating' },
         si: { time: 'ප.ව. 12:00 - 1:00', title: 'ප්‍රධාන ආහාරය (දිවා ආහාරය)', description: 'දිවා කාලයේ ඔබේ ආහාර දිරවීමේ ගින්න (අග්නි) උපරිම වේ. මෙය දවසේ විශාලතම ආහාර වේල විය යුතුය.', tips: 'රස 6ම (පැණි, ඇඹුල්, ලුණු, තිත්ත, කහට, සැර) ඇතුළත් කරගන්න | නිදහස් පරිසරයක ආහාර ගන්න | කෑමෙන් පසු විනාඩි 10ක් විවේක ගන්න' },
         ta: { time: 'பகல் 12:00 - 1:00', title: 'மதிய உணவு', description: 'பகல் நேரத்தில் உங்கள் செரிமான தீ உச்சத்தில் இருக்கும். இது நாளின் மிகப்பெரிய உணவாக இருக்க வேண்டும்.', tips: '6 சுவைகளையும் சேர்க்கவும் | அமைதியான சூழலில் சாப்பிடவும் | சாப்பிட்ட பிறகு 10 நிமிடம் ஓய்வெடுக்கவும்' }
       },
       {
-        order: 6, icon: 'Moon',
+        condition: 'general', order: 6, icon: 'Moon',
         en: { time: '6:00 PM - 7:00 PM', title: 'Light Dinner', description: 'As the sun goes down, your digestive fire weakens. Eat a light, warm dinner.', tips: 'Soups, steamed vegetables | Avoid heavy proteins | Take a short, gentle walk after eating' },
         si: { time: 'ප.ව. 6:00 - 7:00', title: 'රාත්‍රී ආහාරය', description: 'හිරු බැස යන විට ආහාර දිරවීම දුර්වල වේ. නින්දට පැය 2-3කට පෙර සැහැල්ලු රාත්‍රී ආහාරයක් ගන්න.', tips: 'සුප්, තැම්බූ එළවළු | බර ප්‍රෝටීන් සහිත ආහාර වලින් වළකින්න | කෑමෙන් පසු කෙටි ඇවිදීමක නිරත වන්න' },
         ta: { time: 'மாலை 6:00 - 7:00', title: 'இரவு உணவு', description: 'சூரியன் மறையும் போது செரிமானம் பலவீனமடைகிறது. இலகுவான இரவு உணவை உண்ணுங்கள்.', tips: 'சூப், வேகவைத்த காய்கறிகள் | கனமான புரதங்களைத் தவிர்க்கவும் | சாப்பிட்ட பிறகு சிறிது நேரம் நடக்கவும்' }
       },
       {
-        order: 7, icon: 'Moon',
+        condition: 'general', order: 7, icon: 'Moon',
         en: { time: '9:30 PM - 10:00 PM', title: 'Rest & Sleep', description: 'Wind down your day. Promote deep, restorative sleep.', tips: 'Drink warm milk with nutmeg | Read a calming book | Ensure the room is dark and cool' },
         si: { time: 'ප.ව. 9:30 - 10:00', title: 'නින්ද සහ විවේකය', description: 'දවස අවසන් කරන්න. කඵ දෝෂය ප්‍රමුඛ වන මේ වේලාව ගැඹුරු නින්දකට උදව් වේ.', tips: 'සාදික්කා හෝ කහ මිශ්‍ර උණු කිරි වීදුරුවක් බොන්න | සන්සුන් පොතක් කියවන්න | කාමරය අඳුරුව සහ සිසිල්ව තබාගන්න' },
         ta: { time: 'இரவு 9:30 - 10:00', title: 'ஓய்வு & தூக்கம்', description: 'ஆழ்ந்த உறக்கத்திற்கு தயாராகுங்கள்.', tips: 'ஜாதிக்காய் கலந்த சூடான பால் குடிக்கவும் | புத்தகம் படிக்கவும் | அறையை இருட்டாகவும் குளிர்ந்தும் வைத்திருக்கவும்' }
+      },
+      {
+        condition: 'diabetes', order: 1, icon: 'Coffee',
+        en: { time: '6:30 AM', title: 'Morning Drink', description: 'Start your day with a drink to regulate blood sugar levels.', tips: 'Kothalahimbutu tea | Bitter gourd juice | Avoid sugar' },
+        si: { time: 'පෙ.ව. 6:30', title: 'උදෑසන පානය', description: 'රුධිරයේ සීනි මට්ටම පාලනය කිරීමට සුදුසු පානයකින් දවස අරඹන්න.', tips: 'කොතලහිඹුටු තේ | කරවිල යුෂ | සීනි භාවිතයෙන් වළකින්න' },
+        ta: { time: 'காலை 6:30', title: 'காலை பானம்', description: 'இரத்த சர்க்கரை அளவை கட்டுப்படுத்தும் பானத்துடன் நாளைத் தொடங்குங்கள்.', tips: 'கொத்தலஹிம்புடு தேநீர் | பாகற்காய் சாறு | சர்க்கரையைத் தவிர்க்கவும்' }
+      },
+      {
+        condition: 'hypertension', order: 1, icon: 'Activity',
+        en: { time: '7:00 AM', title: 'Calming Yoga', description: 'Gentle yoga and breathing exercises to reduce stress and lower blood pressure.', tips: 'Pranayama | Avoid rigorous cardio | Meditate for 15 minutes' },
+        si: { time: 'පෙ.ව. 7:00', title: 'සැහැල්ලු යෝගා ව්‍යායාම', description: 'මානසික ආතතිය සහ රුධිර පීඩනය අඩු කිරීම සඳහා සැහැල්ලු යෝගා සහ ප්‍රාණයාම කරන්න.', tips: 'ප්‍රාණයාම | වෙහෙසකර ව්‍යායාම වලින් වළකින්න | විනාඩි 15ක භාවනාව' },
+        ta: { time: 'காலை 7:00', title: 'அமைதியான யோகா', description: 'மன அழுத்தம் மற்றும் இரத்த அழுத்தத்தைக் குறைக்க மென்மையான யோகா மற்றும் மூச்சுப் பயிற்சி.', tips: 'பிராணயாமா | கடுமையான பயிற்சிகளைத் தவிர்க்கவும் | 15 நிமிடம் தியானம்' }
       }
     ];
 
