@@ -246,6 +246,48 @@ apiRouter.get('/sitemap-data', async (req, res) => {
 // ============================================================
 // AUTHENTICATION APIs
 // ============================================================
+
+/** Short-lived codes for Expo Go Google Sign-In bridge (website → app) */
+if (!global.__mobileGoogleCodes) global.__mobileGoogleCodes = new Map();
+
+apiRouter.post('/auth/mobile-google/start', async (req, res) => {
+  try {
+    const { idToken } = req.body;
+    if (!idToken) return res.status(400).json({ error: 'idToken required' });
+    const decoded = await auth.verifyIdToken(idToken);
+    const crypto = require('crypto');
+    const code = crypto.randomBytes(24).toString('hex');
+    global.__mobileGoogleCodes.set(code, {
+      uid: decoded.uid,
+      expires: Date.now() + 2 * 60 * 1000,
+    });
+    // prune old
+    for (const [k, v] of global.__mobileGoogleCodes) {
+      if (v.expires < Date.now()) global.__mobileGoogleCodes.delete(k);
+    }
+    res.json({ code });
+  } catch (error) {
+    res.status(401).json({ error: error.message || 'Invalid idToken' });
+  }
+});
+
+apiRouter.post('/auth/mobile-google/exchange', async (req, res) => {
+  try {
+    const { code } = req.body;
+    if (!code) return res.status(400).json({ error: 'code required' });
+    const entry = global.__mobileGoogleCodes.get(code);
+    if (!entry || entry.expires < Date.now()) {
+      if (entry) global.__mobileGoogleCodes.delete(code);
+      return res.status(400).json({ error: 'Code expired or invalid. Try Google Sign-In again.' });
+    }
+    global.__mobileGoogleCodes.delete(code);
+    const customToken = await auth.createCustomToken(entry.uid);
+    res.json({ customToken });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 apiRouter.post('/auth/reset-password', async (req, res) => {
   const { email } = req.body;
   if (!email) return res.status(400).json({ error: 'Email is required' });

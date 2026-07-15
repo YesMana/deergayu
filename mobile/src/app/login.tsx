@@ -15,7 +15,7 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
 
 export default function LoginScreen() {
-  const { login, register, loginWithGoogle, googleConfigured } = useAuth();
+  const { login, register, loginWithGoogle } = useAuth();
   const router = useRouter();
   const [mode, setMode] = useState<'login' | 'register'>('login');
   const [name, setName] = useState('');
@@ -72,11 +72,6 @@ export default function LoginScreen() {
         <MaterialIcons name="login" size={20} color="#f5f7f4" />
         <Text style={styles.googleText}>Continue with Google</Text>
       </TouchableOpacity>
-      {!googleConfigured ? (
-        <Text style={styles.hint}>
-          Google needs Web Client ID in mobile/.env — see README (Firebase → Authentication → Google).
-        </Text>
-      ) : null}
 
       <View style={styles.orRow}>
         <View style={styles.orLine} />

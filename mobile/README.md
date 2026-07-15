@@ -39,21 +39,14 @@ Optional: `EXPO_PUBLIC_API_URL=https://deergayu-api.onrender.com`
 
 ## Google Sign-In
 
-Website already uses Google. Mobile needs the **Web client ID**:
+Mobile uses the **same website Google login** (no Client ID `.env` needed):
 
-1. [Firebase Console](https://console.firebase.google.com/) → project **deergayu-9de41**
-2. **Authentication** → **Sign-in method** → **Google** (enable if needed)
-3. Copy **Web client ID** (`….apps.googleusercontent.com`)
-4. Create `mobile/.env`:
+1. App opens `https://deergayu.com/mobile-auth` in a secure browser
+2. You pick a Google account (same as website)
+3. Browser returns to the app — Firebase session syncs
 
-```env
-EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID=YOUR_WEB_CLIENT_ID.apps.googleusercontent.com
-```
+Requires live deploy of `/mobile-auth` on the site + Render API routes:
+- `POST /api/auth/mobile-google/start`
+- `POST /api/auth/mobile-google/exchange`
 
-5. [Google Cloud Console](https://console.cloud.google.com/apis/credentials) → that OAuth client → **Authorized redirect URIs** add:
-   - `deergayu://oauthredirect`
-6. Restart Expo: `npx expo start -c`
-
-Then Login screen → **Continue with Google** uses the same Firebase users as the website.
-
-> Native Google Sign-In packages need a **development build** (not Expo Go). This app uses browser OAuth + Firebase so Expo Go can work after the Client ID is set.
+Optional override: `EXPO_PUBLIC_MOBILE_AUTH_URL=https://deergayu.com/mobile-auth`
