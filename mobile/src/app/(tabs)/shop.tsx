@@ -15,19 +15,24 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
 import { fetchProducts, productImage, type Product } from '../../lib/api';
 import { useCart } from '../../context/CartContext';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 
 export default function ShopScreen() {
   const { t } = useLanguage();
   const { addToCart } = useCart();
   const router = useRouter();
+  const params = useLocalSearchParams<{ q?: string }>();
 
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [query, setQuery] = useState('');
+  const [query, setQuery] = useState(typeof params.q === 'string' ? params.q : '');
   const [addedId, setAddedId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (typeof params.q === 'string') setQuery(params.q);
+  }, [params.q]);
 
   const load = useCallback(async () => {
     setError(null);

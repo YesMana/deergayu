@@ -66,7 +66,10 @@ export default function TabLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: t('nav_home'),
+          title: '',
+          headerTitle: '',
+          headerTransparent: true,
+          headerStyle: { backgroundColor: 'transparent' },
           tabBarIcon: ({ color }) => <MaterialIcons name="home" size={22} color={color} />,
         }}
       />
