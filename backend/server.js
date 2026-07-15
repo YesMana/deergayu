@@ -486,6 +486,21 @@ apiRouter.get('/products', async (req, res) => {
   }
 });
 
+// Public product detail (approved only) — used by mobile app
+apiRouter.get('/products/:id', async (req, res) => {
+  try {
+    const doc = await db.collection('products').doc(req.params.id).get();
+    if (!doc.exists) return res.status(404).json({ error: 'Product not found' });
+    const data = doc.data();
+    if (data.status && data.status !== 'approved') {
+      return res.status(404).json({ error: 'Product not found' });
+    }
+    res.json({ id: doc.id, ...data });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // AI-Powered Symptom Checker
 apiRouter.post('/symptom-check', async (req, res) => {
   try {
@@ -1235,17 +1250,74 @@ apiRouter.post('/payments/payhere/hash', verifyUser, async (req, res) => {
       .update(merchantId + orderId + amountFormatted + currency + hashedSecret)
       .digest('hex')
       .toUpperCase();
+    const sandbox = process.env.PAYHERE_SANDBOX === 'true';
+    const return_url = process.env.PAYHERE_RETURN_URL || 'https://deergayu.com/my-orders';
+    const cancel_url = process.env.PAYHERE_CANCEL_URL || 'https://deergayu.com/shop/cart';
+    const notify_url = process.env.PAYHERE_NOTIFY_URL || 'https://deergayu.com/api/payments/payhere/notify';
+    const action = sandbox
+      ? 'https://sandbox.payhere.lk/pay/checkout'
+      : 'https://www.payhere.lk/pay/checkout';
+
+    // One-time launch page for mobile (WebBrowser cannot POST forms)
+    if (!global.__payhereLaunch) global.__payhereLaunch = new Map();
+    const token = crypto.randomBytes(20).toString('hex');
+    global.__payhereLaunch.set(token, {
+      expires: Date.now() + 10 * 60 * 1000,
+      action,
+      fields: {
+        merchant_id: merchantId,
+        return_url,
+        cancel_url,
+        notify_url,
+        order_id: orderId,
+        items: 'Deergayu Order',
+        currency,
+        amount: amountFormatted,
+        hash,
+      },
+    });
+
+    const base =
+      process.env.PUBLIC_API_URL ||
+      `${req.protocol}://${req.get('host')}` ||
+      'https://deergayu-api.onrender.com';
+
     res.json({
       merchant_id: merchantId,
       hash,
-      sandbox: process.env.PAYHERE_SANDBOX === 'true',
-      return_url: process.env.PAYHERE_RETURN_URL || 'https://deergayu.com/my-orders',
-      cancel_url: process.env.PAYHERE_CANCEL_URL || 'https://deergayu.com/shop/cart',
-      notify_url: process.env.PAYHERE_NOTIFY_URL || 'https://deergayu.com/api/payments/payhere/notify',
+      sandbox,
+      return_url,
+      cancel_url,
+      notify_url,
+      launchUrl: `${base.replace(/\/$/, '')}/api/payments/payhere/go/${token}`,
     });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
+});
+
+// Auto-submit PayHere form (opened from mobile WebBrowser)
+apiRouter.get('/payments/payhere/go/:token', (req, res) => {
+  const store = global.__payhereLaunch;
+  const entry = store?.get(req.params.token);
+  if (!entry || entry.expires < Date.now()) {
+    if (store) store.delete(req.params.token);
+    return res.status(410).send('<h2>Payment link expired. Please open the app and try again.</h2>');
+  }
+  store.delete(req.params.token);
+  const inputs = Object.entries(entry.fields)
+    .map(
+      ([k, v]) =>
+        `<input type="hidden" name="${k}" value="${String(v).replace(/"/g, '&quot;')}" />`
+    )
+    .join('');
+  res.setHeader('Content-Type', 'text/html; charset=utf-8');
+  res.send(`<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"/><title>PayHere</title></head>
+<body style="font-family:sans-serif;padding:24px;background:#0a140f;color:#f5f7f4">
+<p>Redirecting to PayHere…</p>
+<form id="ph" method="POST" action="${entry.action}">${inputs}</form>
+<script>document.getElementById('ph').submit();</script>
+</body></html>`);
 });
 
 apiRouter.post('/payments/payhere/notify', async (req, res) => {

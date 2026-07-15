@@ -52,6 +52,37 @@ export type Product = {
   reviewCount?: number;
   description?: string;
   status?: string;
+  stock?: number;
+};
+
+export type ShippingZone = { id: string; name: string; fee: number };
+
+export type StorefrontSettings = {
+  shippingZones?: ShippingZone[];
+  bankDetails?: {
+    bank?: string;
+    branch?: string;
+    accountName?: string;
+    accountNo?: string;
+  };
+  payhereEnabled?: boolean;
+  contactEmail?: string;
+};
+
+export type CheckoutResult = {
+  message?: string;
+  orderIds?: string[];
+  shippingFee?: number;
+  shippingZone?: ShippingZone;
+  payhereReady?: boolean;
+};
+
+export type Review = {
+  id: string;
+  userName?: string;
+  rating?: number;
+  comment?: string;
+  createdAt?: string;
 };
 
 export type Provider = {
@@ -119,7 +150,52 @@ export const fetchHomeStats = () => request<HomeStats>('/api/home-stats');
 export const fetchFeaturedProducts = () => request<Product[]>('/api/featured-products');
 export const fetchFeaturedProviders = () => request<Provider[]>('/api/featured-providers');
 export const fetchProducts = (limit = 50) => request<Product[]>(`/api/products?limit=${limit}`);
+export const fetchProduct = (id: string) => request<Product>(`/api/products/${id}`);
 export const fetchProviders = () => request<Provider[]>('/api/providers');
+export const fetchStorefrontSettings = () =>
+  request<StorefrontSettings>('/api/storefront-settings');
+
+export const postCheckout = (body: {
+  paymentMethod: string;
+  deliveryAddress: string;
+  phone: string;
+  notes?: string;
+  shippingZoneId?: string;
+}) =>
+  request<CheckoutResult>('/api/checkout', {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+
+export const createPayHereHash = (orderId: string, amount: number, currency = 'LKR') =>
+  request<{
+    merchant_id: string;
+    hash: string;
+    sandbox?: boolean;
+    return_url?: string;
+    cancel_url?: string;
+    notify_url?: string;
+    launchUrl?: string;
+  }>('/api/payments/payhere/hash', {
+    method: 'POST',
+    body: JSON.stringify({ orderId, amount, currency }),
+  });
+
+export const fetchWishlist = () => request<{ items?: string[] }>('/api/wishlist');
+export const toggleWishlist = (productId: string) =>
+  request<{ added: boolean; items: string[] }>(`/api/wishlist/${productId}`, {
+    method: 'POST',
+    body: '{}',
+  });
+
+export const fetchProductReviews = (productId: string) =>
+  request<Review[]>(`/api/reviews/product/${productId}`);
+export const postReview = (body: {
+  targetType: 'product' | 'provider';
+  targetId: string;
+  rating: number;
+  comment?: string;
+}) => request('/api/reviews', { method: 'POST', body: JSON.stringify(body) });
 export const fetchGuideRemedies = () => request<GuideItem[]>('/api/guide/remedies');
 export const fetchGuideRoutines = () => request<GuideItem[]>('/api/guide/routines');
 export const fetchVideos = () => request<VideoItem[]>('/api/videos');

@@ -26,11 +26,16 @@ Optional: `EXPO_PUBLIC_API_URL=https://deergayu-api.onrender.com`
 
 ## Screens wired to live API
 
-- Home, Shop, Cart (server when logged in)
+- Home, Shop, **Product detail** (reviews + wishlist)
+- Cart with **checkout** (COD / QR / bank / PayHere when enabled)
 - Channeling + booking
 - Guide, Videos
 - Login / Account / Orders / Appointments
 - AyurBot (`/api/chat`), Symptom checker (`/api/symptom-check`)
+
+## Still on website only
+
+- Admin / Vendor dashboards
 
 ## Google Sign-In
 

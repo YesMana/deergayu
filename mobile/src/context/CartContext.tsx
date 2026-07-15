@@ -6,7 +6,9 @@ import {
   addServerCartItem,
   deleteServerCartItem,
   fetchServerCart,
+  postCheckout,
   updateServerCartQty,
+  type CheckoutResult,
 } from '../lib/api';
 import { useAuth } from './AuthContext';
 
@@ -33,6 +35,13 @@ type CartContextValue = {
   removeFromCart: (productId: string) => Promise<void>;
   clearCart: () => Promise<void>;
   refreshCart: () => Promise<void>;
+  checkout: (
+    paymentMethod: string,
+    deliveryAddress: string,
+    phone: string,
+    notes?: string,
+    shippingZoneId?: string
+  ) => Promise<CheckoutResult>;
 };
 
 const CartContext = createContext<CartContextValue | null>(null);
@@ -243,6 +252,28 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     await refreshCart();
   }, [user, items, refreshCart]);
 
+  const checkout = useCallback(
+    async (
+      paymentMethod: string,
+      deliveryAddress: string,
+      phone: string,
+      notes = '',
+      shippingZoneId?: string
+    ) => {
+      if (!user) throw new Error('Please sign in to checkout');
+      const data = await postCheckout({
+        paymentMethod,
+        deliveryAddress,
+        phone,
+        notes,
+        shippingZoneId,
+      });
+      setItems([]);
+      return data;
+    },
+    [user]
+  );
+
   const value = useMemo(() => {
     const cartCount = items.reduce((n, i) => n + i.qty, 0);
     const subtotal = items.reduce((n, i) => n + i.price * i.qty, 0);
@@ -256,8 +287,9 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       removeFromCart,
       clearCart,
       refreshCart,
+      checkout,
     };
-  }, [items, loading, addToCart, updateQty, removeFromCart, clearCart, refreshCart]);
+  }, [items, loading, addToCart, updateQty, removeFromCart, clearCart, refreshCart, checkout]);
 
   return <CartContext.Provider value={value}>{children}</CartContext.Provider>;
 }

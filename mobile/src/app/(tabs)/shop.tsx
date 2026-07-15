@@ -15,10 +15,12 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
 import { fetchProducts, productImage, type Product } from '../../lib/api';
 import { useCart } from '../../context/CartContext';
+import { useRouter } from 'expo-router';
 
 export default function ShopScreen() {
   const { t } = useLanguage();
   const { addToCart } = useCart();
+  const router = useRouter();
 
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
@@ -67,44 +69,53 @@ export default function ShopScreen() {
     const img = productImage(item);
     return (
       <BlurView intensity={20} tint="dark" style={styles.card}>
-        {img ? (
-          <Image source={{ uri: img }} style={styles.image} />
-        ) : (
-          <View style={styles.imagePlaceholder}>
-            <MaterialIcons name="image" size={40} color="rgba(212, 175, 55, 0.4)" />
-          </View>
-        )}
-        <View style={styles.cardContent}>
-          <Text style={styles.productCategory}>{item.category || 'General'}</Text>
-          <Text style={styles.productName} numberOfLines={2}>
-            {item.name}
-          </Text>
-          <View style={styles.row}>
-            <Text style={styles.productPrice}>
-              Rs. {Number(item.price || 0).toLocaleString()}
+        <TouchableOpacity
+          style={styles.cardPress}
+          activeOpacity={0.9}
+          onPress={() => router.push(`/product/${item.id}`)}
+        >
+          {img ? (
+            <Image source={{ uri: img }} style={styles.image} />
+          ) : (
+            <View style={styles.imagePlaceholder}>
+              <MaterialIcons name="image" size={40} color="rgba(212, 175, 55, 0.4)" />
+            </View>
+          )}
+          <View style={styles.cardContent}>
+            <Text style={styles.productCategory}>{item.category || 'General'}</Text>
+            <Text style={styles.productName} numberOfLines={2}>
+              {item.name}
             </Text>
-            {item.rating ? (
-              <View style={styles.ratingRow}>
-                <MaterialIcons name="star" size={16} color="#d4af37" />
-                <Text style={styles.ratingText}>{Number(item.rating).toFixed(1)}</Text>
-              </View>
-            ) : null}
+            <View style={styles.row}>
+              <Text style={styles.productPrice}>
+                Rs. {Number(item.price || 0).toLocaleString()}
+              </Text>
+              {item.rating ? (
+                <View style={styles.ratingRow}>
+                  <MaterialIcons name="star" size={16} color="#d4af37" />
+                  <Text style={styles.ratingText}>{Number(item.rating).toFixed(1)}</Text>
+                </View>
+              ) : null}
+            </View>
+            <TouchableOpacity
+              style={[styles.addButton, addedId === item.id && styles.addButtonDone]}
+              activeOpacity={0.8}
+              onPress={(e) => {
+                e.stopPropagation?.();
+                handleAdd(item);
+              }}
+            >
+              <MaterialIcons
+                name={addedId === item.id ? 'check' : 'add-shopping-cart'}
+                size={18}
+                color="#0a140f"
+              />
+              <Text style={styles.addButtonText}>
+                {addedId === item.id ? 'Added' : 'Add to Cart'}
+              </Text>
+            </TouchableOpacity>
           </View>
-          <TouchableOpacity
-            style={[styles.addButton, addedId === item.id && styles.addButtonDone]}
-            activeOpacity={0.8}
-            onPress={() => handleAdd(item)}
-          >
-            <MaterialIcons
-              name={addedId === item.id ? 'check' : 'add-shopping-cart'}
-              size={18}
-              color="#0a140f"
-            />
-            <Text style={styles.addButtonText}>
-              {addedId === item.id ? 'Added' : 'Add to Cart'}
-            </Text>
-          </TouchableOpacity>
-        </View>
+        </TouchableOpacity>
       </BlurView>
     );
   };
@@ -194,8 +205,10 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(124,179,66,0.15)',
     marginBottom: 16,
     overflow: 'hidden',
-    flexDirection: 'row',
     backgroundColor: 'rgba(20,32,24,0.9)',
+  },
+  cardPress: {
+    flexDirection: 'row',
   },
   image: { width: 120, height: '100%', minHeight: 140 },
   imagePlaceholder: {

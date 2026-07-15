@@ -158,32 +158,38 @@ export default function HomeScreen() {
             const img = productImage(item);
             return (
               <BlurView key={item.id} intensity={20} tint="dark" style={styles.productCard}>
-                {img ? (
-                  <Image source={{ uri: img }} style={styles.productImage} />
-                ) : (
-                  <View style={styles.productImagePlaceholder}>
-                    <MaterialIcons name="image" size={28} color="rgba(212,175,55,0.4)" />
+                <TouchableOpacity
+                  style={{ flexDirection: 'row', flex: 1 }}
+                  activeOpacity={0.9}
+                  onPress={() => router.push(`/product/${item.id}`)}
+                >
+                  {img ? (
+                    <Image source={{ uri: img }} style={styles.productImage} />
+                  ) : (
+                    <View style={styles.productImagePlaceholder}>
+                      <MaterialIcons name="image" size={28} color="rgba(212,175,55,0.4)" />
+                    </View>
+                  )}
+                  <View style={styles.productBody}>
+                    <Text style={styles.productCat}>{item.category || 'General'}</Text>
+                    <Text style={styles.productName} numberOfLines={2}>
+                      {item.name}
+                    </Text>
+                    <Text style={styles.productPrice}>
+                      Rs. {Number(item.price || 0).toLocaleString()}
+                    </Text>
+                    <TouchableOpacity
+                      style={styles.addBtn}
+                      onPress={() => {
+                        addToCart(item).catch(() => {});
+                      }}
+                      activeOpacity={0.85}
+                    >
+                      <MaterialIcons name="add-shopping-cart" size={16} color="#0a140f" />
+                      <Text style={styles.addBtnText}>Add</Text>
+                    </TouchableOpacity>
                   </View>
-                )}
-                <View style={styles.productBody}>
-                  <Text style={styles.productCat}>{item.category || 'General'}</Text>
-                  <Text style={styles.productName} numberOfLines={2}>
-                    {item.name}
-                  </Text>
-                  <Text style={styles.productPrice}>
-                    Rs. {Number(item.price || 0).toLocaleString()}
-                  </Text>
-                  <TouchableOpacity
-                    style={styles.addBtn}
-                    onPress={() => {
-                      addToCart(item).catch(() => {});
-                    }}
-                    activeOpacity={0.85}
-                  >
-                    <MaterialIcons name="add-shopping-cart" size={16} color="#0a140f" />
-                    <Text style={styles.addBtnText}>Add</Text>
-                  </TouchableOpacity>
-                </View>
+                </TouchableOpacity>
               </BlurView>
             );
           })
