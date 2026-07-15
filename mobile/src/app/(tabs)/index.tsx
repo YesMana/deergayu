@@ -47,18 +47,18 @@ const SERVICES = [
     route: '/channeling',
   },
   {
+    key: 'astrology',
+    icon: 'auto-awesome' as const,
+    title: 'Astrology & Vastu',
+    desc: 'Life guidance from experienced astrologers.',
+    route: '/astrology',
+  },
+  {
     key: 'guide',
     icon: 'menu-book' as const,
     title: 'Ayurvedic Guide',
     desc: 'Herbal remedies & daily routines from Sri Lankan tradition.',
     route: '/guide',
-  },
-  {
-    key: 'symptom',
-    icon: 'healing' as const,
-    title: 'AI Symptom Checker',
-    desc: 'Get Ayurvedic guidance based on how you feel.',
-    route: '/symptom-checker',
   },
 ];
 

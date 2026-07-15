@@ -440,6 +440,60 @@ apiRouter.post('/contact', async (req, res) => {
   }
 });
 
+apiRouter.get('/admin/overview', verifyAdmin, async (req, res) => {
+  try {
+    const [expertsPending, productsPending, ordersPending, appointmentsPending, ordersAll, productsAll, usersAll] =
+      await Promise.all([
+        db.collection('users').where('status', '==', 'pending').where('role', 'in', ['doctor', 'clinic', 'organization', 'vendor']).get(),
+        db.collection('products').where('status', '==', 'pending').get(),
+        db.collection('orders').where('status', '==', 'pending').get(),
+        db.collection('appointments').where('status', '==', 'pending').get(),
+        db.collection('orders').get(),
+        db.collection('products').get(),
+        db.collection('users').get(),
+      ]);
+    res.json({
+      pendingExperts: expertsPending.size,
+      pendingProducts: productsPending.size,
+      pendingOrders: ordersPending.size,
+      pendingAppointments: appointmentsPending.size,
+      totalOrders: ordersAll.size,
+      totalProducts: productsAll.size,
+      totalUsers: usersAll.size,
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+apiRouter.get('/admin/experts', verifyAdmin, async (req, res) => {
+  try {
+    const snap = await db.collection('users')
+      .where('role', 'in', ['doctor', 'clinic', 'organization', 'vendor'])
+      .get();
+    let list = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+    const status = (req.query.status || '').toString();
+    if (status) list = list.filter((u) => u.status === status);
+    list.sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || '')));
+    res.json(list);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+apiRouter.get('/admin/products', verifyAdmin, async (req, res) => {
+  try {
+    const snap = await db.collection('products').limit(200).get();
+    let list = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+    const status = (req.query.status || '').toString();
+    if (status) list = list.filter((p) => p.status === status);
+    list.sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || '')));
+    res.json(list);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 apiRouter.get('/admin/contact-messages', verifyAdmin, async (req, res) => {
   try {
     const snap = await db.collection('contact_messages').orderBy('createdAt', 'desc').limit(100).get();

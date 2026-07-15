@@ -66,7 +66,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: '',
+          title: t('nav_home'),
           headerTitle: '',
           headerTransparent: true,
           headerStyle: { backgroundColor: 'transparent' },
@@ -88,9 +88,16 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
+        name="astrology"
+        options={{
+          title: t('srv_astro_title'),
+          tabBarIcon: ({ color }) => <MaterialIcons name="auto-awesome" size={22} color={color} />,
+        }}
+      />
+      <Tabs.Screen
         name="guide"
         options={{
-          title: 'Guide',
+          title: t('nav_guide'),
           tabBarIcon: ({ color }) => <MaterialIcons name="menu-book" size={22} color={color} />,
         }}
       />
@@ -99,13 +106,6 @@ export default function TabLayout() {
         options={{
           title: t('nav_videos'),
           tabBarIcon: ({ color }) => <MaterialIcons name="ondemand-video" size={22} color={color} />,
-        }}
-      />
-      <Tabs.Screen
-        name="astrology"
-        options={{
-          href: null,
-          title: 'Astrology',
         }}
       />
     </Tabs>

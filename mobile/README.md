@@ -28,14 +28,17 @@ Optional: `EXPO_PUBLIC_API_URL=https://deergayu-api.onrender.com`
 
 - Home, Shop, **Product detail** (reviews + wishlist)
 - Cart with **checkout** (COD / QR / bank / PayHere when enabled)
-- Channeling + booking
-- Guide, Videos
+- Channeling + booking (in-person / online)
+- Astrology tab, Guide, Videos
 - Login / Account / Orders / Appointments
+- **Admin Panel** (admin accounts only) — experts, products, orders, appointments
 - AyurBot (`/api/chat`), Symptom checker (`/api/symptom-check`)
 
-## Still on website only
+## Admin on mobile
 
-- Admin / Vendor dashboards
+Sign in with an admin account (same as website). Account → **Admin Panel**.
+
+Covers approvals + order/appointment actions. Settings / videos / guide editors stay on `deergayu.com/admin`.
 
 ## Google Sign-In
 

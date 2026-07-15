@@ -47,6 +47,7 @@ export default function BookingModal({ visible, onClose, provider }: BookingModa
   const [loadingSlots, setLoadingSlots] = useState(false);
   const [phone, setPhone] = useState('');
   const [notes, setNotes] = useState('');
+  const [consultType, setConsultType] = useState<'in_person' | 'online'>('in_person');
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
@@ -86,7 +87,7 @@ export default function BookingModal({ visible, onClose, provider }: BookingModa
         time: selectedTime,
         phone,
         notes,
-        consultationType: 'in_person',
+        consultationType: consultType,
       });
       Alert.alert('Booked', 'Appointment saved — same as on the website.', [
         { text: 'OK', onPress: onClose },
@@ -112,6 +113,26 @@ export default function BookingModal({ visible, onClose, provider }: BookingModa
           <ScrollView style={styles.body} contentContainerStyle={{ paddingBottom: 20 }}>
             <Text style={styles.subText}>Booking with:</Text>
             <Text style={styles.profName}>{provider?.name}</Text>
+
+            <Text style={styles.sectionTitle}>Consultation</Text>
+            <View style={styles.row}>
+              {(
+                [
+                  { id: 'in_person' as const, label: 'In person' },
+                  { id: 'online' as const, label: 'Online' },
+                ]
+              ).map((c) => (
+                <TouchableOpacity
+                  key={c.id}
+                  style={[styles.chip, consultType === c.id && styles.chipSelected]}
+                  onPress={() => setConsultType(c.id)}
+                >
+                  <Text style={[styles.chipText, consultType === c.id && styles.chipTextSelected]}>
+                    {c.label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
 
             <Text style={styles.sectionTitle}>Select Date</Text>
             <View style={styles.row}>

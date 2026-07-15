@@ -257,3 +257,55 @@ export const postContact = (body: Record<string, unknown>) =>
 
 export const postRegisterNotify = (body: Record<string, unknown>) =>
   request('/api/auth/register-notify', { method: 'POST', body: JSON.stringify(body) });
+
+// ── Admin APIs ──────────────────────────────────────────────
+export type AdminOverview = {
+  pendingExperts: number;
+  pendingProducts: number;
+  pendingOrders: number;
+  pendingAppointments: number;
+  totalOrders: number;
+  totalProducts: number;
+  totalUsers: number;
+};
+
+export type AdminExpert = {
+  id: string;
+  name?: string;
+  email?: string;
+  role?: string;
+  status?: string;
+  profileDetails?: Provider['profileDetails'];
+};
+
+export type AdminOrder = Order & {
+  customerName?: string;
+  customerEmail?: string;
+  totalPrice?: number;
+  paymentMethod?: string;
+  phone?: string;
+  deliveryAddress?: string;
+};
+
+export type AdminAppointment = Appointment & {
+  customerName?: string;
+  customerEmail?: string;
+  providerId?: string;
+};
+
+export const fetchAdminOverview = () => request<AdminOverview>('/api/admin/overview');
+export const fetchAdminExperts = (status?: string) =>
+  request<AdminExpert[]>(`/api/admin/experts${status ? `?status=${encodeURIComponent(status)}` : ''}`);
+export const fetchAdminProducts = (status?: string) =>
+  request<Product[]>(`/api/admin/products${status ? `?status=${encodeURIComponent(status)}` : ''}`);
+export const fetchAdminOrders = () => request<AdminOrder[]>('/api/orders');
+export const fetchAdminAppointments = () => request<AdminAppointment[]>('/api/appointments');
+
+export const setUserStatus = (uid: string, status: string) =>
+  request(`/api/users/${uid}/status`, { method: 'POST', body: JSON.stringify({ status }) });
+export const setProductStatus = (id: string, status: string) =>
+  request(`/api/products/${id}/status`, { method: 'POST', body: JSON.stringify({ status }) });
+export const setOrderStatus = (id: string, status: string) =>
+  request(`/api/orders/${id}/status`, { method: 'POST', body: JSON.stringify({ status }) });
+export const setAppointmentStatus = (id: string, status: string) =>
+  request(`/api/appointments/${id}/status`, { method: 'POST', body: JSON.stringify({ status }) });

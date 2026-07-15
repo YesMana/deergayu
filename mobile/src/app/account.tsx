@@ -18,7 +18,11 @@ export default function AccountScreen() {
   const router = useRouter();
   const [orders, setOrders] = useState<Order[]>([]);
   const [appointments, setAppointments] = useState<Appointment[]>([]);
+  const [orderTotal, setOrderTotal] = useState(0);
+  const [apptTotal, setApptTotal] = useState(0);
   const [loading, setLoading] = useState(false);
+
+  const isAdmin = Boolean(profile?.isAdmin || profile?.role === 'admin');
 
   const load = useCallback(async () => {
     if (!user) return;
@@ -28,8 +32,12 @@ export default function AccountScreen() {
         fetchMyOrders().catch(() => []),
         fetchMyAppointments().catch(() => []),
       ]);
-      setOrders(Array.isArray(o) ? o.slice(0, 5) : []);
-      setAppointments(Array.isArray(a) ? a.slice(0, 5) : []);
+      const ordersArr = Array.isArray(o) ? o : [];
+      const apptArr = Array.isArray(a) ? a : [];
+      setOrderTotal(ordersArr.length);
+      setApptTotal(apptArr.length);
+      setOrders(ordersArr.slice(0, 5));
+      setAppointments(apptArr.slice(0, 5));
     } finally {
       setLoading(false);
     }
@@ -59,7 +67,7 @@ export default function AccountScreen() {
       refreshControl={<RefreshControl refreshing={loading} onRefresh={load} tintColor="#7cb342" />}
     >
       <View style={styles.header}>
-        <View style={styles.avatar}>
+        <View style={[styles.avatar, isAdmin && styles.avatarAdmin]}>
           <Text style={styles.avatarText}>
             {(user.displayName || user.email || 'U')[0].toUpperCase()}
           </Text>
@@ -71,15 +79,23 @@ export default function AccountScreen() {
         </Text>
       </View>
 
+      {isAdmin ? (
+        <TouchableOpacity style={styles.adminLink} onPress={() => router.push('/admin')}>
+          <MaterialIcons name="shield" size={22} color="#0a140f" />
+          <Text style={styles.adminLinkText}>Admin Panel</Text>
+          <MaterialIcons name="chevron-right" size={22} color="#0a140f" />
+        </TouchableOpacity>
+      ) : null}
+
       <TouchableOpacity style={styles.link} onPress={() => router.push('/orders')}>
         <MaterialIcons name="receipt-long" size={22} color="#7cb342" />
-        <Text style={styles.linkText}>My Orders ({orders.length}+)</Text>
+        <Text style={styles.linkText}>My Orders ({orderTotal})</Text>
         <MaterialIcons name="chevron-right" size={22} color="#6a7a6a" />
       </TouchableOpacity>
 
       <TouchableOpacity style={styles.link} onPress={() => router.push('/appointments')}>
         <MaterialIcons name="event" size={22} color="#7cb342" />
-        <Text style={styles.linkText}>My Appointments ({appointments.length}+)</Text>
+        <Text style={styles.linkText}>My Appointments ({apptTotal})</Text>
         <MaterialIcons name="chevron-right" size={22} color="#6a7a6a" />
       </TouchableOpacity>
 
@@ -88,6 +104,10 @@ export default function AccountScreen() {
         <Text style={styles.linkText}>Cart</Text>
         <MaterialIcons name="chevron-right" size={22} color="#6a7a6a" />
       </TouchableOpacity>
+
+      {(orders.length > 0 || appointments.length > 0) && (
+        <Text style={styles.previewHint}>Recent activity preview</Text>
+      )}
 
       <TouchableOpacity
         style={styles.logout}
@@ -115,10 +135,22 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginBottom: 12,
   },
+  avatarAdmin: { backgroundColor: '#d4af37' },
   avatarText: { color: '#0a140f', fontSize: 28, fontWeight: '800' },
   name: { color: '#f5f7f4', fontSize: 22, fontWeight: '700' },
   email: { color: '#9aaa9a', marginTop: 4 },
   role: { color: '#d4af37', marginTop: 8, fontSize: 12, fontWeight: '700' },
+  adminLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginHorizontal: 16,
+    marginBottom: 14,
+    padding: 16,
+    borderRadius: 14,
+    backgroundColor: '#7cb342',
+  },
+  adminLinkText: { flex: 1, color: '#0a140f', fontWeight: '800', fontSize: 16 },
   link: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -132,6 +164,12 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(124,179,66,0.2)',
   },
   linkText: { flex: 1, color: '#f5f7f4', fontWeight: '600', fontSize: 16 },
+  previewHint: {
+    color: '#6a7a6a',
+    fontSize: 12,
+    marginHorizontal: 20,
+    marginTop: 8,
+  },
   logout: {
     margin: 16,
     marginTop: 24,

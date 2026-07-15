@@ -38,7 +38,7 @@ export default function AstrologyScreen() {
     try {
       const data = await fetchProviders();
       const list = Array.isArray(data) ? data.filter(isAstrologer) : [];
-      setProviders(list.length ? list : Array.isArray(data) ? data : []);
+      setProviders(list);
     } catch {
       setProviders([]);
     } finally {
