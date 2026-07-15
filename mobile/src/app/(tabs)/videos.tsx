@@ -11,20 +11,25 @@ import {
 } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 import { fetchVideos, type VideoItem } from '../../lib/api';
+import { useLanguage } from '../../context/LanguageContext';
 import { BlurView } from 'expo-blur';
 import { MaterialIcons } from '@expo/vector-icons';
 
 export default function VideosScreen() {
+  const { t } = useLanguage();
   const [items, setItems] = useState<VideoItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
+    setError(null);
     try {
       const data = await fetchVideos();
       setItems(Array.isArray(data) ? data : []);
-    } catch {
+    } catch (e: any) {
       setItems([]);
+      setError(e?.message || 'Could not load videos. Tap to retry.');
     } finally {
       setLoading(false);
     }
@@ -39,9 +44,14 @@ export default function VideosScreen() {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.title}>Videos</Text>
-        <Text style={styles.sub}>Same library as the website</Text>
+        <Text style={styles.title}>{t('nav_videos')}</Text>
+        <Text style={styles.sub}>{t('videos_sub')}</Text>
       </View>
+      {error ? (
+        <TouchableOpacity onPress={load} style={{ paddingHorizontal: 20, marginBottom: 8 }}>
+          <Text style={styles.error}>{error}</Text>
+        </TouchableOpacity>
+      ) : null}
       {loading && !items.length ? (
         <ActivityIndicator color="#7cb342" style={{ marginTop: 40 }} />
       ) : (
@@ -50,7 +60,7 @@ export default function VideosScreen() {
           keyExtractor={(i) => i.id}
           refreshControl={<RefreshControl refreshing={loading} onRefresh={load} tintColor="#7cb342" />}
           contentContainerStyle={{ padding: 16, paddingBottom: 40 }}
-          ListEmptyComponent={<Text style={styles.empty}>No videos yet</Text>}
+          ListEmptyComponent={<Text style={styles.empty}>{t('empty_videos')}</Text>}
           renderItem={({ item }) => (
             <BlurView intensity={20} tint="dark" style={styles.card}>
               <Text style={styles.name}>{item.title}</Text>
@@ -62,7 +72,7 @@ export default function VideosScreen() {
               {item.url ? (
                 <TouchableOpacity style={styles.open} onPress={() => Linking.openURL(item.url!)}>
                   <MaterialIcons name="play-circle-filled" size={22} color="#0a140f" />
-                  <Text style={styles.openText}>Watch</Text>
+                  <Text style={styles.openText}>{t('btn_watch')}</Text>
                 </TouchableOpacity>
               ) : null}
             </BlurView>
@@ -78,6 +88,7 @@ const styles = StyleSheet.create({
   header: { padding: 20, paddingTop: 24 },
   title: { color: '#7cb342', fontSize: 26, fontWeight: '800' },
   sub: { color: '#9aaa9a', marginTop: 6 },
+  error: { color: '#ef5350', textAlign: 'center' },
   empty: { color: '#9aaa9a', textAlign: 'center', marginTop: 40 },
   card: {
     borderRadius: 16,

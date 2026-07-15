@@ -7,6 +7,8 @@ import {
   ScrollView,
   RefreshControl,
   ActivityIndicator,
+  TextInput,
+  Alert,
 } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -14,19 +16,24 @@ import { useAuth } from '../context/AuthContext';
 import { fetchMyAppointments, fetchMyOrders, type Appointment, type Order } from '../lib/api';
 
 export default function AccountScreen() {
-  const { user, profile, logout, loading: authLoading, isAdmin, refreshProfile } = useAuth();
+  const { user, profile, logout, loading: authLoading, isAdmin, refreshProfile, updateDisplayName } =
+    useAuth();
   const router = useRouter();
   const [orders, setOrders] = useState<Order[]>([]);
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [orderTotal, setOrderTotal] = useState(0);
   const [apptTotal, setApptTotal] = useState(0);
   const [loading, setLoading] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [displayName, setDisplayName] = useState('');
+  const [saving, setSaving] = useState(false);
 
   const load = useCallback(async () => {
     if (!user) return;
     setLoading(true);
     try {
       await refreshProfile().catch(() => {});
+      setDisplayName(user.displayName || profile?.name || '');
       const [o, a] = await Promise.all([
         fetchMyOrders().catch(() => []),
         fetchMyAppointments().catch(() => []),
@@ -40,7 +47,7 @@ export default function AccountScreen() {
     } finally {
       setLoading(false);
     }
-  }, [user, refreshProfile]);
+  }, [user, refreshProfile, profile?.name]);
 
   useFocusEffect(
     useCallback(() => {
@@ -51,6 +58,19 @@ export default function AccountScreen() {
       load();
     }, [authLoading, user, router, load])
   );
+
+  const saveName = async () => {
+    setSaving(true);
+    try {
+      await updateDisplayName(displayName);
+      setEditing(false);
+      Alert.alert('Saved', 'Display name updated.');
+    } catch (e: any) {
+      Alert.alert('Update failed', e?.message || 'Try again');
+    } finally {
+      setSaving(false);
+    }
+  };
 
   if (authLoading || !user) {
     return (
@@ -79,15 +99,42 @@ export default function AccountScreen() {
             {(user.displayName || user.email || 'U')[0].toUpperCase()}
           </Text>
         </View>
-        <Text style={styles.name}>{user.displayName || profile?.name || 'Member'}</Text>
-        <Text style={styles.email}>{user.email}</Text>
+        {editing ? (
+          <View style={styles.editRow}>
+            <TextInput
+              style={styles.nameInput}
+              value={displayName}
+              onChangeText={setDisplayName}
+              placeholder="Display name"
+              placeholderTextColor="#6a7a6a"
+              autoFocus
+            />
+            <TouchableOpacity style={styles.saveBtn} onPress={saveName} disabled={saving}>
+              {saving ? (
+                <ActivityIndicator color="#0a140f" />
+              ) : (
+                <Text style={styles.saveText}>Save</Text>
+              )}
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => setEditing(false)}>
+              <Text style={styles.cancelEdit}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <>
+            <TouchableOpacity onPress={() => setEditing(true)} style={styles.nameRow}>
+              <Text style={styles.name}>{user.displayName || profile?.name || 'Member'}</Text>
+              <MaterialIcons name="edit" size={16} color="#d4af37" />
+            </TouchableOpacity>
+            <Text style={styles.email}>{user.email}</Text>
+          </>
+        )}
         <Text style={styles.role}>
           {isAdmin ? 'ADMIN' : (profile?.role || 'user').toString().toUpperCase()} · synced with
           website
         </Text>
       </View>
 
-      {/* Always show for admins — primary entry */}
       {isAdmin ? (
         <TouchableOpacity style={styles.adminLink} onPress={() => router.push('/admin')}>
           <MaterialIcons name="shield" size={22} color="#0a140f" />
@@ -110,6 +157,12 @@ export default function AccountScreen() {
           </Text>
         </TouchableOpacity>
       )}
+
+      <TouchableOpacity style={styles.link} onPress={() => router.push('/wishlist')}>
+        <MaterialIcons name="favorite" size={22} color="#7cb342" />
+        <Text style={styles.linkText}>Wishlist</Text>
+        <MaterialIcons name="chevron-right" size={22} color="#6a7a6a" />
+      </TouchableOpacity>
 
       <TouchableOpacity style={styles.link} onPress={() => router.push('/orders')}>
         <MaterialIcons name="receipt-long" size={22} color="#7cb342" />
@@ -171,8 +224,33 @@ const styles = StyleSheet.create({
   },
   avatarAdmin: { backgroundColor: '#d4af37' },
   avatarText: { color: '#0a140f', fontSize: 28, fontWeight: '800' },
+  nameRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   name: { color: '#f5f7f4', fontSize: 22, fontWeight: '700' },
   email: { color: '#9aaa9a', marginTop: 4 },
+  editRow: { width: '100%', alignItems: 'center', gap: 10 },
+  nameInput: {
+    width: '100%',
+    backgroundColor: '#142018',
+    borderWidth: 1,
+    borderColor: 'rgba(124,179,66,0.3)',
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    color: '#f5f7f4',
+    textAlign: 'center',
+    fontSize: 18,
+    fontWeight: '700',
+  },
+  saveBtn: {
+    backgroundColor: '#7cb342',
+    paddingHorizontal: 24,
+    paddingVertical: 10,
+    borderRadius: 10,
+    minWidth: 100,
+    alignItems: 'center',
+  },
+  saveText: { color: '#0a140f', fontWeight: '800' },
+  cancelEdit: { color: '#9aaa9a', fontWeight: '600' },
   role: { color: '#d4af37', marginTop: 8, fontSize: 12, fontWeight: '700' },
   adminLink: {
     flexDirection: 'row',

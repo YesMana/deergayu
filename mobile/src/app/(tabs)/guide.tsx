@@ -2,11 +2,12 @@ import React, { useCallback, useState } from 'react';
 import {
   View,
   Text,
-  FlatList,
   StyleSheet,
+  FlatList,
   RefreshControl,
   ActivityIndicator,
   Image,
+  TouchableOpacity,
 } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 import { useLanguage } from '../../context/LanguageContext';
@@ -15,17 +16,20 @@ import { mediaUrl } from '../../constants/api';
 import { BlurView } from 'expo-blur';
 
 export default function GuideScreen() {
-  const { lang } = useLanguage();
+  const { lang, t } = useLanguage();
   const [items, setItems] = useState<GuideItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
+    setError(null);
     try {
       const data = await fetchGuideRemedies();
       setItems(Array.isArray(data) ? data : []);
-    } catch {
+    } catch (e: any) {
       setItems([]);
+      setError(e?.message || 'Could not load guide. Tap to retry.');
     } finally {
       setLoading(false);
     }
@@ -50,9 +54,14 @@ export default function GuideScreen() {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.title}>Ayurvedic Guide</Text>
-        <Text style={styles.sub}>Same remedies as deergayu.com</Text>
+        <Text style={styles.title}>{t('nav_guide')}</Text>
+        <Text style={styles.sub}>{t('guide_sub')}</Text>
       </View>
+      {error ? (
+        <TouchableOpacity onPress={load} style={{ paddingHorizontal: 20, marginBottom: 8 }}>
+          <Text style={styles.error}>{error}</Text>
+        </TouchableOpacity>
+      ) : null}
       {loading && !items.length ? (
         <ActivityIndicator color="#7cb342" style={{ marginTop: 40 }} />
       ) : (
@@ -61,7 +70,7 @@ export default function GuideScreen() {
           keyExtractor={(i) => i.id}
           refreshControl={<RefreshControl refreshing={loading} onRefresh={load} tintColor="#7cb342" />}
           contentContainerStyle={{ padding: 16, paddingBottom: 40 }}
-          ListEmptyComponent={<Text style={styles.empty}>No remedies yet</Text>}
+          ListEmptyComponent={<Text style={styles.empty}>{t('empty_guide')}</Text>}
           renderItem={({ item }) => {
             const img = mediaUrl(item.image);
             return (
@@ -88,6 +97,7 @@ const styles = StyleSheet.create({
   header: { padding: 20, paddingTop: 24 },
   title: { color: '#7cb342', fontSize: 26, fontWeight: '800' },
   sub: { color: '#9aaa9a', marginTop: 6 },
+  error: { color: '#ef5350', textAlign: 'center' },
   empty: { color: '#9aaa9a', textAlign: 'center', marginTop: 40 },
   card: {
     borderRadius: 16,

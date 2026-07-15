@@ -7,10 +7,16 @@
     "icon": "./assets/images/icon.png",
     "scheme": "deergayu",
     "userInterfaceStyle": "automatic",
+    "primaryColor": "#7cb342",
     "ios": {
-      "icon": "./assets/expo.icon"
+      "supportsTablet": true,
+      "bundleIdentifier": "com.deergayu.app",
+      "buildNumber": "1",
+      "icon": "./assets/images/icon.png"
     },
     "android": {
+      "package": "com.deergayu.app",
+      "versionCode": 1,
       "adaptiveIcon": {
         "backgroundColor": "#0a140f",
         "foregroundImage": "./assets/images/android-icon-foreground.png",

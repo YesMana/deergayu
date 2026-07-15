@@ -41,7 +41,36 @@ app.use(cors({
   },
   credentials: true
 }));
-app.use(express.json());
+app.use(express.json({ limit: '1mb' }));
+
+/** Simple sliding-window rate limiter (per IP + key). Multi-instance Render is soft-limit only. */
+function rateLimit({ windowMs = 60_000, max = 20, keyPrefix = 'rl' } = {}) {
+  if (!global.__rateBuckets) global.__rateBuckets = new Map();
+  return (req, res, next) => {
+    const ip = req.headers['x-forwarded-for']?.toString().split(',')[0]?.trim() || req.ip || 'unknown';
+    const key = `${keyPrefix}:${ip}`;
+    const now = Date.now();
+    let bucket = global.__rateBuckets.get(key);
+    if (!bucket || bucket.resetAt < now) {
+      bucket = { count: 0, resetAt: now + windowMs };
+      global.__rateBuckets.set(key, bucket);
+    }
+    bucket.count += 1;
+    if (bucket.count > max) {
+      return res.status(429).json({ error: 'Too many requests. Please wait a moment and try again.' });
+    }
+    next();
+  };
+}
+
+function escapeHtml(str = '') {
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
 
 // Initialize Firebase Admin
 try {
@@ -247,48 +276,66 @@ apiRouter.get('/sitemap-data', async (req, res) => {
 // AUTHENTICATION APIs
 // ============================================================
 
-/** Short-lived codes for Expo Go Google Sign-In bridge (website → app) */
-if (!global.__mobileGoogleCodes) global.__mobileGoogleCodes = new Map();
-
-apiRouter.post('/auth/mobile-google/start', async (req, res) => {
-  try {
-    const { idToken } = req.body;
-    if (!idToken) return res.status(400).json({ error: 'idToken required' });
-    const decoded = await auth.verifyIdToken(idToken);
-    const crypto = require('crypto');
-    const code = crypto.randomBytes(24).toString('hex');
-    global.__mobileGoogleCodes.set(code, {
-      uid: decoded.uid,
-      expires: Date.now() + 2 * 60 * 1000,
-    });
-    // prune old
-    for (const [k, v] of global.__mobileGoogleCodes) {
-      if (v.expires < Date.now()) global.__mobileGoogleCodes.delete(k);
+/** Short-lived single-use codes for Expo Go Google Sign-In bridge (website → app). Stored in Firestore so multi-instance API works. */
+apiRouter.post(
+  '/auth/mobile-google/start',
+  rateLimit({ windowMs: 60_000, max: 15, keyPrefix: 'mgoogle-start' }),
+  async (req, res) => {
+    try {
+      const { idToken } = req.body;
+      if (!idToken) return res.status(400).json({ error: 'idToken required' });
+      const decoded = await auth.verifyIdToken(idToken);
+      const crypto = require('crypto');
+      const code = crypto.randomBytes(24).toString('hex');
+      const expires = Date.now() + 2 * 60 * 1000;
+      await db.collection('mobile_google_codes').doc(code).set({
+        uid: decoded.uid,
+        expires,
+        createdAt: FieldValue.serverTimestamp(),
+      });
+      // Best-effort prune of expired docs (limit scan)
+      try {
+        const old = await db.collection('mobile_google_codes').where('expires', '<', Date.now()).limit(20).get();
+        await Promise.all(old.docs.map((d) => d.ref.delete()));
+      } catch (_) {
+        /* ignore prune errors */
+      }
+      res.json({ code });
+    } catch (error) {
+      res.status(401).json({ error: error.message || 'Invalid idToken' });
     }
-    res.json({ code });
-  } catch (error) {
-    res.status(401).json({ error: error.message || 'Invalid idToken' });
   }
-});
+);
 
-apiRouter.post('/auth/mobile-google/exchange', async (req, res) => {
-  try {
-    const { code } = req.body;
-    if (!code) return res.status(400).json({ error: 'code required' });
-    const entry = global.__mobileGoogleCodes.get(code);
-    if (!entry || entry.expires < Date.now()) {
-      if (entry) global.__mobileGoogleCodes.delete(code);
-      return res.status(400).json({ error: 'Code expired or invalid. Try Google Sign-In again.' });
+apiRouter.post(
+  '/auth/mobile-google/exchange',
+  rateLimit({ windowMs: 60_000, max: 30, keyPrefix: 'mgoogle-x' }),
+  async (req, res) => {
+    try {
+      const { code } = req.body;
+      if (!code || typeof code !== 'string') return res.status(400).json({ error: 'code required' });
+      const ref = db.collection('mobile_google_codes').doc(code);
+      const snap = await ref.get();
+      if (!snap.exists) {
+        return res.status(400).json({ error: 'Code expired or invalid. Try Google Sign-In again.' });
+      }
+      const entry = snap.data();
+      await ref.delete(); // single-use
+      if (!entry?.uid || !entry.expires || entry.expires < Date.now()) {
+        return res.status(400).json({ error: 'Code expired or invalid. Try Google Sign-In again.' });
+      }
+      const customToken = await auth.createCustomToken(entry.uid);
+      res.json({ customToken });
+    } catch (error) {
+      res.status(500).json({ error: error.message });
     }
-    global.__mobileGoogleCodes.delete(code);
-    const customToken = await auth.createCustomToken(entry.uid);
-    res.json({ customToken });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
   }
-});
+);
 
-apiRouter.post('/auth/reset-password', async (req, res) => {
+apiRouter.post(
+  '/auth/reset-password',
+  rateLimit({ windowMs: 15 * 60_000, max: 5, keyPrefix: 'reset-pw' }),
+  async (req, res) => {
   const { email } = req.body;
   if (!email) return res.status(400).json({ error: 'Email is required' });
   
@@ -379,36 +426,45 @@ apiRouter.post('/auth/register-notify', async (req, res) => {
 });
 
 // Public contact form — emails admin and sends confirmation to user
-apiRouter.post('/contact', async (req, res) => {
+apiRouter.post(
+  '/contact',
+  rateLimit({ windowMs: 60_000, max: 8, keyPrefix: 'contact' }),
+  async (req, res) => {
   const { name, email, phone, message, subject } = req.body;
   if (!name || !email || !message) {
     return res.status(400).json({ error: 'name, email, and message are required' });
   }
 
   const topic = subject || 'General Inquiry';
+  const safeName = escapeHtml(name);
+  const safeEmail = escapeHtml(email);
+  const safePhone = phone ? escapeHtml(phone) : '';
+  const safeTopic = escapeHtml(topic);
+  const safeMessage = escapeHtml(message);
+  const mailtoEmail = encodeURIComponent(String(email).trim());
 
   const adminHtml = `
     <div style="font-family: Arial, sans-serif; padding: 20px; color: #333;">
       <h2 style="color: #1565c0;">New Contact Message</h2>
       <div style="background: #f5f5f5; padding: 15px; border-radius: 8px; margin: 20px 0;">
-        <p style="margin: 5px 0;"><strong>Name:</strong> ${name}</p>
-        <p style="margin: 5px 0;"><strong>Email:</strong> ${email}</p>
-        ${phone ? `<p style="margin: 5px 0;"><strong>Phone:</strong> ${phone}</p>` : ''}
-        <p style="margin: 5px 0;"><strong>Subject:</strong> ${topic}</p>
+        <p style="margin: 5px 0;"><strong>Name:</strong> ${safeName}</p>
+        <p style="margin: 5px 0;"><strong>Email:</strong> ${safeEmail}</p>
+        ${safePhone ? `<p style="margin: 5px 0;"><strong>Phone:</strong> ${safePhone}</p>` : ''}
+        <p style="margin: 5px 0;"><strong>Subject:</strong> ${safeTopic}</p>
       </div>
-      <p style="white-space: pre-wrap;">${message}</p>
-      <p style="margin-top: 20px;"><a href="mailto:${email}">Reply to ${name}</a></p>
+      <p style="white-space: pre-wrap;">${safeMessage}</p>
+      <p style="margin-top: 20px;"><a href="mailto:${mailtoEmail}">Reply to ${safeName}</a></p>
     </div>
   `;
 
   const userHtml = `
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 8px;">
       <h2 style="color: #2e7d32;">We received your message</h2>
-      <p>Hello <strong>${name}</strong>,</p>
+      <p>Hello <strong>${safeName}</strong>,</p>
       <p>Thank you for contacting Deergayu. We have received your message and our team will get back to you shortly.</p>
       <div style="background: #f5f5f5; padding: 15px; border-radius: 8px; margin: 20px 0;">
-        <p style="margin: 5px 0;"><strong>Subject:</strong> ${topic}</p>
-        <p style="margin: 5px 0; white-space: pre-wrap;"><strong>Your message:</strong><br/>${message}</p>
+        <p style="margin: 5px 0;"><strong>Subject:</strong> ${safeTopic}</p>
+        <p style="margin: 5px 0; white-space: pre-wrap;"><strong>Your message:</strong><br/>${safeMessage}</p>
       </div>
       <p>For urgent matters, call us at <strong>0762209299</strong>.</p>
       <p style="font-size: 12px; color: #999; text-align: center;">Deergayu Platform &copy; ${new Date().getFullYear()}</p>
@@ -598,7 +654,10 @@ apiRouter.get('/products/:id', async (req, res) => {
 });
 
 // AI-Powered Symptom Checker
-apiRouter.post('/symptom-check', async (req, res) => {
+apiRouter.post(
+  '/symptom-check',
+  rateLimit({ windowMs: 60_000, max: 12, keyPrefix: 'symptom' }),
+  async (req, res) => {
   try {
     const { symptom, lang } = req.body;
     if (!symptom) return res.status(400).json({ error: 'Symptom is required' });
@@ -2332,7 +2391,10 @@ apiRouter.post('/astrology', async (req, res) => {
   }
 });
 
-apiRouter.post('/chat', async (req, res) => {
+apiRouter.post(
+  '/chat',
+  rateLimit({ windowMs: 60_000, max: 30, keyPrefix: 'chat' }),
+  async (req, res) => {
   try {
     const { message, lang } = req.body;
     let replyText = "";

@@ -1,5 +1,5 @@
 import { initializeApp, getApps, getApp } from 'firebase/app';
-import { getAuth, initializeAuth, getReactNativePersistence } from 'firebase/auth';
+import { getAuth, initializeAuth } from 'firebase/auth';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
 
@@ -21,8 +21,13 @@ function createAuth() {
     return getAuth(app);
   }
   try {
+    // RN persistence lives on auth internals; types vary across firebase major versions
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { getReactNativePersistence } = require('@firebase/auth/dist/rn/index.js') as {
+      getReactNativePersistence: (storage: typeof AsyncStorage) => unknown;
+    };
     return initializeAuth(app, {
-      persistence: getReactNativePersistence(AsyncStorage),
+      persistence: getReactNativePersistence(AsyncStorage) as any,
     });
   } catch {
     // Already initialized (Fast Refresh) or persistence unavailable

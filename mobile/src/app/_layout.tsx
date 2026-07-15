@@ -5,6 +5,7 @@ import { AuthProvider } from '../context/AuthContext';
 import { LanguageProvider } from '../context/LanguageContext';
 import { CartProvider } from '../context/CartContext';
 import AyurBotMobile from '../components/AI/AyurBotMobile';
+import OfflineBanner from '../components/OfflineBanner';
 
 /**
  * Shared backend with website:
@@ -19,6 +20,7 @@ export default function RootLayout() {
         <AuthProvider>
           <CartProvider>
             <StatusBar style="light" />
+            <OfflineBanner />
             <Stack
               screenOptions={{
                 headerStyle: { backgroundColor: '#142018' },
@@ -31,6 +33,7 @@ export default function RootLayout() {
               <Stack.Screen name="product/[id]" options={{ headerShown: false }} />
               <Stack.Screen name="login" options={{ headerShown: false }} />
               <Stack.Screen name="account" options={{ headerShown: false }} />
+              <Stack.Screen name="wishlist" options={{ headerShown: false }} />
               <Stack.Screen name="admin" options={{ headerShown: false }} />
               <Stack.Screen name="orders" options={{ headerShown: false }} />
               <Stack.Screen name="appointments" options={{ headerShown: false }} />

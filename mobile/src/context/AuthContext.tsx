@@ -42,6 +42,7 @@ type AuthContextValue = {
   register: (name: string, email: string, password: string) => Promise<void>;
   loginWithGoogle: () => Promise<void>;
   logout: () => Promise<void>;
+  updateDisplayName: (name: string) => Promise<void>;
   getToken: () => Promise<string | null>;
   refreshProfile: () => Promise<void>;
 };
@@ -162,6 +163,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       loginWithGoogle,
       logout: async () => {
         await signOut(auth);
+      },
+      updateDisplayName: async (name: string) => {
+        if (!auth.currentUser) throw new Error('Not signed in');
+        const trimmed = name.trim();
+        if (!trimmed) throw new Error('Name is required');
+        await updateProfile(auth.currentUser, { displayName: trimmed });
+        // Force UI refresh — updateProfile mutates currentUser in place
+        setUser(auth.currentUser ? ({ ...auth.currentUser } as User) : null);
+        await refreshProfile().catch(() => {});
       },
       getToken: async () => {
         if (!auth.currentUser) return null;

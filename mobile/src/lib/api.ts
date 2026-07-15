@@ -256,6 +256,12 @@ export const postContact = (body: Record<string, unknown>) =>
 export const postRegisterNotify = (body: Record<string, unknown>) =>
   request('/api/auth/register-notify', { method: 'POST', body: JSON.stringify(body) });
 
+export const postResetPassword = (email: string) =>
+  request<{ message?: string }>('/api/auth/reset-password', {
+    method: 'POST',
+    body: JSON.stringify({ email }),
+  });
+
 // ── Admin APIs ──────────────────────────────────────────────
 export type AdminOverview = {
   pendingExperts: number;

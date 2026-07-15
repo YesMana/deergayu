@@ -10,6 +10,7 @@ const LINKS = [
   { title: 'Ayurvedic Guide', desc: 'Remedies & routines', icon: 'menu-book' as const, route: '/guide' },
   { title: 'Videos', desc: 'Watch wellness content', icon: 'ondemand-video' as const, route: '/videos' },
   { title: 'AI Symptom Checker', desc: 'Get herbal guidance', icon: 'healing' as const, route: '/symptom-checker' },
+  { title: 'Wishlist', desc: 'Saved products', icon: 'favorite' as const, route: '/wishlist' },
   { title: 'My Account', desc: 'Orders & appointments', icon: 'person' as const, route: '/account' },
   { title: 'Cart', desc: 'Review your basket', icon: 'shopping-cart' as const, route: '/cart' },
 ];
@@ -43,7 +44,7 @@ export default function MoreScreen() {
           key={l.route}
           style={styles.card}
           onPress={() => {
-            if (l.route === '/account' && !user) router.push('/login');
+            if ((l.route === '/account' || l.route === '/wishlist') && !user) router.push('/login');
             else router.push(l.route as any);
           }}
         >
