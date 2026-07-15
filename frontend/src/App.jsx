@@ -34,8 +34,6 @@ const Privacy = lazy(() => import('./pages/Privacy'));
 const Terms = lazy(() => import('./pages/Terms'));
 const RefundPolicy = lazy(() => import('./pages/RefundPolicy'));
 const Contact = lazy(() => import('./pages/Contact'));
-
-const Contact = lazy(() => import('./pages/Contact'));
 const MobileAuth = lazy(() => import('./pages/MobileAuth'));
 
 function AppShell() {
