@@ -14,7 +14,7 @@ import { useAuth } from '../context/AuthContext';
 import { fetchMyAppointments, fetchMyOrders, type Appointment, type Order } from '../lib/api';
 
 export default function AccountScreen() {
-  const { user, profile, logout, loading: authLoading } = useAuth();
+  const { user, profile, logout, loading: authLoading, isAdmin, refreshProfile } = useAuth();
   const router = useRouter();
   const [orders, setOrders] = useState<Order[]>([]);
   const [appointments, setAppointments] = useState<Appointment[]>([]);
@@ -22,12 +22,11 @@ export default function AccountScreen() {
   const [apptTotal, setApptTotal] = useState(0);
   const [loading, setLoading] = useState(false);
 
-  const isAdmin = Boolean(profile?.isAdmin || profile?.role === 'admin');
-
   const load = useCallback(async () => {
     if (!user) return;
     setLoading(true);
     try {
+      await refreshProfile().catch(() => {});
       const [o, a] = await Promise.all([
         fetchMyOrders().catch(() => []),
         fetchMyAppointments().catch(() => []),
@@ -41,7 +40,7 @@ export default function AccountScreen() {
     } finally {
       setLoading(false);
     }
-  }, [user]);
+  }, [user, refreshProfile]);
 
   useFocusEffect(
     useCallback(() => {
@@ -66,6 +65,14 @@ export default function AccountScreen() {
       style={styles.container}
       refreshControl={<RefreshControl refreshing={loading} onRefresh={load} tintColor="#7cb342" />}
     >
+      <View style={styles.topBar}>
+        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
+          <MaterialIcons name="arrow-back" size={22} color="#d4af37" />
+        </TouchableOpacity>
+        <Text style={styles.topTitle}>My Account</Text>
+        <View style={{ width: 36 }} />
+      </View>
+
       <View style={styles.header}>
         <View style={[styles.avatar, isAdmin && styles.avatarAdmin]}>
           <Text style={styles.avatarText}>
@@ -75,17 +82,34 @@ export default function AccountScreen() {
         <Text style={styles.name}>{user.displayName || profile?.name || 'Member'}</Text>
         <Text style={styles.email}>{user.email}</Text>
         <Text style={styles.role}>
-          {(profile?.role || 'user').toString().toUpperCase()} · synced with website
+          {isAdmin ? 'ADMIN' : (profile?.role || 'user').toString().toUpperCase()} · synced with
+          website
         </Text>
       </View>
 
+      {/* Always show for admins — primary entry */}
       {isAdmin ? (
         <TouchableOpacity style={styles.adminLink} onPress={() => router.push('/admin')}>
           <MaterialIcons name="shield" size={22} color="#0a140f" />
-          <Text style={styles.adminLinkText}>Admin Panel</Text>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.adminLinkText}>Admin Panel</Text>
+            <Text style={styles.adminLinkSub}>Approvals, orders & appointments</Text>
+          </View>
           <MaterialIcons name="chevron-right" size={22} color="#0a140f" />
         </TouchableOpacity>
-      ) : null}
+      ) : (
+        <TouchableOpacity
+          style={styles.adminHint}
+          onPress={async () => {
+            await refreshProfile();
+          }}
+        >
+          <MaterialIcons name="info-outline" size={18} color="#9aaa9a" />
+          <Text style={styles.adminHintText}>
+            Admin Panel appears here when signed in with an admin account.
+          </Text>
+        </TouchableOpacity>
+      )}
 
       <TouchableOpacity style={styles.link} onPress={() => router.push('/orders')}>
         <MaterialIcons name="receipt-long" size={22} color="#7cb342" />
@@ -125,7 +149,17 @@ export default function AccountScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#0a140f' },
   center: { flex: 1, backgroundColor: '#0a140f', alignItems: 'center', justifyContent: 'center' },
-  header: { alignItems: 'center', padding: 28, paddingTop: 40 },
+  topBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingTop: 52,
+    paddingBottom: 8,
+  },
+  backBtn: { width: 36 },
+  topTitle: { color: '#f5f7f4', fontWeight: '800', fontSize: 17 },
+  header: { alignItems: 'center', padding: 28, paddingTop: 12 },
   avatar: {
     width: 72,
     height: 72,
@@ -150,7 +184,21 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     backgroundColor: '#7cb342',
   },
-  adminLinkText: { flex: 1, color: '#0a140f', fontWeight: '800', fontSize: 16 },
+  adminLinkText: { color: '#0a140f', fontWeight: '800', fontSize: 16 },
+  adminLinkSub: { color: 'rgba(10,20,15,0.7)', fontSize: 12, marginTop: 2 },
+  adminHint: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+    marginHorizontal: 16,
+    marginBottom: 14,
+    padding: 12,
+    borderRadius: 12,
+    backgroundColor: '#142018',
+    borderWidth: 1,
+    borderColor: 'rgba(124,179,66,0.12)',
+  },
+  adminHintText: { flex: 1, color: '#9aaa9a', fontSize: 12, lineHeight: 18 },
   link: {
     flexDirection: 'row',
     alignItems: 'center',

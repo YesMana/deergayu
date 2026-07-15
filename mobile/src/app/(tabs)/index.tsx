@@ -28,6 +28,7 @@ import {
 } from '../../lib/api';
 import { mediaUrl } from '../../constants/api';
 import { useCart } from '../../context/CartContext';
+import { useAuth } from '../../context/AuthContext';
 
 const { width: SCREEN_W } = Dimensions.get('window');
 
@@ -75,6 +76,7 @@ export default function HomeScreen() {
   const { t, lang } = useLanguage();
   const router = useRouter();
   const { addToCart } = useCart();
+  const { isAdmin } = useAuth();
 
   const [stats, setStats] = useState<HomeStats | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
@@ -231,6 +233,17 @@ export default function HomeScreen() {
           </View>
         </Animated.View>
       </ImageBackground>
+
+      {isAdmin ? (
+        <TouchableOpacity style={styles.adminBanner} onPress={() => router.push('/admin')} activeOpacity={0.9}>
+          <MaterialIcons name="shield" size={22} color="#0a140f" />
+          <View style={{ flex: 1 }}>
+            <Text style={styles.adminBannerTitle}>Admin Panel</Text>
+            <Text style={styles.adminBannerSub}>Manage experts, products & orders</Text>
+          </View>
+          <MaterialIcons name="chevron-right" size={22} color="#0a140f" />
+        </TouchableOpacity>
+      ) : null}
 
       {/* ── STATS ── */}
       <View style={styles.statsGrid}>
@@ -554,6 +567,21 @@ const styles = StyleSheet.create({
   trustRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   trustItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   trustText: { color: 'rgba(253,251,247,0.7)', fontSize: 12, fontWeight: '500' },
+
+  adminBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginHorizontal: 16,
+    marginTop: -10,
+    marginBottom: 8,
+    zIndex: 3,
+    backgroundColor: '#7cb342',
+    borderRadius: 14,
+    padding: 14,
+  },
+  adminBannerTitle: { color: '#0a140f', fontWeight: '800', fontSize: 15 },
+  adminBannerSub: { color: 'rgba(10,20,15,0.7)', fontSize: 12, marginTop: 2 },
 
   statsGrid: {
     flexDirection: 'row',

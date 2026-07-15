@@ -8,7 +8,7 @@ import { TouchableOpacity, Text, View } from 'react-native';
 export default function TabLayout() {
   const { t, lang, toggleLanguage } = useLanguage();
   const { cartCount } = useCart();
-  const { user } = useAuth();
+  const { user, isAdmin } = useAuth();
   const router = useRouter();
 
   return (
@@ -26,6 +26,11 @@ export default function TabLayout() {
         tabBarInactiveTintColor: '#9aaa9a',
         headerRight: () => (
           <View style={{ flexDirection: 'row', alignItems: 'center', marginRight: 12, gap: 14 }}>
+            {isAdmin ? (
+              <TouchableOpacity onPress={() => router.push('/admin')} accessibilityLabel="Admin Panel">
+                <MaterialIcons name="shield" size={22} color="#7cb342" />
+              </TouchableOpacity>
+            ) : null}
             <TouchableOpacity
               onPress={toggleLanguage}
               style={{ flexDirection: 'row', alignItems: 'center' }}

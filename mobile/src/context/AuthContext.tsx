@@ -17,15 +17,26 @@ import { fetchAuthMe, postRegisterNotify } from '../lib/api';
 
 WebBrowser.maybeCompleteAuthSession();
 
+/** Same super-admin as website AuthContext / backend platformUtils */
+const SUPER_ADMIN_EMAIL = 'yes.manujaya@gmail.com';
+
 /** Website bridge that uses the same Firebase Google Sign-In as deergayu.com */
 const MOBILE_AUTH_URL = (
   process.env.EXPO_PUBLIC_MOBILE_AUTH_URL || 'https://deergayu.com/mobile-auth'
 ).replace(/\/$/, '');
 
+function resolveIsAdmin(user: User | null, profile: any | null) {
+  if (profile?.isAdmin || profile?.role === 'admin') return true;
+  const email = (user?.email || profile?.email || '').toLowerCase();
+  if (email && email === SUPER_ADMIN_EMAIL) return true;
+  return false;
+}
+
 type AuthContextValue = {
   user: User | null;
   profile: any | null;
   loading: boolean;
+  isAdmin: boolean;
   googleConfigured: boolean;
   login: (email: string, password: string) => Promise<void>;
   register: (name: string, email: string, password: string) => Promise<void>;
@@ -134,6 +145,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       user,
       profile,
       loading,
+      isAdmin: resolveIsAdmin(user, profile),
       googleConfigured: true,
       login: async (email, password) => {
         await signInWithEmailAndPassword(auth, email.trim(), password);

@@ -13,12 +13,10 @@ async function authHeaders(json = true): Promise<Record<string, string>> {
 }
 
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
-  const method = (options.method || 'GET').toUpperCase();
-  const headers = {
-    ...(await authHeaders(method !== 'GET')),
+  const headers: Record<string, string> = {
+    ...(await authHeaders(true)),
     ...(options.headers as Record<string, string> | undefined),
   };
-  // Always attach auth if available
   if (!headers.Authorization && auth.currentUser) {
     headers.Authorization = `Bearer ${await auth.currentUser.getIdToken()}`;
   }
