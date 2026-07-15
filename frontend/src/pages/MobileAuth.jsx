@@ -10,6 +10,24 @@ import { auth, googleProvider } from '../firebase';
 
 const API_URL = import.meta.env.VITE_API_URL || 'https://deergayu-api.onrender.com';
 
+/** Only allow returning login codes into the Deergayu / Expo app — blocks open redirect phishing */
+function isAllowedAppRedirect(url) {
+  if (!url || typeof url !== 'string') return false;
+  const trimmed = url.trim();
+  if (trimmed.startsWith('deergayu://')) return true;
+  if (trimmed.startsWith('exp://')) return true;
+  // Expo Go / tunnel deep links sometimes use https://u.expo.dev
+  try {
+    const u = new URL(trimmed);
+    if (u.protocol === 'https:' && (u.hostname === 'u.expo.dev' || u.hostname.endsWith('.expo.dev'))) {
+      return true;
+    }
+  } catch {
+    /* ignore */
+  }
+  return false;
+}
+
 /**
  * Bridge page for the Expo mobile app.
  * Opens in an in-app browser, signs in with the same Google/Firebase as the website,
@@ -23,6 +41,9 @@ export default function MobileAuth() {
   const [busy, setBusy] = useState(false);
 
   const finishWithUser = async (user) => {
+    if (!isAllowedAppRedirect(redirect)) {
+      throw new Error('Invalid redirect URI. Open Google Sign-In from the Deergayu app only.');
+    }
     setStatus('Signing you into the app…');
     const idToken = await user.getIdToken();
     const res = await fetch(`${API_URL}/api/auth/mobile-google/start`, {

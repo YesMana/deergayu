@@ -55,11 +55,11 @@ const SERVICES = [
     route: '/astrology',
   },
   {
-    key: 'guide',
-    icon: 'menu-book' as const,
-    title: 'Ayurvedic Guide',
-    desc: 'Herbal remedies & daily routines from Sri Lankan tradition.',
-    route: '/guide',
+    key: 'symptom',
+    icon: 'healing' as const,
+    title: 'AI Symptom Checker',
+    desc: 'Get Ayurvedic guidance based on how you feel.',
+    route: '/symptom-checker',
   },
 ];
 

@@ -1336,10 +1336,24 @@ apiRouter.post('/payments/payhere/hash', verifyUser, async (req, res) => {
     if (!merchantId || !merchantSecret) {
       return res.status(503).json({ error: 'PayHere is not configured yet. Set PAYHERE_MERCHANT_ID and PAYHERE_MERCHANT_SECRET.' });
     }
-    const { orderId, amount, currency = 'LKR' } = req.body;
-    if (!orderId || !amount) return res.status(400).json({ error: 'orderId and amount required' });
+    const { orderId, currency = 'LKR' } = req.body;
+    if (!orderId) return res.status(400).json({ error: 'orderId required' });
+
+    const orderDoc = await db.collection('orders').doc(orderId).get();
+    if (!orderDoc.exists) return res.status(404).json({ error: 'Order not found' });
+    const order = orderDoc.data();
+    if (order.customerId !== req.user.uid) {
+      return res.status(403).json({ error: 'Not your order' });
+    }
+    if (order.status !== 'awaiting_payment' && order.paymentMethod !== 'payhere') {
+      return res.status(400).json({ error: 'Order is not awaiting card payment' });
+    }
+
     const crypto = require('crypto');
-    const amountFormatted = Number(amount).toFixed(2);
+    const amountFormatted = Number(order.totalPrice).toFixed(2);
+    if (!Number.isFinite(Number(amountFormatted)) || Number(amountFormatted) <= 0) {
+      return res.status(400).json({ error: 'Order total is invalid' });
+    }
     const hashedSecret = crypto.createHash('md5').update(merchantSecret).digest('hex').toUpperCase();
     const hash = crypto
       .createHash('md5')
@@ -1417,8 +1431,63 @@ apiRouter.get('/payments/payhere/go/:token', (req, res) => {
 });
 
 apiRouter.post('/payments/payhere/notify', async (req, res) => {
-  console.log('PayHere IPN:', req.body);
-  res.status(200).send('OK');
+  try {
+    const merchantId = process.env.PAYHERE_MERCHANT_ID;
+    const merchantSecret = process.env.PAYHERE_MERCHANT_SECRET;
+    if (!merchantId || !merchantSecret) {
+      console.warn('PayHere IPN: merchant not configured');
+      return res.status(200).send('OK');
+    }
+    const {
+      merchant_id,
+      order_id,
+      payhere_amount,
+      payhere_currency,
+      status_code,
+      md5sig,
+    } = req.body || {};
+
+    const crypto = require('crypto');
+    const localMd5 = crypto
+      .createHash('md5')
+      .update(
+        merchant_id +
+          order_id +
+          payhere_amount +
+          payhere_currency +
+          status_code +
+          crypto.createHash('md5').update(merchantSecret).digest('hex').toUpperCase()
+      )
+      .digest('hex')
+      .toUpperCase();
+
+    if (!md5sig || localMd5 !== String(md5sig).toUpperCase()) {
+      console.warn('PayHere IPN: invalid signature', { order_id, status_code });
+      return res.status(403).send('Invalid signature');
+    }
+
+    if (String(status_code) === '2' && order_id) {
+      const orderRef = db.collection('orders').doc(order_id);
+      const snap = await orderRef.get();
+      if (snap.exists) {
+        const expected = Number(snap.data().totalPrice).toFixed(2);
+        if (expected === Number(payhere_amount).toFixed(2)) {
+          await orderRef.update({
+            status: 'confirmed',
+            paymentStatus: 'paid',
+            paidAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          });
+        } else {
+          console.warn('PayHere IPN: amount mismatch', { order_id, expected, payhere_amount });
+        }
+      }
+    }
+    res.status(200).send('OK');
+  } catch (error) {
+    console.error('PayHere IPN error:', error);
+    res.status(200).send('OK');
+  }
 });
 
 // Update product
@@ -1619,13 +1688,31 @@ apiRouter.get('/cart', verifyUser, async (req, res) => {
 
 // Add/update cart
 apiRouter.post('/cart', verifyUser, async (req, res) => {
-  const { productId, name, price, basePrice, quantity, vendorId, vendorName, imageUrl, category } = req.body;
+  const { productId, quantity } = req.body;
   
-  if (!productId || !name || !price) {
-    return res.status(400).json({ error: 'productId, name, and price are required' });
+  if (!productId) {
+    return res.status(400).json({ error: 'productId is required' });
   }
 
   try {
+    const prodDoc = await db.collection('products').doc(productId).get();
+    if (!prodDoc.exists) return res.status(404).json({ error: 'Product not found' });
+    const prod = prodDoc.data();
+    if (prod.status && prod.status !== 'approved') {
+      return res.status(400).json({ error: 'Product is not available' });
+    }
+    const qty = Math.min(Math.max(Number(quantity) || 1, 1), 50);
+    const price = Number(prod.price);
+    if (!Number.isFinite(price) || price < 0) {
+      return res.status(400).json({ error: 'Product price is invalid' });
+    }
+    const basePrice = Number(prod.basePrice ?? price);
+    const name = prod.name || 'Product';
+    const vendorId = prod.vendorId || '';
+    const vendorName = prod.vendorName || '';
+    const imageUrl = prod.imageUrl || prod.image || '';
+    const category = prod.category || '';
+
     const cartRef = db.collection('carts').doc(req.user.uid);
     const cartDoc = await cartRef.get();
     
@@ -1634,21 +1721,27 @@ apiRouter.post('/cart', verifyUser, async (req, res) => {
       items = cartDoc.data().items || [];
     }
 
-    // Check if item already in cart
     const existingIndex = items.findIndex(item => item.productId === productId);
     if (existingIndex >= 0) {
-      items[existingIndex].quantity = (items[existingIndex].quantity || 1) + (quantity || 1);
+      items[existingIndex].quantity = Math.min((items[existingIndex].quantity || 1) + qty, 50);
+      items[existingIndex].price = price;
+      items[existingIndex].basePrice = basePrice;
+      items[existingIndex].name = name;
+      items[existingIndex].vendorId = vendorId;
+      items[existingIndex].vendorName = vendorName;
+      items[existingIndex].imageUrl = imageUrl;
+      items[existingIndex].category = category;
     } else {
       items.push({
         productId,
         name,
-        price: Number(price),
-        basePrice: Number(basePrice ?? price),
-        quantity: quantity || 1,
-        vendorId: vendorId || '',
-        vendorName: vendorName || '',
-        imageUrl: imageUrl || '',
-        category: category || '',
+        price,
+        basePrice,
+        quantity: qty,
+        vendorId,
+        vendorName,
+        imageUrl,
+        category,
         addedAt: new Date().toISOString()
       });
     }
@@ -1725,16 +1818,37 @@ apiRouter.post('/checkout', verifyUser, async (req, res) => {
     const zone = zones.find((z) => z.id === shippingZoneId) || zones[0] || { id: 'island', name: 'Island-wide', fee: 500 };
     const shippingFee = Number(zone.fee) || 0;
 
-    // Enrich cart items with basePrice from product records
-    const enrichedItems = await Promise.all(
-      items.map(async (item) => {
-        if (item.basePrice !== undefined) return item;
-        if (!item.productId) return item;
-        const prod = await db.collection('products').doc(item.productId).get();
-        if (!prod.exists) return item;
-        return { ...item, basePrice: prod.data().basePrice ?? item.price };
-      })
-    );
+    // Authoritative prices from product records (never trust client cart prices)
+    const enrichedItems = [];
+    for (const item of items) {
+      if (!item.productId) continue;
+      const prod = await db.collection('products').doc(item.productId).get();
+      if (!prod.exists) {
+        return res.status(400).json({ error: `Product unavailable: ${item.name || item.productId}` });
+      }
+      const data = prod.data();
+      if (data.status && data.status !== 'approved') {
+        return res.status(400).json({ error: `Product not available: ${data.name || item.productId}` });
+      }
+      const price = Number(data.price);
+      if (!Number.isFinite(price) || price < 0) {
+        return res.status(400).json({ error: `Invalid price for ${data.name || item.productId}` });
+      }
+      enrichedItems.push({
+        ...item,
+        name: data.name || item.name,
+        price,
+        basePrice: Number(data.basePrice ?? price),
+        vendorId: data.vendorId || item.vendorId || '',
+        vendorName: data.vendorName || item.vendorName || '',
+        imageUrl: data.imageUrl || data.image || item.imageUrl || '',
+        category: data.category || item.category || '',
+        quantity: Math.min(Math.max(Number(item.quantity) || 1, 1), 50),
+      });
+    }
+    if (!enrichedItems.length) {
+      return res.status(400).json({ error: 'Cart has no valid products' });
+    }
     
     // Get user info
     const userDoc = await db.collection('users').doc(req.user.uid).get();
@@ -1751,7 +1865,6 @@ apiRouter.post('/checkout', verifyUser, async (req, res) => {
     });
     
     const orderIds = [];
-    const vendorIds = Object.keys(vendorGroups);
     // Split shipping across vendor orders (first order carries full fee for simplicity)
     let shippingAssigned = false;
     

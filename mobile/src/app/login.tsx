@@ -60,6 +60,9 @@ export default function LoginScreen() {
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
+      <TouchableOpacity style={styles.back} onPress={() => router.back()} hitSlop={12}>
+        <MaterialIcons name="arrow-back" size={22} color="#d4af37" />
+      </TouchableOpacity>
       <Text style={styles.brand}>Deergayu</Text>
       <Text style={styles.title}>{mode === 'login' ? 'Sign in' : 'Create account'}</Text>
       <Text style={styles.sub}>Same account as the website — data stays in sync.</Text>
@@ -130,6 +133,7 @@ const styles = StyleSheet.create({
     padding: 24,
     justifyContent: 'center',
   },
+  back: { position: 'absolute', top: 52, left: 20, zIndex: 2 },
   brand: { color: '#7cb342', fontSize: 28, fontWeight: '800', marginBottom: 8 },
   title: { color: '#f5f7f4', fontSize: 24, fontWeight: '700' },
   sub: { color: '#9aaa9a', marginTop: 6, marginBottom: 20, lineHeight: 20 },

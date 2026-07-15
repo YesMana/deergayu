@@ -20,17 +20,20 @@ export default function ChannelingScreen() {
   const { t } = useLanguage();
   const [providers, setProviders] = useState<Provider[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState('');
   const [modalVisible, setModalVisible] = useState(false);
   const [selected, setSelected] = useState<Provider | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
+    setError(null);
     try {
       const data = await fetchProviders();
       setProviders(Array.isArray(data) ? data : []);
-    } catch {
+    } catch (e: any) {
       setProviders([]);
+      setError(e?.message || 'Could not load doctors. Pull to retry.');
     } finally {
       setLoading(false);
     }
@@ -111,6 +114,12 @@ export default function ChannelingScreen() {
         </View>
       </View>
 
+      {error ? (
+        <TouchableOpacity onPress={load} style={{ paddingHorizontal: 20, marginBottom: 8 }}>
+          <Text style={{ color: '#ef5350', textAlign: 'center' }}>{error} Tap to retry.</Text>
+        </TouchableOpacity>
+      ) : null}
+
       {loading && !providers.length ? (
         <ActivityIndicator color="#7cb342" style={{ marginTop: 40 }} />
       ) : (
@@ -121,7 +130,9 @@ export default function ChannelingScreen() {
           contentContainerStyle={styles.listContainer}
           showsVerticalScrollIndicator={false}
           refreshControl={<RefreshControl refreshing={loading} onRefresh={load} tintColor="#7cb342" />}
-          ListEmptyComponent={<Text style={styles.empty}>No providers found</Text>}
+          ListEmptyComponent={
+            <Text style={styles.empty}>{error ? 'Could not load' : 'No providers found'}</Text>
+          }
         />
       )}
 
