@@ -17,6 +17,7 @@ const emptyEdit = {
   telephone: '',
   address: '',
   experience: '',
+  profileImageUrl: '',
 };
 
 export default function ManageProviders() {
@@ -27,8 +28,38 @@ export default function ManageProviders() {
   const [editing, setEditing] = useState(null);
   const [form, setForm] = useState(emptyEdit);
   const [saving, setSaving] = useState(false);
+  const [uploadingImage, setUploadingImage] = useState(false);
 
   const getToken = () => auth.currentUser?.getIdToken();
+
+  const handlePhotoUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file || !editing?.id) return;
+    if (!file.type.startsWith('image/')) {
+      error('Please select a valid image file (JPG, PNG, WEBP)');
+      return;
+    }
+    setUploadingImage(true);
+    try {
+      const token = await getToken();
+      const formData = new FormData();
+      formData.append('image', file, `${editing.id}_profile${file.name.slice(file.name.lastIndexOf('.')) || '.jpg'}`);
+      const res = await fetch(`${API_URL}/api/upload`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+        body: formData,
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || 'Upload failed');
+      setForm((prev) => ({ ...prev, profileImageUrl: data.url }));
+      success('Photo uploaded — click Save changes to publish');
+    } catch (err) {
+      error(err.message || 'Upload failed');
+    } finally {
+      setUploadingImage(false);
+      e.target.value = '';
+    }
+  };
 
   const handleApproveUser = async (uid) => {
     if (!window.confirm('Approve this expert?')) return;
@@ -57,6 +88,7 @@ export default function ManageProviders() {
       telephone: p.profileDetails?.telephone || '',
       address: p.profileDetails?.address || '',
       experience: p.profileDetails?.experience || '',
+      profileImageUrl: p.profileDetails?.profileImageUrl || '',
     });
   };
 
@@ -82,6 +114,7 @@ export default function ManageProviders() {
             telephone: form.telephone,
             address: form.address,
             experience: form.experience,
+            profileImageUrl: form.profileImageUrl || '',
           },
         }),
       });
@@ -204,6 +237,60 @@ export default function ManageProviders() {
             </p>
             <form onSubmit={handleSaveEdit} className="admin-form">
               <div className="form-group">
+                <label>Profile photo</label>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
+                  {form.profileImageUrl ? (
+                    <img
+                      src={form.profileImageUrl}
+                      alt=""
+                      style={{ width: 72, height: 72, borderRadius: '50%', objectFit: 'cover', border: '2px solid var(--primary-color)' }}
+                    />
+                  ) : (
+                    <div
+                      style={{
+                        width: 72,
+                        height: 72,
+                        borderRadius: '50%',
+                        background: 'rgba(61,139,85,0.15)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontWeight: 700,
+                        color: 'var(--primary-light)',
+                      }}
+                    >
+                      {userInitials({ name: form.name, email: editing.email })}
+                    </div>
+                  )}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                    <label className="btn btn-outline" style={{ cursor: uploadingImage ? 'not-allowed' : 'pointer', margin: 0 }}>
+                      {uploadingImage ? 'Uploading…' : (form.profileImageUrl ? 'Change photo' : 'Upload photo')}
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handlePhotoUpload}
+                        disabled={uploadingImage || saving}
+                        style={{ display: 'none' }}
+                      />
+                    </label>
+                    {form.profileImageUrl && (
+                      <button
+                        type="button"
+                        className="btn btn-outline"
+                        style={{ color: '#ef5350', borderColor: 'rgba(239,83,80,0.4)' }}
+                        onClick={() => setForm({ ...form, profileImageUrl: '' })}
+                        disabled={uploadingImage || saving}
+                      >
+                        Remove photo
+                      </button>
+                    )}
+                  </div>
+                </div>
+                <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', margin: '0.5rem 0 0' }}>
+                  Upload first, then Save changes so the photo goes live on Channeling.
+                </p>
+              </div>
+              <div className="form-group">
                 <label>Name</label>
                 <input className="form-control" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
               </div>
@@ -247,7 +334,7 @@ export default function ManageProviders() {
               </div>
               <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end' }}>
                 <button type="button" className="btn btn-outline" onClick={() => setEditing(null)}>Cancel</button>
-                <button type="submit" className="btn btn-primary" disabled={saving}>{saving ? 'Saving…' : 'Save changes'}</button>
+                <button type="submit" className="btn btn-primary" disabled={saving || uploadingImage}>{saving ? 'Saving…' : 'Save changes'}</button>
               </div>
             </form>
           </div>
