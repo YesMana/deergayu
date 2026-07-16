@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '../context/LanguageContext';
 import { Star, Moon, Sun, Sparkles } from 'lucide-react';
 import SEO from '../components/SEO';
+import './Astrology.css';
 
 const Astrology = () => {
   const { lang } = useLanguage();
@@ -14,13 +15,13 @@ const Astrology = () => {
       subtitle: "Discover ancient wisdom, find auspicious times, and protect your energy with authentic Sri Lankan Yanthra and Manthra services.",
       servicesTitle: "Our Sacred Services",
       horoscope: "Horoscope Reading",
-      horoscopeDesc: "Deep analysis of your birth chart to uncover life patterns, career paths, and relationship compatibility.",
+      horoscopeDesc: "Deep analysis of your birth chart for life patterns, career paths, and relationship compatibility.",
       yanthra: "Yanthra Preparation",
-      yanthraDesc: "Custom-made protective talismans energized with ancient mantras for personal and spiritual protection.",
+      yanthraDesc: "Protective talismans energized with ancient mantras for personal and spiritual protection.",
       nekath: "Auspicious Times (Nekath)",
-      nekathDesc: "Calculating the most favorable planetary alignments for weddings, starting businesses, and house warming.",
+      nekathDesc: "Favorable planetary timings for weddings, new businesses, and house warming ceremonies.",
       vasthu: "Vasthu Vidya",
-      vasthuDesc: "Traditional architectural alignment to ensure harmony, prosperity, and positive energy in your home or business.",
+      vasthuDesc: "Architectural guidance for harmony, prosperity, and positive energy in home or business.",
       formTitle: "Request a Consultation",
       formSubtitle: "Provide your details below and our expert astrologers will contact you shortly.",
       name: "Full Name",
@@ -37,13 +38,13 @@ const Astrology = () => {
       subtitle: "පෞරාණික හෙළ වෙදකම සහ ගුප්ත විද්‍යාව හරහා ඔබේ ජීවිතයට ආරක්ෂාව සහ සෞභාග්‍යය උදා කරගන්න.",
       servicesTitle: "අපගේ සේවාවන්",
       horoscope: "කේන්දර පරීක්ෂාව",
-      horoscopeDesc: "ඔබේ ජන්ම පත්‍රය ගැඹුරින් පරීක්ෂා කර ජීවිතයේ ඉදිරි ගමන්මග, රැකියාව සහ විවාහය ගැන නිවැරදි පුරෝකථන.",
+      horoscopeDesc: "ජන්ම පත්‍රය ගැඹුරින් පරීක්ෂා කර ජීවිත මාර්ගය, රැකියාව සහ විවාහය පිළිබඳ මඟ පෙන්වීම.",
       yanthra: "යන්ත්‍ර පැළඳවීම",
-      yanthraDesc: "ග්‍රහ අපල දුරු කිරීමට සහ ජීවිත ආරක්ෂාවට බලගතු මන්ත්‍ර මගින් ජප කරන ලද පෞරාණික යන්ත්‍ර.",
+      yanthraDesc: "ග්‍රහ අපල දුරු කිරීමට සහ ආරක්ෂාවට මන්ත්‍ර ජපිත පෞරාණික යන්ත්‍ර.",
       nekath: "නැකැත් සෑදීම",
-      nekathDesc: "විවාහයට, නව ව්‍යාපාර ආරම්භයට, නිවාස සෑදීමට සහ සියලුම සුබ කටයුතු සඳහා බලගතු නැකැත් සෑදීම.",
+      nekathDesc: "විවාහය, ව්‍යාපාර ආරම්භය සහ නිවාස සඳහා සුබ නැකැත් ගණනය කිරීම.",
       vasthu: "වාස්තු විද්‍යාව",
-      vasthuDesc: "ඔබේ නිවසට සහ ව්‍යාපාරයට සෞභාග්‍යය ළඟා කරදෙන නිවැරදි වාස්තු විද්‍යාත්මක උපදෙස්.",
+      vasthuDesc: "නිවසට සහ ව්‍යාපාරයට සෞභාග්‍යය ගෙන දෙන වාස්තු උපදෙස්.",
       formTitle: "උපදේශනයක් සඳහා ඉල්ලුම් කරන්න",
       formSubtitle: "පහත තොරතුරු ලබා දෙන්න. අපගේ ප්‍රවීණ ජ්‍යොතිර්වේදීන් ඔබව ඉක්මනින් සම්බන්ධ කරගනු ඇත.",
       name: "සම්පූර්ණ නම",
@@ -60,22 +61,22 @@ const Astrology = () => {
       subtitle: "பண்டைய ஞானத்தைக் கண்டறியவும், மங்களகரமான நேரங்களைக் கண்டறியவும் மற்றும் உண்மையான இலங்கை சேவைகளுடன் உங்கள் ஆற்றலைப் பாதுகாக்கவும்.",
       servicesTitle: "எங்கள் சேவைகள்",
       horoscope: "ஜாதகம் பார்த்தல்",
-      horoscopeDesc: "உங்கள் வாழ்க்கைப் பாதைகள் மற்றும் திருமணப் பொருத்தத்தை கண்டறிய உங்கள் பிறப்பு விளக்கப்படத்தின் ஆழமான பகுப்பாய்வு.",
+      horoscopeDesc: "வாழ்க்கைப் பாதை மற்றும் திருமணப் பொருத்தத்திற்கான பிறப்பு விளக்கப்பட ஆய்வு.",
       yanthra: "யந்திரம் தயாரித்தல்",
-      yanthraDesc: "தனிப்பட்ட மற்றும் ஆன்மீக பாதுகாப்பிற்காக பழங்கால மந்திரங்களால் ஆற்றல் பெற்ற தனிப்பயனாக்கப்பட்ட தாயத்துக்கள்.",
+      yanthraDesc: "பாதுகாப்பிற்காக மந்திரங்களால் ஆற்றல் பெற்ற தனிப்பயன் தாயத்துக்கள்.",
       nekath: "நல்ல நேரங்கள்",
-      nekathDesc: "திருமணங்கள், வணிகங்களைத் தொடங்குதல் போன்றவற்றுக்கான மிகவும் சாதகமான நேரங்களைக் கணக்கிடுதல்.",
+      nekathDesc: "திருமணம் மற்றும் வணிகத் தொடக்கத்திற்கான சாதகமான நேரக் கணக்கீடு.",
       vasthu: "வாஸ்து சாஸ்திரம்",
-      vasthuDesc: "உங்கள் வீடு அல்லது வியாபாரத்தில் நல்லிணக்கம், செழிப்பு மற்றும் நேர்மறை ஆற்றலை உறுதி செய்வதற்கான வாஸ்து ஆலோசனைகள்.",
+      vasthuDesc: "வீடு அல்லது வியாபாரத்தில் நல்லிணக்கத்திற்கான வாஸ்து ஆலோசனை.",
       formTitle: "ஆலோசனைக்கு கோரவும்",
       formSubtitle: "உங்கள் விவரங்களை கீழே வழங்கவும், எங்கள் நிபுணர்கள் உங்களை விரைவில் தொடர்புகொள்வார்கள்.",
       name: "முழு பெயர்",
-      phone: "தொலைபேசி எண்",
+      phone: "தொலைபேசி",
       service: "சேவையைத் தேர்ந்தெடுக்கவும்",
       dob: "பிறந்த தேதி",
       tob: "பிறந்த நேரம்",
       pob: "பிறந்த இடம்",
-      msg: "கூடுதல் குறிப்புகள் அல்லது கேள்விகள்",
+      msg: "கூடுதல் குறிப்புகள்",
       submit: "கோரிக்கையை சமர்ப்பிக்கவும்"
     }
   };
@@ -86,61 +87,78 @@ const Astrology = () => {
     navigate(`/channeling?tab=astrologer&service=${encodeURIComponent(serviceName)}`);
   };
 
+  const tiles = [
+    {
+      key: 'horoscope',
+      title: t.horoscope,
+      desc: t.horoscopeDesc,
+      service: 'Horoscope Reading',
+      icon: <Star size={36} style={{ color: 'var(--secondary-light)' }} />,
+    },
+    {
+      key: 'yanthra',
+      title: t.yanthra,
+      desc: t.yanthraDesc,
+      service: 'Yanthra Preparation',
+      icon: <Sun size={36} style={{ color: 'var(--accent-color)' }} />,
+    },
+    {
+      key: 'nekath',
+      title: t.nekath,
+      desc: t.nekathDesc,
+      service: 'Auspicious Times',
+      icon: <Moon size={36} style={{ color: 'var(--primary-light)' }} />,
+    },
+    {
+      key: 'vasthu',
+      title: t.vasthu,
+      desc: t.vasthuDesc,
+      service: 'Vasthu Vidya',
+      icon: (
+        <div className="astrology-vasthu-mark" aria-hidden>
+          <span />
+        </div>
+      ),
+    },
+  ];
+
   return (
-    <div className="astrology-page" style={{ paddingTop: '5rem', minHeight: '100vh', paddingBottom: '4rem' }}>
+    <div className="astrology-page">
       <SEO
         title="Traditional Astrology & Rituals | Deergayu"
         description="Horoscope reading, yanthra, nekath, and vasthu services from authentic Sri Lankan Vedic astrologers on Deergayu."
         url="https://deergayu.com/astrology"
         canonical="https://deergayu.com/astrology"
       />
-      
-      {/* Hero Section */}
-      <section style={{ textAlign: 'center', padding: '4rem 1.5rem', background: 'radial-gradient(circle at center, rgba(212, 175, 55, 0.15) 0%, transparent 70%)' }}>
-        <Sparkles size={48} style={{ color: 'var(--secondary-color)', margin: '0 auto 1.5rem' }} />
-        <h1 style={{ fontSize: '3rem', fontWeight: 800, marginBottom: '1rem', color: 'var(--secondary-color)', textShadow: '0 2px 10px rgba(212,175,55,0.2)' }}>
-          {t.title}
-        </h1>
-        <p style={{ fontSize: '1.2rem', maxWidth: '700px', margin: '0 auto', color: 'var(--text-secondary)', lineHeight: 1.6 }}>
-          {t.subtitle}
-        </p>
+
+      <section className="astrology-hero">
+        <Sparkles size={48} className="astrology-hero-icon" />
+        <h1>{t.title}</h1>
+        <p>{t.subtitle}</p>
       </section>
 
       <div className="container">
-        {/* Services Grid */}
-        <section style={{ marginBottom: '5rem' }}>
-          <h2 style={{ textAlign: 'center', fontSize: '2rem', marginBottom: '3rem', color: '#fff' }}>{t.servicesTitle}</h2>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '2rem' }}>
-            
-            <div className="glass-panel glass-panel-hover" style={{ padding: '2rem', textAlign: 'center', cursor: 'pointer' }} onClick={() => handleTileClick("Horoscope Reading")}>
-              <Star size={40} style={{ color: 'var(--secondary-light)', margin: '0 auto 1rem' }} />
-              <h3 style={{ fontSize: '1.3rem', marginBottom: '1rem', color: '#fff' }}>{t.horoscope}</h3>
-              <p style={{ color: 'var(--text-muted)', fontSize: '0.95rem' }}>{t.horoscopeDesc}</p>
-            </div>
-
-            <div className="glass-panel glass-panel-hover" style={{ padding: '2rem', textAlign: 'center', cursor: 'pointer' }} onClick={() => handleTileClick("Yanthra Preparation")}>
-              <Sun size={40} style={{ color: 'var(--accent-color)', margin: '0 auto 1rem' }} />
-              <h3 style={{ fontSize: '1.3rem', marginBottom: '1rem', color: '#fff' }}>{t.yanthra}</h3>
-              <p style={{ color: 'var(--text-muted)', fontSize: '0.95rem' }}>{t.yanthraDesc}</p>
-            </div>
-
-            <div className="glass-panel glass-panel-hover" style={{ padding: '2rem', textAlign: 'center', cursor: 'pointer' }} onClick={() => handleTileClick("Auspicious Times")}>
-              <Moon size={40} style={{ color: 'var(--primary-light)', margin: '0 auto 1rem' }} />
-              <h3 style={{ fontSize: '1.3rem', marginBottom: '1rem', color: '#fff' }}>{t.nekath}</h3>
-              <p style={{ color: 'var(--text-muted)', fontSize: '0.95rem' }}>{t.nekathDesc}</p>
-            </div>
-
-            <div className="glass-panel glass-panel-hover" style={{ padding: '2rem', textAlign: 'center', cursor: 'pointer' }} onClick={() => handleTileClick("Vasthu Vidya")}>
-              <div style={{ width: '40px', height: '40px', margin: '0 auto 1rem', border: '2px solid var(--info-color)', transform: 'rotate(45deg)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <div style={{ width: '15px', height: '15px', background: 'var(--info-color)' }}></div>
+        <section className="astrology-services">
+          <h2>{t.servicesTitle}</h2>
+          <div className="astrology-tiles">
+            {tiles.map((tile) => (
+              <div
+                key={tile.key}
+                className="astrology-tile glass-panel glass-panel-hover"
+                onClick={() => handleTileClick(tile.service)}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') handleTileClick(tile.service);
+                }}
+              >
+                <div className="astrology-tile-icon">{tile.icon}</div>
+                <h3>{tile.title}</h3>
+                <p>{tile.desc}</p>
               </div>
-              <h3 style={{ fontSize: '1.3rem', marginBottom: '1rem', color: '#fff' }}>{t.vasthu}</h3>
-              <p style={{ color: 'var(--text-muted)', fontSize: '0.95rem' }}>{t.vasthuDesc}</p>
-            </div>
-
+            ))}
           </div>
         </section>
-
       </div>
     </div>
   );
