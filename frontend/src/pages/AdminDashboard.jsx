@@ -1,5 +1,17 @@
 import React, { useState, useEffect } from 'react';
-import { LayoutDashboard, Users, ShieldAlert, Package, ShoppingBag, Calendar, Settings, Video, BookOpen, Star } from 'lucide-react';
+import {
+  LayoutDashboard,
+  Users,
+  ShieldAlert,
+  Package,
+  ShoppingBag,
+  Calendar,
+  Settings,
+  Video,
+  BookOpen,
+  Star,
+  Mail,
+} from 'lucide-react';
 import { collection, getCountFromServer, query, where } from 'firebase/firestore';
 import { db } from '../firebase';
 
@@ -14,6 +26,7 @@ import ManageSettings from '../components/Admin/ManageSettings';
 import ManageVideos from '../components/Admin/ManageVideos';
 import ManageGuide from '../components/Admin/ManageGuide';
 import ManageReviews from '../components/Admin/ManageReviews';
+import ManageContact from '../components/Admin/ManageContact';
 import ErrorBoundary from '../components/Common/ErrorBoundary';
 import PartnerSupportCard from '../components/PartnerSupportCard';
 
@@ -21,16 +34,21 @@ import './AdminDashboard.css';
 
 const AdminDashboard = () => {
   const [activeTab, setActiveTab] = useState('dashboard');
-  
+
   // Lightweight badge counts
   const [pendingExperts, setPendingExperts] = useState(0);
   const [pendingProducts, setPendingProducts] = useState(0);
   const [pendingOrders, setPendingOrders] = useState(0);
+  const [newInquiries, setNewInquiries] = useState(0);
 
   useEffect(() => {
     const fetchBadgeCounts = async () => {
       try {
-        const usersQ = query(collection(db, 'users'), where('status', '==', 'pending'), where('role', 'in', ['doctor', 'clinic', 'organization', 'vendor']));
+        const usersQ = query(
+          collection(db, 'users'),
+          where('status', '==', 'pending'),
+          where('role', 'in', ['doctor', 'clinic', 'organization', 'vendor'])
+        );
         const usersSnap = await getCountFromServer(usersQ);
         setPendingExperts(usersSnap.data().count);
 
@@ -41,25 +59,37 @@ const AdminDashboard = () => {
         const ordersQ = query(collection(db, 'orders'), where('status', '==', 'pending'));
         const ordersSnap = await getCountFromServer(ordersQ);
         setPendingOrders(ordersSnap.data().count);
+
+        try {
+          const contactQ = query(
+            collection(db, 'contact_messages'),
+            where('status', '==', 'new')
+          );
+          const contactSnap = await getCountFromServer(contactQ);
+          setNewInquiries(contactSnap.data().count);
+        } catch {
+          /* index may be missing — ignore badge */
+        }
       } catch (e) {
-        console.error("Failed to fetch badge counts", e);
+        console.error('Failed to fetch badge counts', e);
       }
     };
-    
+
     fetchBadgeCounts();
   }, [activeTab]);
 
   const navItems = [
-    { id: 'dashboard',    label: 'Overview',         Icon: LayoutDashboard },
-    { id: 'providers',    label: 'Manage Experts',   Icon: Users,           badge: pendingExperts },
-    { id: 'users',        label: 'All Users',        Icon: ShieldAlert },
-    { id: 'products',     label: 'Product Approvals', Icon: Package,         badge: pendingProducts },
-    { id: 'orders',       label: 'All Orders',       Icon: ShoppingBag,     badge: pendingOrders },
-    { id: 'appointments', label: 'Appointments',     Icon: Calendar },
-    { id: 'reviews',      label: 'Reviews',          Icon: Star },
-    { id: 'settings',     label: 'Settings',         Icon: Settings },
-    { id: 'videos',       label: 'Videos',           Icon: Video },
-    { id: 'guide',        label: 'Ayurvedic Guide',  Icon: BookOpen },
+    { id: 'dashboard', label: 'Overview', Icon: LayoutDashboard },
+    { id: 'providers', label: 'Manage Experts', Icon: Users, badge: pendingExperts },
+    { id: 'users', label: 'All Users', Icon: ShieldAlert },
+    { id: 'products', label: 'Product Approvals', Icon: Package, badge: pendingProducts },
+    { id: 'orders', label: 'All Orders', Icon: ShoppingBag, badge: pendingOrders },
+    { id: 'appointments', label: 'Appointments', Icon: Calendar },
+    { id: 'reviews', label: 'Reviews', Icon: Star },
+    { id: 'contact', label: 'Inquiries', Icon: Mail, badge: newInquiries },
+    { id: 'settings', label: 'Settings', Icon: Settings },
+    { id: 'videos', label: 'Videos', Icon: Video },
+    { id: 'guide', label: 'Ayurvedic Guide', Icon: BookOpen },
   ];
 
   return (
@@ -81,7 +111,7 @@ const AdminDashboard = () => {
               {badge > 0 && <span className="nav-badge">{badge}</span>}
             </li>
           ))}
-          
+
           <li className="admin-nav-section-title">Users & Operations</li>
           {navItems.slice(1, 3).map(({ id, label, Icon, badge }) => (
             <li key={id} className={activeTab === id ? 'active' : ''} onClick={() => setActiveTab(id)}>
@@ -99,7 +129,7 @@ const AdminDashboard = () => {
           ))}
 
           <li className="admin-nav-section-title">Services</li>
-          {navItems.slice(5, 7).map(({ id, label, Icon, badge }) => (
+          {navItems.slice(5, 8).map(({ id, label, Icon, badge }) => (
             <li key={id} className={activeTab === id ? 'active' : ''} onClick={() => setActiveTab(id)}>
               <Icon size={17} /> {label}
               {badge > 0 && <span className="nav-badge">{badge}</span>}
@@ -107,7 +137,7 @@ const AdminDashboard = () => {
           ))}
 
           <li className="admin-nav-section-title">System</li>
-          {navItems.slice(7).map(({ id, label, Icon, badge }) => (
+          {navItems.slice(8).map(({ id, label, Icon, badge }) => (
             <li key={id} className={activeTab === id ? 'active' : ''} onClick={() => setActiveTab(id)}>
               <Icon size={17} /> {label}
               {badge > 0 && <span className="nav-badge">{badge}</span>}
@@ -118,13 +148,14 @@ const AdminDashboard = () => {
       </aside>
 
       <main className="admin-main">
-        {activeTab === 'dashboard'    && <OverviewDashboard setActiveTab={setActiveTab} />}
-        {activeTab === 'providers'    && <ManageProviders />}
-        {activeTab === 'users'        && <ManageUsers />}
-        {activeTab === 'products'     && <ManageProducts />}
-        {activeTab === 'orders'       && <ManageOrders />}
+        {activeTab === 'dashboard' && <OverviewDashboard setActiveTab={setActiveTab} />}
+        {activeTab === 'providers' && <ManageProviders />}
+        {activeTab === 'users' && <ManageUsers />}
+        {activeTab === 'products' && <ManageProducts />}
+        {activeTab === 'orders' && <ManageOrders />}
         {activeTab === 'appointments' && <ManageAppointments />}
-        {activeTab === 'reviews'      && <ManageReviews />}
+        {activeTab === 'reviews' && <ManageReviews />}
+        {activeTab === 'contact' && <ManageContact />}
         {activeTab === 'settings' && <ManageSettings />}
         {activeTab === 'videos' && <ManageVideos />}
         {activeTab === 'guide' && (
