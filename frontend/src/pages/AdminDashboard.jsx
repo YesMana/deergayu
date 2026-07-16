@@ -15,6 +15,7 @@ import ManageVideos from '../components/Admin/ManageVideos';
 import ManageGuide from '../components/Admin/ManageGuide';
 import ManageReviews from '../components/Admin/ManageReviews';
 import ErrorBoundary from '../components/Common/ErrorBoundary';
+import PartnerSupportCard from '../components/PartnerSupportCard';
 
 import './AdminDashboard.css';
 
@@ -113,6 +114,7 @@ const AdminDashboard = () => {
             </li>
           ))}
         </ul>
+        <PartnerSupportCard context="admin" />
       </aside>
 
       <main className="admin-main">

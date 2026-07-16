@@ -14,6 +14,7 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
 import { fetchMyAppointments, fetchMyOrders, type Appointment, type Order } from '../lib/api';
+import PartnerSupportCard, { isPartnerRole } from '../components/PartnerSupportCard';
 
 export default function AccountScreen() {
   const { user, profile, logout, loading: authLoading, isAdmin, refreshProfile, updateDisplayName } =
@@ -185,6 +186,10 @@ export default function AccountScreen() {
       {(orders.length > 0 || appointments.length > 0) && (
         <Text style={styles.previewHint}>Recent activity preview</Text>
       )}
+
+      {isPartnerRole(profile?.role, isAdmin) ? (
+        <PartnerSupportCard context={isAdmin ? 'admin' : profile?.role || 'partner'} />
+      ) : null}
 
       <TouchableOpacity
         style={styles.logout}

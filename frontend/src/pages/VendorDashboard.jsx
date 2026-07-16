@@ -5,6 +5,7 @@ import { useToast } from '../context/ToastContext';
 import { db, auth, storage } from '../firebase';
 import { doc, updateDoc, collection, query, where, orderBy, onSnapshot } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import PartnerSupportCard from '../components/PartnerSupportCard';
 import './AdminDashboard.css';
 
 
@@ -726,7 +727,8 @@ const VendorDashboard = () => {
               <br/><br/>
               We will contact you shortly via the provided telephone number to complete the verification and payment process.
             </p>
-            <button onClick={() => window.location.href = '/'} className="btn btn-outline" style={{ marginTop: '2rem' }}>Return to Home</button>
+            <PartnerSupportCard compact context={user?.role || 'partner'} />
+            <button onClick={() => window.location.href = '/'} className="btn btn-outline" style={{ marginTop: '1.25rem' }}>Return to Home</button>
           </div>
         </div>
       );
@@ -805,6 +807,7 @@ const VendorDashboard = () => {
             <Settings size={17} /> Settings
           </li>
         </ul>
+        <PartnerSupportCard context={isDoctor ? (user?.role || 'doctor') : 'vendor'} />
       </aside>
 
       <main className="admin-main">

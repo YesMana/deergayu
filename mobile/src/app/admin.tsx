@@ -30,6 +30,7 @@ import {
   type AdminOverview,
   type Product,
 } from '../lib/api';
+import PartnerSupportCard from '../components/PartnerSupportCard';
 
 type Tab = 'home' | 'experts' | 'products' | 'orders' | 'appointments';
 
@@ -203,6 +204,7 @@ export default function AdminScreen() {
               Full settings, videos, guide & reviews remain on deergayu.com/admin. Mobile covers
               approvals and order/appointment actions.
             </Text>
+            <PartnerSupportCard context="admin" />
           </>
         )}
 
