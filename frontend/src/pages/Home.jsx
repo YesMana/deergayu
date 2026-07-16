@@ -191,28 +191,28 @@ const Home = () => {
             <motion.div className="service-card glass-panel glass-panel-hover" variants={fadeUpVariant}>
               <div className="service-icon-wrapper"><Leaf size={32} /></div>
               <h3>Ayurvedic Shop</h3>
-              <p>Browse hundreds of authentic herbal medicines, oils, and wellness products directly from certified vendors.</p>
+              <p>Authentic herbal medicines, oils, and wellness products from certified vendors — delivered with care.</p>
               <Link to="/shop" className="service-link">Browse Products <ChevronRight size={16} /></Link>
             </motion.div>
 
             <motion.div className="service-card glass-panel glass-panel-hover" variants={fadeUpVariant}>
               <div className="service-icon-wrapper"><Calendar size={32} /></div>
               <h3>Doctor Channeling</h3>
-              <p>Book appointments with qualified Ayurvedic doctors and specialists. Online and in-person sessions available.</p>
+              <p>Book qualified Ayurvedic doctors and specialists for online or in-person consultations.</p>
               <Link to="/channeling" className="service-link">Book Now <ChevronRight size={16} /></Link>
             </motion.div>
 
             <motion.div className="service-card glass-panel glass-panel-hover" variants={fadeUpVariant}>
               <div className="service-icon-wrapper"><BookOpen size={32} /></div>
               <h3>Ayurvedic Guide</h3>
-              <p>Explore traditional Sri Lankan herbal remedies (අත් බෙහෙත්) and learn the daily Ayurvedic routine (දිනචරියාව).</p>
+              <p>Traditional Sri Lankan remedies and daily routines — practical wisdom for everyday wellness.</p>
               <Link to="/ayurvedic-guide" className="service-link">Read Guide <ChevronRight size={16} /></Link>
             </motion.div>
 
             <motion.div className="service-card glass-panel glass-panel-hover" variants={fadeUpVariant}>
               <div className="service-icon-wrapper"><Star size={32} /></div>
               <h3>Astrology & Vastu</h3>
-              <p>Consult with experienced astrologers and Vastu experts for life guidance and home harmony.</p>
+              <p>Guidance from experienced astrologers and Vastu experts for life direction and home harmony.</p>
               <Link to="/channeling?type=astrologer" className="service-link">Explore <ChevronRight size={16} /></Link>
             </motion.div>
           </motion.div>

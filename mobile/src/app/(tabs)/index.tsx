@@ -37,14 +37,14 @@ const SERVICES = [
     key: 'shop',
     icon: 'shopping-bag' as const,
     title: 'Ayurvedic Shop',
-    desc: 'Authentic herbal medicines, oils & wellness products.',
+    desc: 'Herbal medicines, oils & wellness from certified vendors.',
     route: '/shop',
   },
   {
     key: 'channeling',
     icon: 'event' as const,
     title: 'Doctor Channeling',
-    desc: 'Book certified Ayurvedic doctors — online or in person.',
+    desc: 'Book Ayurvedic doctors — online or in person.',
     route: '/channeling',
   },
   {
@@ -58,7 +58,7 @@ const SERVICES = [
     key: 'symptom',
     icon: 'healing' as const,
     title: 'AI Symptom Checker',
-    desc: 'Get Ayurvedic guidance based on how you feel.',
+    desc: 'Ayurvedic tips based on how you feel today.',
     route: '/symptom-checker',
   },
 ];
@@ -283,8 +283,12 @@ export default function HomeScreen() {
               <View style={styles.serviceIcon}>
                 <MaterialIcons name={svc.icon} size={26} color="#d4af37" />
               </View>
-              <Text style={styles.serviceTitle}>{svc.title}</Text>
-              <Text style={styles.serviceDesc}>{svc.desc}</Text>
+              <Text style={styles.serviceTitle} numberOfLines={2}>
+                {svc.title}
+              </Text>
+              <Text style={styles.serviceDesc} numberOfLines={3}>
+                {svc.desc}
+              </Text>
               <View style={styles.serviceLink}>
                 <Text style={styles.serviceLinkText}>Open</Text>
                 <MaterialIcons name="chevron-right" size={16} color="#7cb342" />
@@ -585,21 +589,20 @@ const styles = StyleSheet.create({
 
   statsGrid: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
     gap: 8,
     paddingHorizontal: 16,
     marginTop: -18,
     zIndex: 2,
   },
   statCard: {
-    width: (SCREEN_W - 32 - 24) / 4,
-    minWidth: 72,
-    flexGrow: 1,
+    flex: 1,
     backgroundColor: '#142018',
     borderRadius: 14,
     paddingVertical: 12,
-    paddingHorizontal: 6,
+    paddingHorizontal: 4,
     alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 92,
     borderWidth: 1,
     borderColor: 'rgba(124, 179, 66, 0.22)',
   },
@@ -612,8 +615,14 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginBottom: 6,
   },
-  statValue: { color: '#7cb342', fontSize: 16, fontWeight: '800' },
-  statLabel: { color: '#9aaa9a', fontSize: 10, marginTop: 2, fontWeight: '600' },
+  statValue: { color: '#7cb342', fontSize: 15, fontWeight: '800', textAlign: 'center' },
+  statLabel: {
+    color: '#9aaa9a',
+    fontSize: 10,
+    marginTop: 2,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
 
   errorText: { color: '#ef5350', textAlign: 'center', marginTop: 12, paddingHorizontal: 20 },
 
@@ -651,14 +660,18 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 12,
+    alignItems: 'stretch',
   },
   serviceCard: {
     width: (SCREEN_W - 40 - 12) / 2,
+    minHeight: 168,
     backgroundColor: 'rgba(20, 32, 24, 0.95)',
     borderRadius: 16,
     padding: 14,
     borderWidth: 1,
     borderColor: 'rgba(212, 175, 55, 0.14)',
+    flexDirection: 'column',
+    justifyContent: 'space-between',
   },
   serviceIcon: {
     width: 44,
@@ -669,9 +682,24 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginBottom: 10,
   },
-  serviceTitle: { color: '#f5f7f4', fontWeight: '800', fontSize: 14, marginBottom: 4 },
-  serviceDesc: { color: '#9aaa9a', fontSize: 12, lineHeight: 17, flexGrow: 1 },
-  serviceLink: { flexDirection: 'row', alignItems: 'center', marginTop: 10 },
+  serviceTitle: {
+    color: '#f5f7f4',
+    fontWeight: '800',
+    fontSize: 14,
+    marginBottom: 4,
+    minHeight: 36,
+  },
+  serviceDesc: {
+    color: '#9aaa9a',
+    fontSize: 12,
+    lineHeight: 17,
+    minHeight: 51,
+    marginBottom: 10,
+  },
+  serviceLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
   serviceLinkText: { color: '#7cb342', fontWeight: '700', fontSize: 13 },
 
   hScroll: { paddingRight: 20, gap: 12 },
