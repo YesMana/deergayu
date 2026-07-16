@@ -4,6 +4,7 @@ import { Leaf, UserCircle, MessageSquare, Star, ChevronRight, Activity, Calendar
 import { useLanguage } from '../context/LanguageContext';
 import { motion } from 'framer-motion';
 import SEO from '../components/SEO';
+import SocialLinks from '../components/SocialLinks';
 import './Home.css';
 
 const API_URL = import.meta.env.VITE_API_URL || '';
@@ -382,6 +383,19 @@ const Home = () => {
               </div>
             </div>
           </div>
+        </div>
+      </motion.section>
+
+      {/* ── SOCIAL (admin-managed links) ── */}
+      <motion.section
+        className="social-home-section section"
+        initial="hidden"
+        whileInView="visible"
+        viewport={{ once: true, margin: '-80px' }}
+        variants={fadeUpVariant}
+      >
+        <div className="container">
+          <SocialLinks variant="home" />
         </div>
       </motion.section>
 

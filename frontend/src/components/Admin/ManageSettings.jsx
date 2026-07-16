@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { DollarSign, Activity, Mail, Tag, Shield, Send, Truck, CreditCard } from 'lucide-react';
+import { DollarSign, Activity, Mail, Tag, Shield, Send, Truck, CreditCard, Share2 } from 'lucide-react';
 import { auth } from '../../firebase';
 import { useToast } from '../../context/ToastContext';
 
@@ -31,7 +31,22 @@ const DEFAULT_SETTINGS = {
     accountNo: '123-4567-8901-00',
   },
   payhereEnabled: false,
+  socialLinks: {
+    facebook: '',
+    tiktok: '',
+    instagram: '',
+    youtube: '',
+    whatsapp: '',
+  },
 };
+
+const SOCIAL_FIELDS = [
+  { key: 'facebook', label: 'Facebook Page', placeholder: 'https://facebook.com/yourpage' },
+  { key: 'tiktok', label: 'TikTok', placeholder: 'https://tiktok.com/@yourhandle' },
+  { key: 'instagram', label: 'Instagram', placeholder: 'https://instagram.com/yourhandle' },
+  { key: 'youtube', label: 'YouTube', placeholder: 'https://youtube.com/@yourchannel' },
+  { key: 'whatsapp', label: 'WhatsApp', placeholder: '0719909299 or https://wa.me/94719909299' },
+];
 
 const ManageSettings = () => {
   const { success, error } = useToast();
@@ -52,7 +67,13 @@ const ManageSettings = () => {
       const token = await getToken();
       const res = await fetch(`${API_URL}/api/settings`, { headers: { Authorization: `Bearer ${token}` } });
       if (res.ok) {
-        const data = { ...DEFAULT_SETTINGS, ...(await res.json()) };
+        const raw = await res.json();
+        const data = {
+          ...DEFAULT_SETTINGS,
+          ...raw,
+          socialLinks: { ...DEFAULT_SETTINGS.socialLinks, ...(raw.socialLinks || {}) },
+          bankDetails: { ...DEFAULT_SETTINGS.bankDetails, ...(raw.bankDetails || {}) },
+        };
         setSettings(data);
         setShippingJson(JSON.stringify(data.shippingZones || DEFAULT_SETTINGS.shippingZones, null, 2));
       }
@@ -156,10 +177,52 @@ const ManageSettings = () => {
   return (
     <>
       <div className="admin-page-header">
-        <div><h1>Platform Settings</h1><p className="page-subtitle">Commission, categories, admins & email broadcast</p></div>
+        <div>
+          <h1>Platform Settings</h1>
+          <p className="page-subtitle">Commission, social links, categories, admins & email</p>
+        </div>
         <button className="btn btn-primary" onClick={handleSaveSettings} disabled={savingSettings}>
           {savingSettings ? 'Saving…' : '💾 Save All Settings'}
         </button>
+      </div>
+
+      {/* Social Links — shown on Home + Footer */}
+      <div className="dash-section">
+        <div className="dash-section-header">
+          <h3>
+            <Share2 size={15} /> Social Media Links
+          </h3>
+        </div>
+        <div className="settings-card" style={{ margin: '0 1rem 1rem' }}>
+          <p style={{ marginTop: 0, color: 'var(--text-secondary)' }}>
+            Paste your Facebook page, TikTok, Instagram, YouTube, or WhatsApp. Empty fields stay
+            hidden on the website. Links appear on the <strong>Home</strong> page and in the{' '}
+            <strong>Footer</strong>.
+          </p>
+          <div className="settings-grid" style={{ marginTop: '1rem' }}>
+            {SOCIAL_FIELDS.map(({ key, label, placeholder }) => (
+              <div className="form-group" key={key} style={{ marginBottom: '0.75rem' }}>
+                <label>{label}</label>
+                <input
+                  className="form-control"
+                  type="text"
+                  inputMode="url"
+                  placeholder={placeholder}
+                  value={settings.socialLinks?.[key] || ''}
+                  onChange={(e) =>
+                    setSettings({
+                      ...settings,
+                      socialLinks: { ...(settings.socialLinks || {}), [key]: e.target.value },
+                    })
+                  }
+                />
+              </div>
+            ))}
+          </div>
+          <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: 0 }}>
+            Tip: WhatsApp can be a phone number (071…) — we convert it to a wa.me link automatically.
+          </p>
+        </div>
       </div>
 
       {/* Commission */}

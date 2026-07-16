@@ -29,12 +29,58 @@ const DEFAULT_SETTINGS = {
   },
   payhereEnabled: false,
   contactEmail: 'info@deergayu.com',
+  socialLinks: {
+    facebook: '',
+    tiktok: '',
+    instagram: '',
+    youtube: '',
+    whatsapp: '',
+  },
 };
 
 async function getSettings(db) {
   const doc = await db.collection('settings').doc('admin').get();
-  if (!doc.exists) return { ...DEFAULT_SETTINGS };
-  return { ...DEFAULT_SETTINGS, ...doc.data() };
+  if (!doc.exists) return { ...DEFAULT_SETTINGS, socialLinks: { ...DEFAULT_SETTINGS.socialLinks } };
+  const data = doc.data() || {};
+  return {
+    ...DEFAULT_SETTINGS,
+    ...data,
+    bankDetails: { ...DEFAULT_SETTINGS.bankDetails, ...(data.bankDetails || {}) },
+    socialLinks: { ...DEFAULT_SETTINGS.socialLinks, ...(data.socialLinks || {}) },
+  };
+}
+
+/** Normalize public social URLs; empty / invalid → ''. */
+function normalizeSocialLinks(input = {}) {
+  const out = { ...DEFAULT_SETTINGS.socialLinks };
+  for (const key of Object.keys(out)) {
+    let v = String(input[key] || '').trim();
+    if (!v) {
+      out[key] = '';
+      continue;
+    }
+    if (key === 'whatsapp') {
+      const digits = v.replace(/\D/g, '');
+      if (digits.length >= 9) {
+        const e164 = digits.startsWith('94') ? digits : digits.startsWith('0') ? `94${digits.slice(1)}` : digits;
+        out[key] = `https://wa.me/${e164}`;
+      } else if (/^https?:\/\//i.test(v)) {
+        out[key] = v;
+      } else {
+        out[key] = '';
+      }
+      continue;
+    }
+    if (!/^https?:\/\//i.test(v)) v = `https://${v}`;
+    try {
+      const u = new URL(v);
+      if (u.protocol !== 'http:' && u.protocol !== 'https:') out[key] = '';
+      else out[key] = u.toString();
+    } catch {
+      out[key] = '';
+    }
+  }
+  return out;
 }
 
 async function isAdminUser(db, decodedToken) {
@@ -121,6 +167,7 @@ module.exports = {
   DEFAULT_CATEGORIES,
   DEFAULT_SETTINGS,
   getSettings,
+  normalizeSocialLinks,
   isAdminUser,
   calcProductPricing,
   getCategoryCommission,

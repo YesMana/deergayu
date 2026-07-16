@@ -13,6 +13,7 @@ const { getAuth } = require('firebase-admin/auth');
 const { sendEmail, sendAdminEmail, verifySmtp, getEmailStatus, ADMIN_EMAIL } = require('./emailService');
 const {
   getSettings,
+  normalizeSocialLinks,
   isAdminUser,
   calcProductPricing,
   getCategoryCommission,
@@ -236,15 +237,17 @@ apiRouter.get('/auth/me', verifyUser, async (req, res) => {
   }
 });
 
-// Public storefront settings (shipping, bank, payhere flag)
+// Public storefront settings (shipping, bank, payhere flag, social)
 apiRouter.get('/storefront-settings', async (req, res) => {
   try {
     const settings = await getSettings(db);
+    const socialLinks = normalizeSocialLinks(settings.socialLinks || {});
     res.json({
       shippingZones: settings.shippingZones || DEFAULT_SETTINGS.shippingZones,
       bankDetails: settings.bankDetails || DEFAULT_SETTINGS.bankDetails,
       payhereEnabled: Boolean(settings.payhereEnabled && process.env.PAYHERE_MERCHANT_ID),
       contactEmail: settings.contactEmail || DEFAULT_SETTINGS.contactEmail,
+      socialLinks,
     });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -1065,6 +1068,11 @@ apiRouter.post('/settings', verifyAdmin, async (req, res) => {
     autoApproveProducts,
     adminEmails,
     categories,
+    shippingZones,
+    bankDetails,
+    payhereEnabled,
+    contactEmail,
+    socialLinks,
   } = req.body;
   try {
     const payload = {
@@ -1077,9 +1085,23 @@ apiRouter.post('/settings', verifyAdmin, async (req, res) => {
     if (autoApproveProducts !== undefined) payload.autoApproveProducts = !!autoApproveProducts;
     if (Array.isArray(adminEmails)) payload.adminEmails = adminEmails.filter(Boolean);
     if (Array.isArray(categories)) payload.categories = categories;
+    if (Array.isArray(shippingZones)) payload.shippingZones = shippingZones;
+    if (bankDetails && typeof bankDetails === 'object') {
+      payload.bankDetails = {
+        bank: String(bankDetails.bank || ''),
+        branch: String(bankDetails.branch || ''),
+        accountName: String(bankDetails.accountName || ''),
+        accountNo: String(bankDetails.accountNo || ''),
+      };
+    }
+    if (payhereEnabled !== undefined) payload.payhereEnabled = !!payhereEnabled;
+    if (contactEmail !== undefined) payload.contactEmail = String(contactEmail || '').trim();
+    if (socialLinks && typeof socialLinks === 'object') {
+      payload.socialLinks = normalizeSocialLinks(socialLinks);
+    }
 
     await db.collection('settings').doc('admin').set(payload, { merge: true });
-    res.json({ message: 'Settings saved successfully' });
+    res.json({ message: 'Settings saved successfully', socialLinks: payload.socialLinks });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

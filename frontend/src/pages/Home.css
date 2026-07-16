@@ -467,6 +467,12 @@
 /* ── EXPERT CTA ── */
 .expert-cta-section { background: var(--surface-color); }
 
+.social-home-section {
+  padding-top: 0;
+  padding-bottom: 4rem;
+  background: transparent;
+}
+
 .cta-card {
   display: grid;
   grid-template-columns: 1fr auto;

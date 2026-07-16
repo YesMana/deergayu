@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import { Leaf } from 'lucide-react';
+import SocialLinks from './SocialLinks';
 import './Footer.css';
 
 const Footer = () => {
@@ -13,7 +14,11 @@ const Footer = () => {
             <Leaf size={22} />
             <span>Deergayu</span>
           </Link>
-          <p>Sri Lanka&apos;s Ayurvedic platform for authentic herbs, doctor channeling, and holistic wellness.</p>
+          <p>
+            Sri Lanka&apos;s Ayurvedic platform for authentic herbs, doctor channeling, and holistic
+            wellness.
+          </p>
+          <SocialLinks variant="footer" />
         </div>
 
         <nav className="footer-nav" aria-label="Footer">
