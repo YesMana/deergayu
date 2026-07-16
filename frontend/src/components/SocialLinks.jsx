@@ -21,8 +21,8 @@ const PLATFORMS = [
 ];
 
 /**
- * Premium social icon row — only renders platforms with URLs from storefront settings.
- * variant: 'footer' | 'home' | 'inline'
+ * variant: 'footer' | 'home'
+ * Home always shows the strip so the spot is findable; icons appear once admin adds URLs.
  */
 export default function SocialLinks({ variant = 'footer', className = '' }) {
   const [links, setLinks] = useState(null);
@@ -42,36 +42,46 @@ export default function SocialLinks({ variant = 'footer', className = '' }) {
     };
   }, []);
 
-  if (!links) return null;
+  if (links === null) return null;
 
   const active = PLATFORMS.filter((p) => links[p.key]);
-  if (!active.length) return null;
+
+  // Footer: only show when at least one link exists
+  if (variant === 'footer' && !active.length) return null;
 
   return (
     <div className={`social-links social-links--${variant} ${className}`.trim()}>
       {variant === 'home' && (
         <div className="social-links-copy">
           <span className="social-links-eyebrow">Follow Deergayu</span>
-          <p>Stay with us on social — wellness tips, offers, and community.</p>
+          <p>
+            {active.length
+              ? 'Stay with us on social — wellness tips, offers, and community.'
+              : 'Our social channels will appear here once added in Admin → Social Links.'}
+          </p>
         </div>
       )}
-      <ul className="social-links-list" aria-label="Social media">
-        {active.map(({ key, label, Icon }) => (
-          <li key={key}>
-            <a
-              href={links[key]}
-              target="_blank"
-              rel="noopener noreferrer"
-              aria-label={label}
-              title={label}
-              className="social-links-item"
-            >
-              <Icon size={variant === 'home' ? 20 : 18} />
-              {variant === 'home' ? <span>{label}</span> : null}
-            </a>
-          </li>
-        ))}
-      </ul>
+      {active.length > 0 ? (
+        <ul className="social-links-list" aria-label="Social media">
+          {active.map(({ key, label, Icon }) => (
+            <li key={key}>
+              <a
+                href={links[key]}
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label={label}
+                title={label}
+                className="social-links-item"
+              >
+                <Icon size={variant === 'home' ? 20 : 18} />
+                {variant === 'home' ? <span>{label}</span> : null}
+              </a>
+            </li>
+          ))}
+        </ul>
+      ) : variant === 'home' ? (
+        <div className="social-links-empty">No links yet</div>
+      ) : null}
     </div>
   );
 }

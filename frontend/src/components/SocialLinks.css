@@ -79,6 +79,15 @@
   color: #e8f5c8;
 }
 
+.social-links-empty {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--text-muted, #6a7a6a);
+  padding: 0.65rem 1rem;
+  border-radius: 999px;
+  border: 1px dashed rgba(212, 175, 55, 0.25);
+}
+
 @media (max-width: 640px) {
   .social-links--home {
     padding: 1.35rem 1.15rem;

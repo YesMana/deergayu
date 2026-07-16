@@ -11,6 +11,7 @@ import {
   BookOpen,
   Star,
   Mail,
+  Share2,
 } from 'lucide-react';
 import { collection, getCountFromServer, query, where } from 'firebase/firestore';
 import { db } from '../firebase';
@@ -27,6 +28,7 @@ import ManageVideos from '../components/Admin/ManageVideos';
 import ManageGuide from '../components/Admin/ManageGuide';
 import ManageReviews from '../components/Admin/ManageReviews';
 import ManageContact from '../components/Admin/ManageContact';
+import ManageSocial from '../components/Admin/ManageSocial';
 import ErrorBoundary from '../components/Common/ErrorBoundary';
 import PartnerSupportCard from '../components/PartnerSupportCard';
 
@@ -87,6 +89,7 @@ const AdminDashboard = () => {
     { id: 'appointments', label: 'Appointments', Icon: Calendar },
     { id: 'reviews', label: 'Reviews', Icon: Star },
     { id: 'contact', label: 'Inquiries', Icon: Mail, badge: newInquiries },
+    { id: 'social', label: 'Social Links', Icon: Share2 },
     { id: 'settings', label: 'Settings', Icon: Settings },
     { id: 'videos', label: 'Videos', Icon: Video },
     { id: 'guide', label: 'Ayurvedic Guide', Icon: BookOpen },
@@ -138,7 +141,16 @@ const AdminDashboard = () => {
 
           <li className="admin-nav-section-title">System</li>
           {navItems.slice(8).map(({ id, label, Icon, badge }) => (
-            <li key={id} className={activeTab === id ? 'active' : ''} onClick={() => setActiveTab(id)}>
+            <li
+              key={id}
+              className={activeTab === id ? 'active' : ''}
+              onClick={() => setActiveTab(id)}
+              style={
+                id === 'social'
+                  ? { border: '1px solid rgba(212,175,55,0.35)', background: 'rgba(212,175,55,0.08)' }
+                  : undefined
+              }
+            >
               <Icon size={17} /> {label}
               {badge > 0 && <span className="nav-badge">{badge}</span>}
             </li>
@@ -156,6 +168,7 @@ const AdminDashboard = () => {
         {activeTab === 'appointments' && <ManageAppointments />}
         {activeTab === 'reviews' && <ManageReviews />}
         {activeTab === 'contact' && <ManageContact />}
+        {activeTab === 'social' && <ManageSocial />}
         {activeTab === 'settings' && <ManageSettings />}
         {activeTab === 'videos' && <ManageVideos />}
         {activeTab === 'guide' && (
