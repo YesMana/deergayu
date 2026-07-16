@@ -559,6 +559,24 @@ apiRouter.get('/admin/contact-messages', verifyAdmin, async (req, res) => {
   }
 });
 
+apiRouter.post('/admin/contact-messages/:id/status', verifyAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status } = req.body || {};
+    const allowed = ['new', 'read', 'resolved'];
+    if (!allowed.includes(status)) {
+      return res.status(400).json({ error: 'status must be new, read, or resolved' });
+    }
+    const ref = db.collection('contact_messages').doc(id);
+    const snap = await ref.get();
+    if (!snap.exists) return res.status(404).json({ error: 'Inquiry not found' });
+    await ref.set({ status, updatedAt: new Date().toISOString() }, { merge: true });
+    res.json({ id, status });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // ============================================================
 // PUBLIC SMART APIs (Home Page, Symptom Checker, etc.)
 // ============================================================
