@@ -29,6 +29,7 @@ import {
 import { mediaUrl } from '../../constants/api';
 import { useCart } from '../../context/CartContext';
 import { useAuth } from '../../context/AuthContext';
+import { displayHomeStats } from '../../constants/homeStats';
 
 const { width: SCREEN_W } = Dimensions.get('window');
 
@@ -247,12 +248,15 @@ export default function HomeScreen() {
 
       {/* ── STATS ── */}
       <View style={styles.statsGrid}>
-        {[
-          { icon: 'groups' as const, value: stats?.expertCount ?? '—', label: 'Experts' },
-          { icon: 'inventory-2' as const, value: stats?.productCount ?? '—', label: 'Products' },
-          { icon: 'event-available' as const, value: stats?.appointmentCount ?? '—', label: 'Bookings' },
-          { icon: 'verified' as const, value: '100%', label: 'Natural' },
-        ].map((s) => (
+        {(() => {
+          const shown = displayHomeStats(stats);
+          return [
+            { icon: 'groups' as const, value: shown.expertCount, label: 'Experts' },
+            { icon: 'inventory-2' as const, value: shown.productCount, label: 'Products' },
+            { icon: 'event-available' as const, value: shown.appointmentCount, label: 'Bookings' },
+            { icon: 'verified' as const, value: '100%', label: 'Natural' },
+          ];
+        })().map((s) => (
           <View key={s.label} style={styles.statCard}>
             <View style={styles.statIconWrap}>
               <MaterialIcons name={s.icon} size={18} color="#7cb342" />

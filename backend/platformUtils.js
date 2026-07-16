@@ -36,6 +36,12 @@ const DEFAULT_SETTINGS = {
     youtube: '',
     whatsapp: '',
   },
+  /** Public home stats floors — show at least these until real counts grow past them */
+  homeStatsFloor: {
+    expertCount: 50,
+    productCount: 120,
+    appointmentCount: 1000,
+  },
 };
 
 async function getSettings(db) {

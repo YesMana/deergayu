@@ -5,6 +5,7 @@ import { useLanguage } from '../context/LanguageContext';
 import { motion } from 'framer-motion';
 import SEO from '../components/SEO';
 import SocialLinks from '../components/SocialLinks';
+import { displayHomeStats } from '../constants/homeStats';
 import './Home.css';
 
 const API_URL = import.meta.env.VITE_API_URL || '';
@@ -45,10 +46,11 @@ const Home = () => {
     }
   };
 
+  const shown = displayHomeStats(stats);
   const statItems = [
-    { icon: Users, value: stats.expertCount || '50+', label: 'Expert Practitioners' },
-    { icon: Package, value: stats.productCount || '100+', label: 'Herbal Products' },
-    { icon: Calendar, value: stats.appointmentCount || '1K+', label: 'Consultations Done' },
+    { icon: Users, value: shown.expertCount, label: 'Expert Practitioners' },
+    { icon: Package, value: shown.productCount, label: 'Herbal Products' },
+    { icon: Calendar, value: shown.appointmentCount, label: 'Consultations Done' },
     { icon: Shield, value: '100%', label: 'Authentic & Natural' },
   ];
 
