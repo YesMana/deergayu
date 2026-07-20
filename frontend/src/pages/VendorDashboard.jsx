@@ -151,7 +151,13 @@ const VendorDashboard = () => {
 
   const [settingsData, setSettingsData] = useState({
     name: '',
-    profileImageUrl: ''
+    profileImageUrl: '',
+    telephone: '',
+    address: '',
+    specialty: '',
+    experience: '',
+    doctorType: '',
+    bio: '',
   });
   const [savingSettings, setSavingSettings] = useState(false);
   
@@ -220,10 +226,20 @@ const VendorDashboard = () => {
       if (user.profileDetails?.schedule) {
         setSchedule(user.profileDetails.schedule);
       }
-      setSettingsData(prev => ({
+      const pd = user.profileDetails || {};
+      const specialtyStr = Array.isArray(pd.specialty)
+        ? pd.specialty.join(', ')
+        : (pd.specialty || '');
+      setSettingsData((prev) => ({
         ...prev,
         name: user.displayName || user.name || '',
-        profileImageUrl: user.profileDetails?.profileImageUrl || ''
+        profileImageUrl: pd.profileImageUrl || '',
+        telephone: pd.telephone || '',
+        address: pd.address || '',
+        specialty: specialtyStr,
+        experience: pd.experience || '',
+        doctorType: pd.doctorType || '',
+        bio: pd.bio || '',
       }));
     }
   }, [user]);
@@ -594,22 +610,29 @@ const VendorDashboard = () => {
     setSavingSettings(true);
     try {
       const userRef = doc(db, 'users', user.uid);
-      // Merge image URL into existing profileDetails (preserve address, phone, specialty etc.)
       const existingDetails = user.profileDetails || {};
+      const specialtyVal = settingsData.specialty.includes(',')
+        ? settingsData.specialty.split(',').map((s) => s.trim()).filter(Boolean)
+        : settingsData.specialty.trim();
+      const nextDetails = {
+        ...existingDetails,
+        profileImageUrl: settingsData.profileImageUrl || '',
+        telephone: settingsData.telephone || '',
+        address: settingsData.address || '',
+        specialty: specialtyVal || existingDetails.specialty || '',
+        experience: settingsData.experience || '',
+        doctorType: settingsData.doctorType || '',
+        bio: settingsData.bio || '',
+      };
       await updateDoc(userRef, {
         name: settingsData.name,
-        'profileDetails.profileImageUrl': settingsData.profileImageUrl
+        profileDetails: nextDetails,
       });
-      // Refresh the user in AuthContext so Navbar + profile pic updates immediately
       if (refreshUser) await refreshUser();
-      // Also update local user object for immediate UI feedback
-      if (user.profileDetails) {
-        user.profileDetails.profileImageUrl = settingsData.profileImageUrl;
-      } else {
-        user.profileDetails = { profileImageUrl: settingsData.profileImageUrl };
-      }
+      user.profileDetails = nextDetails;
       user.displayName = settingsData.name;
-      success('Profile picture and name updated successfully!');
+      user.name = settingsData.name;
+      success('Profile updated — photo and details are live on the site.');
     } catch (err) {
       console.error('Error saving settings:', err);
       error('Failed to save profile. Please try again.');
@@ -804,7 +827,7 @@ const VendorDashboard = () => {
             </li>
           )}
           <li className={activeTab === 'settings' ? 'active' : ''} onClick={() => setActiveTab('settings')}>
-            <Settings size={17} /> Settings
+            <Settings size={17} /> {isDoctor ? 'My Profile' : 'Settings'}
           </li>
         </ul>
         <PartnerSupportCard context={isDoctor ? (user?.role || 'doctor') : 'vendor'} />
@@ -1649,9 +1672,13 @@ const VendorDashboard = () => {
           )}
 
           {activeTab === 'settings' && (
-            <div className="glass-panel table-container" style={{maxWidth: '600px'}}>
-              <h2 style={{color: 'var(--text-primary)', marginBottom: '0.25rem'}}>Profile Settings</h2>
-              <p style={{color: 'var(--text-secondary)', fontSize: '0.875rem', marginBottom: '1.75rem'}}>Update your name and profile picture. Changes apply immediately.</p>
+            <div className="glass-panel table-container" style={{maxWidth: '640px'}}>
+              <h2 style={{color: 'var(--text-primary)', marginBottom: '0.25rem'}}>
+                {isDoctor ? 'My Profile' : 'Profile Settings'}
+              </h2>
+              <p style={{color: 'var(--text-secondary)', fontSize: '0.875rem', marginBottom: '1.75rem'}}>
+                Update your photo and profile details. Changes show on Channeling / public pages after save.
+              </p>
               
               {/* Profile Picture Section - Prominent */}
               <div style={{
@@ -1665,7 +1692,6 @@ const VendorDashboard = () => {
                 alignItems: 'center',
                 flexWrap: 'wrap'
               }}>
-                {/* Avatar Preview */}
                 <div style={{ position: 'relative', flexShrink: 0 }}>
                   {settingsData.profileImageUrl ? (
                     <>
@@ -1707,13 +1733,12 @@ const VendorDashboard = () => {
                   )}
                 </div>
 
-                {/* Upload Controls */}
                 <div style={{ flex: 1, minWidth: '200px' }}>
                   <label style={{ color: 'var(--text-primary)', fontWeight: '700', display: 'block', marginBottom: '0.5rem' }}>
                     Profile Picture
                   </label>
                   <p style={{ color: 'var(--text-secondary)', fontSize: '0.78rem', marginBottom: '0.75rem' }}>
-                    JPG, PNG or WEBP. Max 3MB. Square images work best.
+                    JPG, PNG or WEBP. Square images work best. Click Save after uploading.
                   </p>
                   <label style={{
                     display: 'inline-flex', alignItems: 'center', gap: '0.4rem',
@@ -1747,10 +1772,41 @@ const VendorDashboard = () => {
                 <input type="email" defaultValue={user?.email || ''} disabled className="form-control" style={{width: '100%', padding: '0.75rem', borderRadius: 'var(--radius-sm)', border: '1px solid rgba(212, 175, 55, 0.3)', background: 'rgba(255, 255, 255, 0.05)', color: 'var(--text-secondary)', opacity: 0.7}} />
               </div>
 
-              <div className="form-group" style={{marginBottom: '1.5rem'}}>
+              <div className="form-group" style={{marginBottom: '1rem'}}>
                 <label style={{color: 'var(--text-secondary)'}}>Display Name</label>
                 <input type="text" value={settingsData.name} onChange={e => setSettingsData({...settingsData, name: e.target.value})} className="form-control" style={{width: '100%', padding: '0.75rem', borderRadius: 'var(--radius-sm)', border: '1px solid rgba(212, 175, 55, 0.3)', background: 'rgba(255, 255, 255, 0.05)', color: 'var(--text-primary)'}} />
               </div>
+
+              {isDoctor && (
+                <>
+                  <div className="form-group" style={{marginBottom: '1rem'}}>
+                    <label style={{color: 'var(--text-secondary)'}}>Doctor / expert type</label>
+                    <input type="text" value={settingsData.doctorType} onChange={e => setSettingsData({...settingsData, doctorType: e.target.value})} placeholder="e.g. Ayurvedic Physician" className="form-control" style={{width: '100%', padding: '0.75rem', borderRadius: 'var(--radius-sm)', border: '1px solid rgba(212, 175, 55, 0.3)', background: 'rgba(255, 255, 255, 0.05)', color: 'var(--text-primary)'}} />
+                  </div>
+                  <div className="form-group" style={{marginBottom: '1rem'}}>
+                    <label style={{color: 'var(--text-secondary)'}}>Specialty</label>
+                    <input type="text" value={settingsData.specialty} onChange={e => setSettingsData({...settingsData, specialty: e.target.value})} placeholder="Comma-separated if multiple" className="form-control" style={{width: '100%', padding: '0.75rem', borderRadius: 'var(--radius-sm)', border: '1px solid rgba(212, 175, 55, 0.3)', background: 'rgba(255, 255, 255, 0.05)', color: 'var(--text-primary)'}} />
+                  </div>
+                  <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem'}}>
+                    <div className="form-group" style={{marginBottom: '1rem'}}>
+                      <label style={{color: 'var(--text-secondary)'}}>Phone</label>
+                      <input type="tel" value={settingsData.telephone} onChange={e => setSettingsData({...settingsData, telephone: e.target.value})} className="form-control" style={{width: '100%', padding: '0.75rem', borderRadius: 'var(--radius-sm)', border: '1px solid rgba(212, 175, 55, 0.3)', background: 'rgba(255, 255, 255, 0.05)', color: 'var(--text-primary)'}} />
+                    </div>
+                    <div className="form-group" style={{marginBottom: '1rem'}}>
+                      <label style={{color: 'var(--text-secondary)'}}>Experience</label>
+                      <input type="text" value={settingsData.experience} onChange={e => setSettingsData({...settingsData, experience: e.target.value})} placeholder="e.g. 10 years" className="form-control" style={{width: '100%', padding: '0.75rem', borderRadius: 'var(--radius-sm)', border: '1px solid rgba(212, 175, 55, 0.3)', background: 'rgba(255, 255, 255, 0.05)', color: 'var(--text-primary)'}} />
+                    </div>
+                  </div>
+                  <div className="form-group" style={{marginBottom: '1rem'}}>
+                    <label style={{color: 'var(--text-secondary)'}}>Address</label>
+                    <input type="text" value={settingsData.address} onChange={e => setSettingsData({...settingsData, address: e.target.value})} className="form-control" style={{width: '100%', padding: '0.75rem', borderRadius: 'var(--radius-sm)', border: '1px solid rgba(212, 175, 55, 0.3)', background: 'rgba(255, 255, 255, 0.05)', color: 'var(--text-primary)'}} />
+                  </div>
+                  <div className="form-group" style={{marginBottom: '1.5rem'}}>
+                    <label style={{color: 'var(--text-secondary)'}}>Bio / about</label>
+                    <textarea value={settingsData.bio} onChange={e => setSettingsData({...settingsData, bio: e.target.value})} rows={3} className="form-control" style={{width: '100%', padding: '0.75rem', borderRadius: 'var(--radius-sm)', border: '1px solid rgba(212, 175, 55, 0.3)', background: 'rgba(255, 255, 255, 0.05)', color: 'var(--text-primary)', resize: 'vertical'}} />
+                  </div>
+                </>
+              )}
 
               <div style={{display: 'flex', gap: '1rem', marginTop: '0.5rem'}}>
                 <button className="btn btn-primary" onClick={handleSettingsSubmit} disabled={savingSettings || settingsUploadingImage}>
