@@ -5,8 +5,8 @@ import { auth } from '../../firebase';
 import { useToast } from '../../context/ToastContext';
 import { userInitials, StatusPill } from './AdminUtils';
 import AdminUserProfileModal from './AdminUserProfileModal';
-
-const API_URL = import.meta.env.VITE_API_URL || '';
+import { uploadImageDurable } from '../../utils/uploadImage';
+import { API_URL } from '../../config/api';
 
 const emptyEdit = {
   name: '',
@@ -41,17 +41,8 @@ export default function ManageProviders() {
     }
     setUploadingImage(true);
     try {
-      const token = await getToken();
-      const formData = new FormData();
-      formData.append('image', file, `${editing.id}_profile${file.name.slice(file.name.lastIndexOf('.')) || '.jpg'}`);
-      const res = await fetch(`${API_URL}/api/upload`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token}` },
-        body: formData,
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error || 'Upload failed');
-      setForm((prev) => ({ ...prev, profileImageUrl: data.url }));
+      const url = await uploadImageDurable(file, `profiles/${editing.id}`);
+      setForm((prev) => ({ ...prev, profileImageUrl: url }));
       success('Photo uploaded — click Save changes to publish');
     } catch (err) {
       error(err.message || 'Upload failed');

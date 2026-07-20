@@ -330,8 +330,8 @@ const AyurvedicGuide = () => {
     const fetchContent = async () => {
       try {
         const [remRes, routRes] = await Promise.all([
-          fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/guide/remedies`),
-          fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/guide/routines`)
+          fetch(`${import.meta.env.VITE_API_URL || 'https://deergayu-api.onrender.com'}/api/guide/remedies`),
+          fetch(`${import.meta.env.VITE_API_URL || 'https://deergayu-api.onrender.com'}/api/guide/routines`)
         ]);
         const remData = await remRes.json();
         const routData = await routRes.json();
@@ -418,7 +418,19 @@ const AyurvedicGuide = () => {
                       const remedy = item[lang] || item.en;
                       return (
                       <motion.div key={item.id} className="remedy-card glass-panel glass-panel-hover" variants={fadeUpVariant} initial="hidden" whileInView="visible" viewport={{ once: true }}>
-                        <div className="remedy-image" style={{ backgroundImage: `url(${resolveMediaUrl(item.image)})` }}>
+                        <div className="remedy-image">
+                          {item.image ? (
+                            <img
+                              src={resolveMediaUrl(item.image)}
+                              alt={remedy?.name || 'Remedy'}
+                              className="remedy-image-photo"
+                              loading="lazy"
+                              onError={(e) => {
+                                e.currentTarget.style.display = 'none';
+                                e.currentTarget.parentElement?.classList.add('remedy-image--missing');
+                              }}
+                            />
+                          ) : null}
                           <div className="remedy-badge">{data.badge}</div>
                         </div>
                         <div className="remedy-content">

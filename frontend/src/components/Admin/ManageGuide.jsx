@@ -3,8 +3,8 @@ import { Leaf, Clock, Plus, Edit, Trash2, Image as ImageIcon, UploadCloud, Refre
 import { auth } from '../../firebase';
 import { useToast } from '../../context/ToastContext';
 import { resolveMediaUrl } from './AdminUtils';
-
-const API_URL = import.meta.env.VITE_API_URL || '';
+import { uploadImageDurable } from '../../utils/uploadImage';
+import { API_URL } from '../../config/api';
 
 const CONDITION_LABELS = {
   general: 'General Wellness',
@@ -211,21 +211,9 @@ const ManageGuide = () => {
     }
     setUploadingImage(true);
     try {
-      const token = await getToken();
-      if (!token) throw new Error('Please sign in again');
-      const formData = new FormData();
-      formData.append('image', file);
-      const response = await fetch(`${API_URL}/api/upload`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token}` },
-        body: formData,
-      });
-      const data = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(data.error || `Upload failed (${response.status})`);
-      const imageUrl = data.url || (data.path ? resolveMediaUrl(data.path) : '');
-      if (!imageUrl) throw new Error('No image URL returned from server');
+      const imageUrl = await uploadImageDurable(file, 'guide');
       setCurrentFormData((prev) => ({ ...prev, image: imageUrl }));
-      success('Image uploaded');
+      success('Image uploaded (saved permanently)');
     } catch (err) {
       console.error('Upload error:', err);
       error(err.message || 'Failed to upload image');
@@ -257,12 +245,21 @@ const ManageGuide = () => {
           </label>
         </div>
         {currentFormData.image ? (
-          <img
-            src={resolveMediaUrl(currentFormData.image)}
-            alt="Preview"
-            style={{ width: 100, height: 100, objectFit: 'cover', marginTop: 10, borderRadius: 8 }}
-            onError={(e) => { e.currentTarget.style.display = 'none'; }}
-          />
+          <>
+            <img
+              src={resolveMediaUrl(currentFormData.image)}
+              alt="Preview"
+              style={{ width: 100, height: 100, objectFit: 'cover', marginTop: 10, borderRadius: 8 }}
+              onError={(e) => {
+                e.currentTarget.style.display = 'none';
+                const hint = e.currentTarget.nextElementSibling;
+                if (hint) hint.style.display = 'block';
+              }}
+            />
+            <p style={{ display: 'none', color: '#ffa726', fontSize: '0.85rem', marginTop: 8 }}>
+              This image file is missing (old Render disk uploads are wiped on restart). Please Upload again, then Save.
+            </p>
+          </>
         ) : null}
       </div>
 

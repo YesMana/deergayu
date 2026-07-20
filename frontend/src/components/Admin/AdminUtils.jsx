@@ -13,15 +13,15 @@ export const resolveMediaUrl = (url) => {
   if (!url || typeof url !== 'string') return '';
   const trimmed = url.trim();
   if (/^https?:\/\//i.test(trimmed)) return trimmed;
-  const apiBase = (import.meta.env.VITE_API_URL || '').replace(/\/$/, '');
+  const apiBase = (import.meta.env.VITE_API_URL || 'https://deergayu-api.onrender.com').replace(/\/$/, '');
   const path = trimmed.startsWith('/') ? trimmed : `/${trimmed}`;
   if (path.startsWith('/api/uploads/')) {
-    return apiBase ? `${apiBase}${path}` : path;
+    return `${apiBase}${path}`;
   }
   if (path.startsWith('/uploads/')) {
-    return apiBase ? `${apiBase}/api${path}` : `/api${path}`;
+    return `${apiBase}/api${path}`;
   }
-  return apiBase ? `${apiBase}${path}` : path;
+  return `${apiBase}${path}`;
 };
 
 export const STATUS_COLORS = {
