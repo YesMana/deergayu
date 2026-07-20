@@ -2586,7 +2586,7 @@ async function uploadFileToFirebaseStorage(localPath, destName, contentType) {
   const bucket = admin.storage().bucket(FIREBASE_STORAGE_BUCKET);
   const dest = `uploads/${destName}`;
   const token = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
-  await bucket.upload(localPath, {
+  const uploadPromise = bucket.upload(localPath, {
     destination: dest,
     metadata: {
       contentType: contentType || 'image/jpeg',
@@ -2594,6 +2594,10 @@ async function uploadFileToFirebaseStorage(localPath, destName, contentType) {
       metadata: { firebaseStorageDownloadTokens: token },
     },
   });
+  const timeoutPromise = new Promise((_, reject) => {
+    setTimeout(() => reject(new Error('Firebase Storage upload timed out')), 20_000);
+  });
+  await Promise.race([uploadPromise, timeoutPromise]);
   return `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodeURIComponent(dest)}?alt=media&token=${token}`;
 }
 
