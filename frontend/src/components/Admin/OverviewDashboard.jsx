@@ -1,86 +1,113 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Users, Package, ShoppingBag, TrendingUp, Calendar, CheckCircle, RefreshCw } from 'lucide-react';
 import { auth } from '../../firebase';
-import { useProvidersQuery } from '../../hooks/queries/useProviders';
-import { useProductsQuery } from '../../hooks/queries/useProducts';
-import { useOrdersQuery } from '../../hooks/queries/useOrders';
-import { useAppointmentsQuery } from '../../hooks/queries/useAppointments';
+import { useAuth } from '../../context/AuthContext';
 import { fmtCurrency, fmtDate, StatusPill } from './AdminUtils';
 import { API_URL } from '../../config/api';
 
+const emptyOverview = {
+  totalExperts: 0,
+  pendingExperts: 0,
+  totalProducts: 0,
+  pendingProducts: 0,
+  approvedProducts: 0,
+  totalOrders: 0,
+  pendingOrders: 0,
+  totalAppointments: 0,
+  pendingAppointments: 0,
+  thisWeekAppts: 0,
+  totalRevenue: 0,
+  commissionPercent: 10,
+  commissionRevenue: 0,
+  recentOrders: [],
+  recentAppointments: [],
+};
+
 export default function OverviewDashboard({ setActiveTab }) {
-  const { data: providers = [], isLoading: p1, isError: e1, error: err1, refetch: r1, isFetching: f1 } = useProvidersQuery();
-  const { data: products = [], isLoading: p2, isError: e2, error: err2, refetch: r2, isFetching: f2 } = useProductsQuery();
-  const { data: orders = [], isLoading: p3, isError: e3, error: err3, refetch: r3, isFetching: f3 } = useOrdersQuery();
-  const { data: appointments = [], isLoading: p4, isError: e4, error: err4, refetch: r4, isFetching: f4 } = useAppointmentsQuery();
-  const [settings, setSettings] = useState({ commissionPercent: 10 });
-  
-  // Wait for first successful load; don't block forever on a single failing query
-  const loading = (p1 || p2 || p3 || p4) && !(providers.length || products.length || orders.length || appointments.length);
+  const { user, loading: authLoading } = useAuth();
+  const [overview, setOverview] = useState(emptyOverview);
+  const [loading, setLoading] = useState(true);
+  const [errorMsg, setErrorMsg] = useState('');
+  const [refreshing, setRefreshing] = useState(false);
 
-  const fetchData = async () => {
-    await Promise.allSettled([r1(), r2(), r3(), r4()]);
+  const fetchOverview = useCallback(async () => {
+    const current = auth.currentUser;
+    if (!current) {
+      setErrorMsg('Not signed in');
+      setLoading(false);
+      return;
+    }
+    setRefreshing(true);
+    setErrorMsg('');
     try {
-      const token = await auth.currentUser?.getIdToken();
-      if (!token) return;
-      const resSettings = await fetch(`${API_URL}/api/settings`, { headers: { Authorization: `Bearer ${token}` } });
-      if (resSettings.ok) setSettings(await resSettings.json());
-    } catch (e) { console.error("Settings:", e); }
-  };
-
-  useEffect(() => {
-    fetchData();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+      const token = await current.getIdToken();
+      const res = await fetch(`${API_URL}/api/admin/overview`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data.error || `Overview failed (${res.status})`);
+      }
+      setOverview({ ...emptyOverview, ...data });
+    } catch (err) {
+      console.error('Overview load failed:', err);
+      setErrorMsg(err.message || 'Failed to load overview');
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
   }, []);
 
-  // Derived Stats
-  const pendingProducts  = products.filter(p => p.status === 'pending').length;
-  const pendingExperts   = providers.filter(p => p.status === 'pending').length;
-  const pendingOrders    = orders.filter(o => o.status === 'pending').length;
-  const totalRevenue     = orders
-    .filter(o => o.status === 'delivered')
-    .reduce((sum, o) => sum + Number(o.totalPrice || 0), 0);
-  const commissionRevenue = Math.round(totalRevenue * (settings.commissionPercent || 10) / 100);
-  const thisWeekAppts = appointments.filter(a => {
-    const d = new Date(a.createdAt || a.date);
-    const now = new Date();
-    return (now - d) < 7 * 24 * 60 * 60 * 1000;
-  }).length;
+  useEffect(() => {
+    if (authLoading) return;
+    if (!user) {
+      setLoading(false);
+      setErrorMsg('Not signed in');
+      return;
+    }
+    fetchOverview();
+  }, [authLoading, user, fetchOverview]);
 
-  const recentOrders = [...orders].slice(0, 5);
-  const recentAppts  = [...appointments].slice(0, 5);
-
-  const partialErrors = [
-    e1 && `Experts: ${err1?.message || 'failed'}`,
-    e2 && `Products: ${err2?.message || 'failed'}`,
-    e3 && `Orders: ${err3?.message || 'failed'}`,
-    e4 && `Appointments: ${err4?.message || 'failed'}`,
-  ].filter(Boolean);
-
-  const totalFailure = e1 && e2 && e3 && e4;
-
-  if (loading) {
-    return <div className="loading-state" style={{ padding: '4rem 0' }}><div className="spinner" /> Loading dashboard…</div>;
+  if (authLoading || loading) {
+    return (
+      <div className="loading-state" style={{ padding: '4rem 0' }}>
+        <div className="spinner" /> Loading dashboard…
+      </div>
+    );
   }
 
-  if (totalFailure) {
+  if (errorMsg && overview.totalOrders === 0 && overview.totalExperts === 0 && overview.totalProducts === 0) {
     return (
       <div style={{ padding: '3rem', textAlign: 'center' }}>
         <h2 style={{ color: '#ffa726' }}>Dashboard data could not load</h2>
         <p style={{ color: 'var(--text-secondary)', margin: '1rem 0' }}>
-          Could not reach Firestore or the API (<code>{API_URL}</code>). If the API just woke up on Render, wait ~30s and retry.
+          {errorMsg}
         </p>
-        {partialErrors.length > 0 && (
-          <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginBottom: '1rem' }}>
-            {partialErrors.join(' · ')}
-          </p>
-        )}
-        <button className="btn btn-primary" onClick={fetchData} disabled={f1 || f2 || f3 || f4}>
-          {(f1 || f2 || f3 || f4) ? 'Retrying…' : 'Retry'}
+        <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginBottom: '1rem' }}>
+          API: <code>{API_URL}</code> — if Render just woke up, wait ~30 seconds and retry.
+        </p>
+        <button className="btn btn-primary" onClick={fetchOverview} disabled={refreshing}>
+          {refreshing ? 'Retrying…' : 'Retry'}
         </button>
       </div>
     );
   }
+
+  const {
+    totalExperts,
+    pendingExperts,
+    totalProducts,
+    pendingProducts,
+    approvedProducts,
+    totalOrders,
+    pendingOrders,
+    totalAppointments,
+    thisWeekAppts,
+    totalRevenue,
+    commissionRevenue,
+    recentOrders = [],
+    recentAppointments = [],
+  } = overview;
 
   return (
     <>
@@ -91,14 +118,15 @@ export default function OverviewDashboard({ setActiveTab }) {
         </div>
         <button
           className="btn btn-ghost btn-sm"
-          onClick={fetchData}
+          onClick={fetchOverview}
+          disabled={refreshing}
           style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.82rem' }}
         >
-          <RefreshCw size={14} /> Refresh
+          <RefreshCw size={14} /> {refreshing ? 'Refreshing…' : 'Refresh'}
         </button>
       </div>
 
-      {partialErrors.length > 0 && (
+      {errorMsg && (
         <div
           style={{
             marginBottom: '1rem',
@@ -108,15 +136,9 @@ export default function OverviewDashboard({ setActiveTab }) {
             border: '1px solid rgba(255,167,38,0.35)',
             color: '#ffb74d',
             fontSize: '0.85rem',
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            gap: '1rem',
-            flexWrap: 'wrap',
           }}
         >
-          <span>Some dashboard data failed to load — {partialErrors.join(' · ')}</span>
-          <button type="button" className="btn btn-outline btn-sm" onClick={fetchData}>Retry</button>
+          {errorMsg}
         </div>
       )}
 
@@ -124,7 +146,7 @@ export default function OverviewDashboard({ setActiveTab }) {
         {[
           {
             label: 'Total Experts',
-            value: providers.length,
+            value: totalExperts,
             Icon: Users,
             color: '#29b6f6',
             iconBg: 'rgba(41,182,246,0.12)',
@@ -135,7 +157,7 @@ export default function OverviewDashboard({ setActiveTab }) {
           },
           {
             label: 'Total Products',
-            value: products.length,
+            value: totalProducts,
             Icon: Package,
             color: '#ab47bc',
             iconBg: 'rgba(171,71,188,0.12)',
@@ -146,7 +168,7 @@ export default function OverviewDashboard({ setActiveTab }) {
           },
           {
             label: 'Total Orders',
-            value: orders.length,
+            value: totalOrders,
             Icon: ShoppingBag,
             color: '#26c6da',
             iconBg: 'rgba(38,198,218,0.12)',
@@ -168,7 +190,7 @@ export default function OverviewDashboard({ setActiveTab }) {
           },
           {
             label: 'Total Appointments',
-            value: appointments.length,
+            value: totalAppointments,
             Icon: Calendar,
             color: '#ffa726',
             iconBg: 'rgba(255,167,38,0.12)',
@@ -179,12 +201,12 @@ export default function OverviewDashboard({ setActiveTab }) {
           },
           {
             label: 'Approved Products',
-            value: products.filter(p => p.status === 'approved').length,
+            value: approvedProducts,
             Icon: CheckCircle,
             color: '#d4af37',
             iconBg: 'rgba(212,175,55,0.12)',
             accent: 'linear-gradient(90deg,#d4af37,#a67c00)',
-            trend: `of ${products.length} total`,
+            trend: `of ${totalProducts} total`,
             trendType: '',
             onClick: () => setActiveTab('products'),
           },
@@ -208,7 +230,6 @@ export default function OverviewDashboard({ setActiveTab }) {
       </div>
 
       <div className="two-col">
-        {/* Recent Orders */}
         <div className="dash-section">
           <div className="dash-section-header">
             <h3><ShoppingBag size={15} /> Recent Orders</h3>
@@ -221,7 +242,7 @@ export default function OverviewDashboard({ setActiveTab }) {
                 <p>No orders yet</p>
               </div>
             ) : (
-              recentOrders.map(o => (
+              recentOrders.map((o) => (
                 <div key={o.id} className="activity-item">
                   <div className="activity-avatar">
                     <ShoppingBag size={14} />
@@ -240,20 +261,19 @@ export default function OverviewDashboard({ setActiveTab }) {
           </div>
         </div>
 
-        {/* Recent Appointments */}
         <div className="dash-section">
           <div className="dash-section-header">
             <h3><Calendar size={15} /> Recent Appointments</h3>
             <span className="view-all" onClick={() => setActiveTab('appointments')}>View all →</span>
           </div>
           <div className="dash-section-body">
-            {recentAppts.length === 0 ? (
+            {recentAppointments.length === 0 ? (
               <div className="empty-state" style={{ padding: '2rem' }}>
                 <div className="icon">📅</div>
                 <p>No appointments yet</p>
               </div>
             ) : (
-              recentAppts.map(a => (
+              recentAppointments.map((a) => (
                 <div key={a.id} className="activity-item">
                   <div className="activity-avatar" style={{ background: 'linear-gradient(135deg, #ffa726, #e65100)' }}>
                     <Calendar size={14} color="#fff" />
@@ -273,7 +293,6 @@ export default function OverviewDashboard({ setActiveTab }) {
         </div>
       </div>
 
-      {/* Action Alerts */}
       {(pendingExperts > 0 || pendingProducts > 0) && (
         <div className="dash-section">
           <div className="dash-section-header">

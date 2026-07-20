@@ -502,26 +502,58 @@ apiRouter.post(
 
 apiRouter.get('/admin/overview', verifyAdmin, async (req, res) => {
   try {
-    const [expertsPending, productsPending, ordersPending, appointmentsPending, ordersAll, productsAll, usersAll] =
-      await Promise.all([
-        db.collection('users').where('status', '==', 'pending').where('role', 'in', ['doctor', 'clinic', 'organization', 'vendor']).get(),
-        db.collection('products').where('status', '==', 'pending').get(),
-        db.collection('orders').where('status', '==', 'pending').get(),
-        db.collection('appointments').where('status', '==', 'pending').get(),
-        db.collection('orders').get(),
-        db.collection('products').get(),
-        db.collection('users').get(),
-      ]);
+    const [
+      expertsSnap,
+      productsSnap,
+      ordersSnap,
+      appointmentsSnap,
+      settings,
+    ] = await Promise.all([
+      db.collection('users').where('role', 'in', ['doctor', 'clinic', 'organization', 'vendor']).get(),
+      db.collection('products').get(),
+      db.collection('orders').get(),
+      db.collection('appointments').get(),
+      getSettings(db),
+    ]);
+
+    const experts = expertsSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
+    const products = productsSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
+    const orders = ordersSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
+    const appointments = appointmentsSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
+
+    const sortByCreated = (a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || ''));
+    orders.sort(sortByCreated);
+    appointments.sort(sortByCreated);
+
+    const totalRevenue = orders
+      .filter((o) => o.status === 'delivered')
+      .reduce((sum, o) => sum + Number(o.totalPrice || 0), 0);
+    const commissionPercent = Number(settings.commissionPercent ?? 10);
+    const weekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+    const thisWeekAppts = appointments.filter((a) => {
+      const t = new Date(a.createdAt || a.date || 0).getTime();
+      return Number.isFinite(t) && t >= weekAgo;
+    }).length;
+
     res.json({
-      pendingExperts: expertsPending.size,
-      pendingProducts: productsPending.size,
-      pendingOrders: ordersPending.size,
-      pendingAppointments: appointmentsPending.size,
-      totalOrders: ordersAll.size,
-      totalProducts: productsAll.size,
-      totalUsers: usersAll.size,
+      totalExperts: experts.length,
+      pendingExperts: experts.filter((e) => e.status === 'pending').length,
+      totalProducts: products.length,
+      pendingProducts: products.filter((p) => p.status === 'pending').length,
+      approvedProducts: products.filter((p) => p.status === 'approved').length,
+      totalOrders: orders.length,
+      pendingOrders: orders.filter((o) => o.status === 'pending').length,
+      totalAppointments: appointments.length,
+      pendingAppointments: appointments.filter((a) => a.status === 'pending').length,
+      thisWeekAppts,
+      totalRevenue,
+      commissionPercent,
+      commissionRevenue: Math.round(totalRevenue * commissionPercent / 100),
+      recentOrders: orders.slice(0, 5),
+      recentAppointments: appointments.slice(0, 5),
     });
   } catch (error) {
+    console.error('admin/overview error:', error);
     res.status(500).json({ error: error.message });
   }
 });

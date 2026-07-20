@@ -1,6 +1,22 @@
 import { useQuery, useInfiniteQuery } from '@tanstack/react-query';
 import { collection, getDocs, query, where, limit, startAfter, orderBy } from 'firebase/firestore';
-import { db } from '../../firebase';
+import { auth, db } from '../../firebase';
+import { API_URL } from '../../config/api';
+
+async function fetchProductsFromApi(status = null) {
+  const user = auth.currentUser;
+  if (!user) throw new Error('Not signed in');
+  const token = await user.getIdToken();
+  const qs = status ? `?status=${encodeURIComponent(status)}` : '';
+  const res = await fetch(`${API_URL}/api/admin/products${qs}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.error || `Failed to fetch products (${res.status})`);
+  }
+  return res.json();
+}
 
 /**
  * Fetch all products (optionally filtered by status)
@@ -9,13 +25,19 @@ export const useProductsQuery = (status = null) => {
   return useQuery({
     queryKey: ['products', { status }],
     queryFn: async () => {
-      const col = collection(db, 'products');
-      const q = status ? query(col, where('status', '==', status)) : query(col);
-      const snap = await getDocs(q);
-      const products = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-      products.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
-      return products;
+      try {
+        const col = collection(db, 'products');
+        const q = status ? query(col, where('status', '==', status)) : query(col);
+        const snap = await getDocs(q);
+        const products = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+        products.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+        return products;
+      } catch (err) {
+        console.warn('Products Firestore query failed, trying API:', err?.message || err);
+        return fetchProductsFromApi(status);
+      }
     },
+    retry: 1,
   });
 };
 
