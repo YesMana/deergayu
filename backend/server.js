@@ -507,13 +507,13 @@ apiRouter.get('/admin/overview', verifyAdmin, async (req, res) => {
       productsSnap,
       ordersSnap,
       appointmentsSnap,
-      settingsDoc,
+      settings,
     ] = await Promise.all([
       db.collection('users').where('role', 'in', ['doctor', 'clinic', 'organization', 'vendor']).get(),
       db.collection('products').get(),
       db.collection('orders').get(),
       db.collection('appointments').get(),
-      db.collection('settings').doc('platform').get().catch(() => null),
+      getSettings(db),
     ]);
 
     const experts = expertsSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
@@ -528,9 +528,7 @@ apiRouter.get('/admin/overview', verifyAdmin, async (req, res) => {
     const totalRevenue = orders
       .filter((o) => o.status === 'delivered')
       .reduce((sum, o) => sum + Number(o.totalPrice || 0), 0);
-    const commissionPercent = settingsDoc?.exists
-      ? Number(settingsDoc.data()?.commissionPercent ?? 10)
-      : 10;
+    const commissionPercent = Number(settings.commissionPercent ?? 10);
     const weekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
     const thisWeekAppts = appointments.filter((a) => {
       const t = new Date(a.createdAt || a.date || 0).getTime();
