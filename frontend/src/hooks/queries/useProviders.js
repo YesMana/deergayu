@@ -1,6 +1,22 @@
 import { useQuery, useInfiniteQuery } from '@tanstack/react-query';
 import { collection, getDocs, query, where, limit, startAfter, orderBy, getCountFromServer } from 'firebase/firestore';
-import { db } from '../../firebase';
+import { auth, db } from '../../firebase';
+import { API_URL } from '../../config/api';
+
+async function fetchProvidersFromApi(status = null) {
+  const user = auth.currentUser;
+  if (!user) throw new Error('Not signed in');
+  const token = await user.getIdToken();
+  const qs = status ? `?status=${encodeURIComponent(status)}` : '';
+  const res = await fetch(`${API_URL}/api/admin/experts${qs}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.error || `Failed to fetch experts (${res.status})`);
+  }
+  return res.json();
+}
 
 /**
  * Fetch all experts (doctors, clinics, organizations, vendors).
@@ -9,18 +25,23 @@ export const useProvidersQuery = (status = null) => {
   return useQuery({
     queryKey: ['providers', { status }],
     queryFn: async () => {
-      const col = collection(db, 'users');
-      const constraints = [where('role', 'in', ['doctor', 'clinic', 'organization', 'vendor'])];
-      if (status) constraints.push(where('status', '==', status));
-      
-      const q = query(col, ...constraints);
-      const snap = await getDocs(q);
-      
-      const providers = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-      // Sort client-side to avoid composite index requirement
-      providers.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
-      return providers;
+      try {
+        const col = collection(db, 'users');
+        const constraints = [where('role', 'in', ['doctor', 'clinic', 'organization', 'vendor'])];
+        if (status) constraints.push(where('status', '==', status));
+
+        const q = query(col, ...constraints);
+        const snap = await getDocs(q);
+
+        const providers = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        providers.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+        return providers;
+      } catch (err) {
+        console.warn('Providers Firestore query failed, trying API:', err?.message || err);
+        return fetchProvidersFromApi(status);
+      }
     },
+    retry: 1,
   });
 };
 

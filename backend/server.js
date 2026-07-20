@@ -38,7 +38,8 @@ app.use(cors({
   origin: (origin, callback) => {
     if (!origin) return callback(null, true); // allow non-browser requests
     const allowed = allowedOrigins.some(o => typeof o === 'string' ? o === origin : o.test(origin));
-    callback(null, allowed ? true : new Error('CORS: Origin not allowed'));
+    if (allowed) return callback(null, true);
+    return callback(null, false);
   },
   credentials: true
 }));
@@ -945,8 +946,15 @@ apiRouter.post('/products/:id/status', verifyAdmin, async (req, res) => {
 // Get all orders (admin)
 apiRouter.get('/orders', verifyAdmin, async (req, res) => {
   try {
-    const snapshot = await db.collection('orders').orderBy('createdAt', 'desc').get();
+    let snapshot;
+    try {
+      snapshot = await db.collection('orders').orderBy('createdAt', 'desc').get();
+    } catch (orderErr) {
+      console.warn('orders orderBy fallback:', orderErr.message);
+      snapshot = await db.collection('orders').get();
+    }
     const orders = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    orders.sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || '')));
     res.json(orders);
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -974,8 +982,15 @@ apiRouter.post('/orders/:id/status', verifyAdmin, async (req, res) => {
 // Get all appointments (admin)
 apiRouter.get('/appointments', verifyAdmin, async (req, res) => {
   try {
-    const snapshot = await db.collection('appointments').orderBy('createdAt', 'desc').get();
+    let snapshot;
+    try {
+      snapshot = await db.collection('appointments').orderBy('createdAt', 'desc').get();
+    } catch (orderErr) {
+      console.warn('appointments orderBy fallback:', orderErr.message);
+      snapshot = await db.collection('appointments').get();
+    }
     const appointments = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    appointments.sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || '')));
     res.json(appointments);
   } catch (error) {
     res.status(500).json({ error: error.message });

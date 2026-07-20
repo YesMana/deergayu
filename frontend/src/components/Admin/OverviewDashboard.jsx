@@ -1,30 +1,28 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Users, Package, ShoppingBag, TrendingUp, Calendar, CheckCircle, RefreshCw } from 'lucide-react';
 import { auth } from '../../firebase';
-import { useToast } from '../../context/ToastContext';
 import { useProvidersQuery } from '../../hooks/queries/useProviders';
 import { useProductsQuery } from '../../hooks/queries/useProducts';
 import { useOrdersQuery } from '../../hooks/queries/useOrders';
 import { useAppointmentsQuery } from '../../hooks/queries/useAppointments';
 import { fmtCurrency, fmtDate, StatusPill } from './AdminUtils';
-
-const API_URL = import.meta.env.VITE_API_URL || '';
+import { API_URL } from '../../config/api';
 
 export default function OverviewDashboard({ setActiveTab }) {
-  const { error } = useToast();
-  
-  const { data: providers = [], isLoading: p1, isError: e1, refetch: r1 } = useProvidersQuery();
-  const { data: products = [], isLoading: p2, isError: e2, refetch: r2 } = useProductsQuery();
-  const { data: orders = [], isLoading: p3, isError: e3, refetch: r3 } = useOrdersQuery();
-  const { data: appointments = [], isLoading: p4, isError: e4, refetch: r4 } = useAppointmentsQuery();
+  const { data: providers = [], isLoading: p1, isError: e1, error: err1, refetch: r1, isFetching: f1 } = useProvidersQuery();
+  const { data: products = [], isLoading: p2, isError: e2, error: err2, refetch: r2, isFetching: f2 } = useProductsQuery();
+  const { data: orders = [], isLoading: p3, isError: e3, error: err3, refetch: r3, isFetching: f3 } = useOrdersQuery();
+  const { data: appointments = [], isLoading: p4, isError: e4, error: err4, refetch: r4, isFetching: f4 } = useAppointmentsQuery();
   const [settings, setSettings] = useState({ commissionPercent: 10 });
   
-  const loading = p1 || p2 || p3 || p4;
+  // Wait for first successful load; don't block forever on a single failing query
+  const loading = (p1 || p2 || p3 || p4) && !(providers.length || products.length || orders.length || appointments.length);
 
   const fetchData = async () => {
-    r1(); r2(); r3(); r4();
+    await Promise.allSettled([r1(), r2(), r3(), r4()]);
     try {
       const token = await auth.currentUser?.getIdToken();
+      if (!token) return;
       const resSettings = await fetch(`${API_URL}/api/settings`, { headers: { Authorization: `Bearer ${token}` } });
       if (resSettings.ok) setSettings(await resSettings.json());
     } catch (e) { console.error("Settings:", e); }
@@ -52,18 +50,34 @@ export default function OverviewDashboard({ setActiveTab }) {
   const recentOrders = [...orders].slice(0, 5);
   const recentAppts  = [...appointments].slice(0, 5);
 
+  const partialErrors = [
+    e1 && `Experts: ${err1?.message || 'failed'}`,
+    e2 && `Products: ${err2?.message || 'failed'}`,
+    e3 && `Orders: ${err3?.message || 'failed'}`,
+    e4 && `Appointments: ${err4?.message || 'failed'}`,
+  ].filter(Boolean);
+
+  const totalFailure = e1 && e2 && e3 && e4;
+
   if (loading) {
     return <div className="loading-state" style={{ padding: '4rem 0' }}><div className="spinner" /> Loading dashboard…</div>;
   }
 
-  if (e1 || e2 || e3 || e4) {
+  if (totalFailure) {
     return (
       <div style={{ padding: '3rem', textAlign: 'center' }}>
         <h2 style={{ color: '#ffa726' }}>Dashboard data could not load</h2>
         <p style={{ color: 'var(--text-secondary)', margin: '1rem 0' }}>
-          Backend API connection failed. Make sure backend is running and <code>VITE_API_URL</code> is set correctly.
+          Could not reach Firestore or the API (<code>{API_URL}</code>). If the API just woke up on Render, wait ~30s and retry.
         </p>
-        <button className="btn btn-primary" onClick={fetchData}>Retry</button>
+        {partialErrors.length > 0 && (
+          <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginBottom: '1rem' }}>
+            {partialErrors.join(' · ')}
+          </p>
+        )}
+        <button className="btn btn-primary" onClick={fetchData} disabled={f1 || f2 || f3 || f4}>
+          {(f1 || f2 || f3 || f4) ? 'Retrying…' : 'Retry'}
+        </button>
       </div>
     );
   }
@@ -83,6 +97,28 @@ export default function OverviewDashboard({ setActiveTab }) {
           <RefreshCw size={14} /> Refresh
         </button>
       </div>
+
+      {partialErrors.length > 0 && (
+        <div
+          style={{
+            marginBottom: '1rem',
+            padding: '0.75rem 1rem',
+            borderRadius: 'var(--radius-sm)',
+            background: 'rgba(255,167,38,0.12)',
+            border: '1px solid rgba(255,167,38,0.35)',
+            color: '#ffb74d',
+            fontSize: '0.85rem',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            gap: '1rem',
+            flexWrap: 'wrap',
+          }}
+        >
+          <span>Some dashboard data failed to load — {partialErrors.join(' · ')}</span>
+          <button type="button" className="btn btn-outline btn-sm" onClick={fetchData}>Retry</button>
+        </div>
+      )}
 
       <div className="kpi-grid">
         {[
