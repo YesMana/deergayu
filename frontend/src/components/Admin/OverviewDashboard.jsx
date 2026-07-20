@@ -40,7 +40,14 @@ export default function OverviewDashboard({ setActiveTab }) {
     setRefreshing(true);
     setErrorMsg('');
     try {
-      const token = await current.getIdToken();
+      // Wake / verify API first (Render free tier cold start)
+      try {
+        await fetch(`${API_URL}/api/health`, { method: 'GET' });
+      } catch {
+        /* ignore — overview call will surface the real error */
+      }
+
+      const token = await current.getIdToken(true);
       const res = await fetch(`${API_URL}/api/admin/overview`, {
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -49,8 +56,34 @@ export default function OverviewDashboard({ setActiveTab }) {
         throw new Error(data.error || `Overview failed (${res.status})`);
       }
       setOverview({ ...emptyOverview, ...data });
+      return;
     } catch (err) {
       console.error('Overview load failed:', err);
+      // Last-resort: public counts so the page is not a dead end
+      try {
+        const [provRes, prodRes] = await Promise.all([
+          fetch(`${API_URL}/api/providers`),
+          fetch(`${API_URL}/api/products`),
+        ]);
+        const providers = provRes.ok ? await provRes.json() : [];
+        const products = prodRes.ok ? await prodRes.json() : [];
+        if ((providers?.length || 0) > 0 || (products?.length || 0) > 0) {
+          setOverview({
+            ...emptyOverview,
+            totalExperts: Array.isArray(providers) ? providers.length : 0,
+            totalProducts: Array.isArray(products) ? products.length : 0,
+            approvedProducts: Array.isArray(products)
+              ? products.filter((p) => p.status === 'approved').length
+              : 0,
+          });
+          setErrorMsg(
+            `${err.message || 'Admin overview failed'}. Showing public counts only — open Manage Experts / Orders for full data.`
+          );
+          return;
+        }
+      } catch {
+        /* fall through */
+      }
       setErrorMsg(err.message || 'Failed to load overview');
     } finally {
       setLoading(false);
