@@ -1,8 +1,8 @@
 {
   "rewrites": [
     {
-      "source": "/api/(.*)",
-      "destination": "/api/$1"
+      "source": "/api/:path*",
+      "destination": "https://deergayu-api.onrender.com/api/:path*"
     },
     {
       "source": "/((?!api/).*)",
