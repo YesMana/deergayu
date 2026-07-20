@@ -107,6 +107,19 @@
   background-size: cover;
   background-position: center;
   position: relative;
+  background: linear-gradient(135deg, rgba(46, 125, 50, 0.35), rgba(10, 20, 16, 0.9));
+  overflow: hidden;
+}
+
+.remedy-image-photo {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.remedy-image--missing {
+  background: linear-gradient(135deg, rgba(46, 125, 50, 0.45), rgba(212, 175, 55, 0.2));
 }
 
 .remedy-image::before {
@@ -115,12 +128,14 @@
   inset: 0;
   background: linear-gradient(180deg, transparent 45%, rgba(10, 20, 16, 0.75) 100%);
   pointer-events: none;
+  z-index: 1;
 }
 
 .remedy-badge {
   position: absolute;
   top: 1rem;
   right: 1rem;
+  z-index: 2;
   background: rgba(10, 20, 16, 0.85);
   color: var(--primary-light);
   border: 1px solid var(--glass-border);
@@ -129,7 +144,6 @@
   font-size: 0.8rem;
   font-weight: 600;
   backdrop-filter: blur(6px);
-  z-index: 1;
 }
 
 .remedy-content {

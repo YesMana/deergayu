@@ -75,19 +75,22 @@ function escapeHtml(str = '') {
 }
 
 // Initialize Firebase Admin
+const FIREBASE_STORAGE_BUCKET =
+  process.env.FIREBASE_STORAGE_BUCKET || 'deergayu-9de41.firebasestorage.app';
 try {
   if (process.env.FIREBASE_SERVICE_ACCOUNT) {
     const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
     admin.initializeApp({
-      credential: admin.cert(serviceAccount)
+      credential: admin.cert(serviceAccount),
+      storageBucket: FIREBASE_STORAGE_BUCKET,
     });
     console.log("Firebase Admin initialized with ENV credentials.");
   } else {
-    admin.initializeApp();
+    admin.initializeApp({ storageBucket: FIREBASE_STORAGE_BUCKET });
     console.log("Firebase Admin initialized with default credentials.");
   }
 } catch (error) {
-  console.error("Firebase Admin initialization error:", error);
+    console.error("Firebase Admin initialization error:", error);
 }
 
 const db = getFirestore();
@@ -2579,9 +2582,24 @@ function publicUploadUrl(req, filename) {
   return `${proto}://${host}${prefix}/uploads/${filename}`;
 }
 
-// Add file upload API endpoint
+async function uploadFileToFirebaseStorage(localPath, destName, contentType) {
+  const bucket = admin.storage().bucket(FIREBASE_STORAGE_BUCKET);
+  const dest = `uploads/${destName}`;
+  const token = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
+  await bucket.upload(localPath, {
+    destination: dest,
+    metadata: {
+      contentType: contentType || 'image/jpeg',
+      cacheControl: 'public,max-age=31536000',
+      metadata: { firebaseStorageDownloadTokens: token },
+    },
+  });
+  return `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodeURIComponent(dest)}?alt=media&token=${token}`;
+}
+
+// Add file upload API endpoint — prefers durable Firebase Storage over ephemeral disk
 apiRouter.post('/upload', verifyUser, (req, res) => {
-  upload.single('image')(req, res, (err) => {
+  upload.single('image')(req, res, async (err) => {
     if (err) {
       const msg = err.code === 'LIMIT_FILE_SIZE' ? 'Image must be under 5MB' : (err.message || 'Upload failed');
       return res.status(400).json({ error: msg });
@@ -2591,8 +2609,21 @@ apiRouter.post('/upload', verifyUser, (req, res) => {
         return res.status(400).json({ error: 'No file uploaded' });
       }
       const relativePath = `/uploads/${req.file.filename}`;
-      const url = publicUploadUrl(req, req.file.filename);
-      res.json({ url, path: relativePath });
+      let url = publicUploadUrl(req, req.file.filename);
+      let storage = 'disk';
+      try {
+        url = await uploadFileToFirebaseStorage(
+          req.file.path,
+          req.file.filename,
+          req.file.mimetype
+        );
+        storage = 'firebase';
+        // Disk copy is only a temp buffer once Firebase has the file
+        try { fs.unlinkSync(req.file.path); } catch { /* ignore */ }
+      } catch (storageErr) {
+        console.warn('Firebase Storage upload failed, keeping disk URL:', storageErr.message);
+      }
+      res.json({ url, path: relativePath, storage });
     } catch (error) {
       console.error('File upload error:', error);
       res.status(500).json({ error: 'Failed to upload file' });
