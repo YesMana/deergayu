@@ -3,8 +3,8 @@ import { Link } from 'react-router-dom';
 import { Package, ShoppingBag } from 'lucide-react';
 import { auth } from '../firebase';
 import './MyOrders.css';
+import { API_URL } from '../config/api';
 
-const API_URL = import.meta.env.VITE_API_URL || '';
 
 const statusClass = (status) => {
   const map = {

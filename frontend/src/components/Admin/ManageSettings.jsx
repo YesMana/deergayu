@@ -2,8 +2,8 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { DollarSign, Activity, Mail, Tag, Shield, Send, Truck, CreditCard, Share2 } from 'lucide-react';
 import { auth } from '../../firebase';
 import { useToast } from '../../context/ToastContext';
+import { API_URL } from '../../config/api';
 
-const API_URL = import.meta.env.VITE_API_URL || '';
 
 const DEFAULT_SETTINGS = {
   commissionPercent: 10,

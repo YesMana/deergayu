@@ -2,8 +2,8 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Share2, Save, ExternalLink } from 'lucide-react';
 import { auth } from '../../firebase';
 import { useToast } from '../../context/ToastContext';
+import { API_URL } from '../../config/api';
 
-const API_URL = import.meta.env.VITE_API_URL || '';
 
 const EMPTY = {
   facebook: '',

@@ -3,7 +3,20 @@ import { collection, getDocs, query, where, limit, startAfter, orderBy } from 'f
 import { auth, db } from '../../firebase';
 import { API_URL } from '../../config/api';
 
-async function fetchProductsFromApi(status = null) {
+async function fetchPublicProducts(status = null) {
+  const res = await fetch(`${API_URL}/api/products?limit=100`);
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.error || `Failed to fetch products (${res.status})`);
+  }
+  let products = await res.json();
+  if (!Array.isArray(products)) products = [];
+  if (status) products = products.filter((p) => p.status === status);
+  products.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+  return products;
+}
+
+async function fetchAdminProducts(status = null) {
   const user = auth.currentUser;
   if (!user) throw new Error('Not signed in');
   const token = await user.getIdToken();
@@ -18,32 +31,39 @@ async function fetchProductsFromApi(status = null) {
   return res.json();
 }
 
+async function fetchProductsWithFallback(status = null) {
+  try {
+    const col = collection(db, 'products');
+    const q = status ? query(col, where('status', '==', status)) : query(col);
+    const snap = await getDocs(q);
+    const products = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+    products.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+    return products;
+  } catch (err) {
+    console.warn('Products Firestore failed, using API:', err?.code || err?.message || err);
+    try {
+      return await fetchPublicProducts(status);
+    } catch (publicErr) {
+      // Admin-only list (all statuses) when signed in
+      return fetchAdminProducts(status);
+    }
+  }
+}
+
 /**
  * Fetch all products (optionally filtered by status)
  */
 export const useProductsQuery = (status = null) => {
   return useQuery({
     queryKey: ['products', { status }],
-    queryFn: async () => {
-      try {
-        const col = collection(db, 'products');
-        const q = status ? query(col, where('status', '==', status)) : query(col);
-        const snap = await getDocs(q);
-        const products = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-        products.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
-        return products;
-      } catch (err) {
-        console.warn('Products Firestore query failed, trying API:', err?.message || err);
-        return fetchProductsFromApi(status);
-      }
-    },
+    queryFn: () => fetchProductsWithFallback(status),
     retry: 1,
   });
 };
 
 /**
  * Fetch products with cursor-based pagination.
- * When status is null/"All", load without status filter so admin sees every vendor product.
+ * Falls back to public /api/products when Firestore client reads are denied.
  */
 export const useInfiniteProductsQuery = ({ pageSize = 12, status = null }) => {
   return useInfiniteQuery({
@@ -51,19 +71,11 @@ export const useInfiniteProductsQuery = ({ pageSize = 12, status = null }) => {
     queryFn: async ({ pageParam = null }) => {
       const col = collection(db, 'products');
       const constraints = [];
+      if (status) constraints.push(where('status', '==', status));
 
-      if (status) {
-        constraints.push(where('status', '==', status));
-      }
-
-      // Prefer createdAt ordering when possible; fall back without order if index missing
       try {
-        const ordered = [
-          ...constraints,
-          orderBy('createdAt', 'desc'),
-          limit(pageSize),
-        ];
-        if (pageParam) ordered.push(startAfter(pageParam));
+        const ordered = [...constraints, orderBy('createdAt', 'desc'), limit(pageSize)];
+        if (pageParam && typeof pageParam !== 'number') ordered.push(startAfter(pageParam));
         const snap = await getDocs(query(col, ...ordered));
         const lastDoc = snap.docs.length > 0 ? snap.docs[snap.docs.length - 1] : null;
         return {
@@ -71,19 +83,19 @@ export const useInfiniteProductsQuery = ({ pageSize = 12, status = null }) => {
           nextCursor: lastDoc,
         };
       } catch (err) {
-        // Missing composite index — fetch and sort client-side
-        console.warn('Products query falling back (index?):', err?.code || err?.message);
-        const snap = await getDocs(
-          status ? query(col, where('status', '==', status), limit(200)) : query(col, limit(200))
-        );
-        let products = snap.docs.map((d) => ({ id: d.id, ...d.data(), _doc: d }));
-        products.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+        // permission-denied, missing index, etc. → public API + client pagination
+        console.warn('Products infinite Firestore failed, using API:', err?.code || err?.message || err);
+        const all = await fetchPublicProducts(status);
+        const pageIndex = typeof pageParam === 'number' ? pageParam : 0;
+        const start = pageIndex * pageSize;
+        const slice = all.slice(start, start + pageSize);
         return {
-          products: products.map(({ _doc, ...p }) => p),
-          nextCursor: null,
+          products: slice,
+          nextCursor: start + pageSize < all.length ? pageIndex + 1 : undefined,
         };
       }
     },
-    getNextPageParam: (lastPage) => lastPage.nextCursor || undefined,
+    getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
+    retry: 1,
   });
 };

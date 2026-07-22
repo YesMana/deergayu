@@ -3,8 +3,8 @@ import { Star, RefreshCw, EyeOff, Eye } from 'lucide-react';
 import { auth } from '../../firebase';
 import { useToast } from '../../context/ToastContext';
 import { fmtDate } from './AdminUtils';
+import { API_URL } from '../../config/api';
 
-const API_URL = import.meta.env.VITE_API_URL || '';
 
 export default function ManageReviews() {
   const { success, error } = useToast();

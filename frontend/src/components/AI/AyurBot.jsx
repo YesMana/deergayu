@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { MessageCircle, X, Send, Sparkles } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import './AyurBot.css';
+import { API_URL } from '../../config/api';
 
 const AyurBot = () => {
   const [isOpen, setIsOpen] = useState(false);
@@ -143,7 +144,7 @@ const AyurBot = () => {
     setIsTyping(true);
 
     try {
-      const API_URL = import.meta.env.VITE_API_URL || '';
+      
       const response = await fetch(`${API_URL}/api/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

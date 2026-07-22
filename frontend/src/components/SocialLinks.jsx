@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { MessageCircle } from 'lucide-react';
 import './SocialLinks.css';
+import { API_URL } from '../config/api';
 
-const API_URL = import.meta.env.VITE_API_URL || '';
 
 /** Brand icons as inline SVGs — lucide-react no longer exports Facebook/Instagram/YouTube. */
 function IconFacebook({ size = 18 }) {

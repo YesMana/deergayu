@@ -6,8 +6,8 @@ import { useToast } from '../context/ToastContext';
 import { db, auth } from '../firebase';
 import { collection, query, where, onSnapshot, orderBy, limit } from 'firebase/firestore';
 import './CustomerDashboard.css';
+import { API_URL } from '../config/api';
 
-const API_URL = import.meta.env.VITE_API_URL || '';
 
 const statusConfig = {
   pending:     { label: 'Pending',     color: '#ffa726', bg: 'rgba(255, 167, 38, 0.12)', Icon: Clock },

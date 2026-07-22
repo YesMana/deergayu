@@ -6,8 +6,8 @@ import { db, auth } from '../firebase';
 import { collection, query, where, onSnapshot } from 'firebase/firestore';
 import { Calendar, Clock, AlertCircle, CheckCircle, XCircle, Phone } from 'lucide-react';
 import './AdminDashboard.css';
+import { API_URL } from '../config/api';
 
-const API_URL = import.meta.env.VITE_API_URL || '';
 
 const MyAppointments = () => {
   const { user } = useAuth();

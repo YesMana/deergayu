@@ -5,8 +5,8 @@ import { useLanguage } from '../context/LanguageContext';
 import { db } from '../firebase';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import './Login.css';
+import { API_URL } from '../config/api';
 
-const API_URL = import.meta.env.VITE_API_URL || '';
 
 const Login = () => {
   const location = useLocation();

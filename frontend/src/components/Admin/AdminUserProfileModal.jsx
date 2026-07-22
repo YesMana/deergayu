@@ -2,8 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { X, DollarSign, Star, Package, ShoppingBag, Calendar, Mail } from 'lucide-react';
 import { auth } from '../../firebase';
 import { fmtCurrency, fmtDate, StatusPill, userInitials } from './AdminUtils';
+import { API_URL } from '../../config/api';
 
-const API_URL = import.meta.env.VITE_API_URL || '';
 
 export default function AdminUserProfileModal({ userId, onClose }) {
   const [data, setData] = useState(null);

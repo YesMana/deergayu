@@ -4,8 +4,8 @@ import { auth } from '../../firebase';
 import { useToast } from '../../context/ToastContext';
 import { useOrdersQuery } from '../../hooks/queries/useOrders';
 import { fmtCurrency, fmtDate, StatusPill } from './AdminUtils';
+import { API_URL } from '../../config/api';
 
-const API_URL = import.meta.env.VITE_API_URL || '';
 
 export default function ManageOrders({ commissionPercent = 10 }) {
   const { success, error } = useToast();

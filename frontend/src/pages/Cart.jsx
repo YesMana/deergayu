@@ -5,8 +5,8 @@ import { useCart } from '../context/CartContext';
 import { useToast } from '../context/ToastContext';
 import { auth } from '../firebase';
 import './Cart.css';
+import { API_URL } from '../config/api';
 
-const API_URL = import.meta.env.VITE_API_URL || '';
 
 const DEFAULT_BANK = {
   bank: "People's Bank",

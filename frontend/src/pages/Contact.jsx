@@ -3,8 +3,8 @@ import { MessageCircle, Phone, Mail, MapPin } from 'lucide-react';
 import SEO from '../components/SEO';
 import { useToast } from '../context/ToastContext';
 import './LegalPages.css';
+import { API_URL } from '../config/api';
 
-const API_URL = import.meta.env.VITE_API_URL || '';
 
 /** Public customer contact channels */
 const CONTACTS = {

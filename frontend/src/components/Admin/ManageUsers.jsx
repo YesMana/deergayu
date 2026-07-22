@@ -5,8 +5,8 @@ import { db, auth } from '../../firebase';
 import { useToast } from '../../context/ToastContext';
 import { fmtDate, userInitials, StatusPill } from './AdminUtils';
 import AdminUserProfileModal from './AdminUserProfileModal';
+import { API_URL } from '../../config/api';
 
-const API_URL = import.meta.env.VITE_API_URL || '';
 const PAGE_SIZE = 20;
 
 export default function ManageUsers() {
