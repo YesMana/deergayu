@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Leaf, Sun, Coffee, Droplet, Moon, Activity, Info, BookOpen, Clock } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import { resolveMediaUrl } from '../components/Admin/AdminUtils';
+import { resolveGuideRemedyImage } from '../constants/guideImages';
 import SEO from '../components/SEO';
 import './AyurvedicGuide.css';
 
@@ -419,18 +420,16 @@ const AyurvedicGuide = () => {
                       return (
                       <motion.div key={item.id} className="remedy-card glass-panel glass-panel-hover" variants={fadeUpVariant} initial="hidden" whileInView="visible" viewport={{ once: true }}>
                         <div className="remedy-image">
-                          {item.image ? (
-                            <img
-                              src={resolveMediaUrl(item.image)}
-                              alt={remedy?.name || 'Remedy'}
-                              className="remedy-image-photo"
-                              loading="lazy"
-                              onError={(e) => {
-                                e.currentTarget.style.display = 'none';
-                                e.currentTarget.parentElement?.classList.add('remedy-image--missing');
-                              }}
-                            />
-                          ) : null}
+                          <img
+                            src={resolveMediaUrl(resolveGuideRemedyImage(item))}
+                            alt={remedy?.name || 'Remedy'}
+                            className="remedy-image-photo"
+                            loading="lazy"
+                            onError={(e) => {
+                              e.currentTarget.onerror = null;
+                              e.currentTarget.src = resolveGuideRemedyImage({ en: { name: '' } });
+                            }}
+                          />
                           <div className="remedy-badge">{data.badge}</div>
                         </div>
                         <div className="remedy-content">

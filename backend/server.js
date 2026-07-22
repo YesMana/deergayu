@@ -21,6 +21,11 @@ const {
   updateReviewAggregates,
   DEFAULT_SETTINGS,
 } = require('./platformUtils');
+const {
+  isEphemeralGuideUploadUrl,
+  resolveGuideRemedyImage,
+  GUIDE_IMAGE_BY_NAME,
+} = require('./guideImages');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 const multer = require('multer');
 
@@ -2658,9 +2663,41 @@ apiRouter.get('/guide/remedies', async (req, res) => {
     let remedies = mapGuideDocs(snapshot);
     const admin = await isGuideAdmin(req);
     if (!admin) remedies = filterPublishedGuide(remedies);
+    // Replace wiped Render disk URLs with durable fallbacks so the Guide always shows photos
+    remedies = remedies.map((r) => ({
+      ...r,
+      image: resolveGuideRemedyImage(r),
+      imageNeedsRepair: isEphemeralGuideUploadUrl(r.image),
+    }));
     remedies.sort((a, b) => (a.order || 0) - (b.order || 0));
     res.json(remedies);
   } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/** Permanently rewrite ephemeral / missing guide images in Firestore */
+apiRouter.post('/guide/repair-images', verifyAdmin, async (req, res) => {
+  try {
+    const snapshot = await db.collection('herbal_remedies').get();
+    let updated = 0;
+    const batch = db.batch();
+    snapshot.docs.forEach((docSnap) => {
+      const data = docSnap.data() || {};
+      const next = resolveGuideRemedyImage(data);
+      if (next && next !== data.image) {
+        batch.update(docSnap.ref, { image: next, updatedAt: new Date().toISOString() });
+        updated += 1;
+      }
+    });
+    if (updated > 0) await batch.commit();
+    res.json({
+      message: `Repaired ${updated} remedy image(s)`,
+      updated,
+      mappedNames: Object.keys(GUIDE_IMAGE_BY_NAME).length,
+    });
+  } catch (error) {
+    console.error('guide/repair-images:', error);
     res.status(500).json({ error: error.message });
   }
 });
