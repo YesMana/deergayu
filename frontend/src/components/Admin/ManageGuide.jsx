@@ -229,13 +229,18 @@ const ManageGuide = () => {
       error('Please select a valid image file');
       return;
     }
-    // Capture input early — React may recycle the event before await finishes
     const input = e.target;
     setUploadingImage(true);
     try {
       const imageUrl = await uploadImageDurable(file, 'guide');
       setCurrentFormData((prev) => ({ ...prev, image: imageUrl }));
-      success('Image uploaded — click Save Remedy to publish');
+      if (imageUrl.startsWith('data:image/')) {
+        success('Image ready (saved with remedy). Click Save Remedy.');
+      } else if (/firebasestorage/i.test(imageUrl)) {
+        success('Image uploaded permanently. Click Save Remedy.');
+      } else {
+        success('Image uploaded. Click Save Remedy to publish.');
+      }
     } catch (err) {
       console.error('Upload error:', err);
       error(err.message || 'Failed to upload image');

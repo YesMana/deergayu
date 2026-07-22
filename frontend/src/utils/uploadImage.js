@@ -10,6 +10,21 @@ function withTimeout(promise, ms, label) {
   return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
 }
 
+function isEphemeralUploadUrl(url = '') {
+  const u = String(url || '');
+  return /\/api\/uploads\//i.test(u) || /onrender\.com\/.*\/uploads\//i.test(u);
+}
+
+function isDurableUrl(url = '') {
+  const u = String(url || '');
+  if (!u) return false;
+  if (u.startsWith('data:image/')) return true;
+  if (/firebasestorage\.googleapis\.com/i.test(u)) return true;
+  if (/images\.unsplash\.com/i.test(u)) return true;
+  if (/^https?:\/\//i.test(u) && !isEphemeralUploadUrl(u)) return true;
+  return false;
+}
+
 /** Light client compress → JPEG blob (keeps uploads fast on mobile networks). */
 async function compressForUpload(file, maxEdge = 1400, quality = 0.82) {
   if (!file.type?.startsWith('image/') || file.type === 'image/gif') return file;
@@ -33,6 +48,15 @@ async function compressForUpload(file, maxEdge = 1400, quality = 0.82) {
   }
 }
 
+async function fileToDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result || ''));
+    reader.onerror = () => reject(new Error('Could not read image file'));
+    reader.readAsDataURL(file);
+  });
+}
+
 async function uploadViaApi(file, filename) {
   const user = auth.currentUser;
   if (!user) throw new Error('Please sign in again');
@@ -52,7 +76,7 @@ async function uploadViaApi(file, filename) {
     const data = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(data.error || `Upload failed (${res.status})`);
     if (!data.url) throw new Error('No image URL returned from server');
-    return data.url;
+    return { url: data.url, storage: data.storage || 'disk' };
   } catch (err) {
     if (err?.name === 'AbortError') throw new Error('Upload timed out — check your connection and try again');
     throw err;
@@ -68,8 +92,8 @@ async function uploadViaFirebase(file, objectPath) {
 }
 
 /**
- * Upload an image. Prefers the API (reliable), then Firebase Storage.
- * Firebase client attempts are hard-capped so the UI never sticks on "Uploading…".
+ * Upload an image that will stick after Render restarts.
+ * Prefers Firebase Storage, then API (Firebase server-side), then inline data URL.
  */
 export async function uploadImageDurable(file, folder = 'uploads') {
   if (!file) throw new Error('No file selected');
@@ -82,24 +106,38 @@ export async function uploadImageDurable(file, folder = 'uploads') {
   const ext = (prepared.name.split('.').pop() || 'jpg').toLowerCase().replace(/[^a-z0-9]/g, '') || 'jpg';
   const filename = `${Date.now()}-${Math.round(Math.random() * 1e9)}.${ext}`;
   const objectPath = `${String(folder || 'uploads').replace(/^\/+|\/+$/g, '')}/${filename}`;
-
   const errors = [];
 
-  // 1) API first — completes even when Firebase Storage rules/CORS are missing
+  // 1) Firebase Storage first — survives Render disk wipes
   try {
-    return await uploadViaApi(prepared, filename);
+    const url = await withTimeout(uploadViaFirebase(prepared, objectPath), 15_000, 'Firebase Storage');
+    if (isDurableUrl(url)) return url;
+  } catch (err) {
+    errors.push(err?.message || String(err));
+    console.warn('Firebase Storage upload failed:', err?.message || err);
+  }
+
+  // 2) Backend API (may return Firebase URL if server Storage works)
+  try {
+    const { url } = await uploadViaApi(prepared, filename);
+    if (isDurableUrl(url)) return url;
+    // Ephemeral Render disk URL — do not keep; try Firebase once more then inline
+    errors.push('API returned temporary disk URL');
   } catch (err) {
     errors.push(err?.message || String(err));
     console.warn('API upload failed:', err?.message || err);
   }
 
-  // 2) Firebase Storage with a short timeout (never hang the Upload button)
+  // 3) Inline data URL last resort (Firestore field, durable, no Storage rules needed)
   try {
-    const url = await withTimeout(uploadViaFirebase(prepared, objectPath), 12_000, 'Firebase Storage');
-    if (url) return url;
+    const smaller = await compressForUpload(prepared, 1000, 0.72);
+    if (smaller.size > 850_000) {
+      throw new Error('Image too large to store inline — enable Firebase Storage rules');
+    }
+    const dataUrl = await fileToDataUrl(smaller);
+    if (dataUrl.startsWith('data:image/')) return dataUrl;
   } catch (err) {
     errors.push(err?.message || String(err));
-    console.warn('Firebase Storage upload failed:', err?.message || err);
   }
 
   throw new Error(errors.filter(Boolean).join(' · ') || 'Upload failed');

@@ -14,14 +14,9 @@ const U = {
   teacup: 'https://images.unsplash.com/photo-1571934811356-5cc061b6821f?auto=format&fit=crop&q=80&w=800',
   leaves: 'https://images.unsplash.com/photo-1597318181409-cf64d0b5d8a2?auto=format&fit=crop&q=80&w=800',
   salad: 'https://images.unsplash.com/photo-1505576391880-b3f9d713dc4f?auto=format&fit=crop&q=80&w=800',
-  cocktail: 'https://images.unsplash.com/photo-1470337458703-46ad1756a187?auto=format&fit=crop&q=80&w=800',
-  coffee: 'https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?auto=format&fit=crop&q=80&w=800',
-  iced: 'https://images.unsplash.com/photo-1556679343-c7306c1976bc?auto=format&fit=crop&q=80&w=800',
-  lemon: 'https://images.unsplash.com/photo-1627435601361-ec25f5b1d0e5?auto=format&fit=crop&q=80&w=800',
   berries: 'https://images.unsplash.com/photo-1464305795204-6f5bbfc7fb81?auto=format&fit=crop&q=80&w=800',
   juice: 'https://images.unsplash.com/photo-1600271886742-f049cd451bba?auto=format&fit=crop&q=80&w=800',
   greenTea: 'https://images.unsplash.com/photo-1582793988951-9aed5509eb97?auto=format&fit=crop&q=80&w=800',
-  citrus: 'https://images.unsplash.com/photo-1513558161293-cdaf765ed2fd?auto=format&fit=crop&q=80&w=800',
 };
 
 export const GUIDE_IMAGE_BY_NAME = {
@@ -46,17 +41,30 @@ export const GUIDE_IMAGE_BY_NAME = {
   'Bael Fruit Drink': U.juice,
 };
 
-/** True when URL points at Render/local disk uploads that get wiped on restart. */
 export function isEphemeralGuideUploadUrl(url = '') {
   const u = String(url || '');
-  return /\/api\/uploads\//i.test(u) || /\/uploads\/\d{10,}-/i.test(u);
+  return /\/api\/uploads\//i.test(u) || /onrender\.com\/.*\/uploads\//i.test(u);
 }
 
-export function resolveGuideRemedyImage(remedy) {
-  const name = remedy?.en?.name || remedy?.name || '';
-  const url = (remedy?.image || '').trim();
-  if (url && !isEphemeralGuideUploadUrl(url) && /^https?:\/\//i.test(url)) {
-    return url;
-  }
+/** Fallback only — never overwrite a real uploaded Firebase / data URL. */
+export function guideImageFallback(remedyOrName) {
+  const name =
+    typeof remedyOrName === 'string'
+      ? remedyOrName
+      : remedyOrName?.en?.name || remedyOrName?.name || '';
   return GUIDE_IMAGE_BY_NAME[name] || GUIDE_IMAGE_DEFAULT;
+}
+
+/**
+ * Prefer the stored image URL. Only substitute Unsplash when missing/blank.
+ * Broken ephemeral URLs are handled by <img onError>, so new uploads are not overwritten.
+ */
+export function resolveGuideRemedyImage(remedy) {
+  const url = (remedy?.image || '').trim();
+  if (url.startsWith('data:image/')) return url;
+  if (url && /^https?:\/\//i.test(url) && !isEphemeralGuideUploadUrl(url)) return url;
+  // Keep ephemeral URL so a freshly uploaded file can still display while on disk;
+  // onError will swap to fallback if it 404s.
+  if (url && /^https?:\/\//i.test(url)) return url;
+  return guideImageFallback(remedy);
 }
