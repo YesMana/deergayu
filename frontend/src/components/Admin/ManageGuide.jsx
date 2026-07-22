@@ -111,6 +111,26 @@ const ManageGuide = () => {
     }
   };
 
+  const handleRepairImages = async () => {
+    if (!window.confirm('Replace wiped Render disk photos with durable images for all remedies?')) return;
+    setLoading(true);
+    try {
+      const token = await getToken();
+      const response = await fetch(`${API_URL}/api/guide/repair-images`, {
+        method: 'POST',
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error || 'Repair failed');
+      success(data.message || 'Images repaired');
+      await fetchData();
+    } catch (err) {
+      console.error(err);
+      error(err.message || 'Failed to repair images');
+      setLoading(false);
+    }
+  };
+
   const handleAddNew = () => {
     setCurrentFormData(activeTab === 'remedies' ? { ...initialRemedyState } : { ...initialRoutineState });
     setIsEditing(true);
@@ -379,6 +399,9 @@ const ManageGuide = () => {
           <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
             <button className="btn btn-outline" onClick={fetchData} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
               <RefreshCw size={14} /> Refresh
+            </button>
+            <button className="btn btn-outline" onClick={handleRepairImages} style={{ borderColor: '#4caf50', color: '#4caf50' }}>
+              <ImageIcon size={14} style={{ marginRight: 6 }} /> Fix Missing Photos
             </button>
             <button className="btn btn-outline" onClick={handleSeedData} style={{ borderColor: '#d4af37', color: '#d4af37' }}>
               Seed Demo Data
