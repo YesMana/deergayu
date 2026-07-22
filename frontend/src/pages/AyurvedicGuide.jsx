@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Leaf, Sun, Coffee, Droplet, Moon, Activity, Info, BookOpen, Clock } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import { resolveMediaUrl } from '../components/Admin/AdminUtils';
-import { resolveGuideRemedyImage } from '../constants/guideImages';
+import { guideImageFallback, resolveGuideRemedyImage } from '../constants/guideImages';
 import SEO from '../components/SEO';
 import './AyurvedicGuide.css';
 
@@ -426,8 +426,14 @@ const AyurvedicGuide = () => {
                             className="remedy-image-photo"
                             loading="lazy"
                             onError={(e) => {
-                              e.currentTarget.onerror = null;
-                              e.currentTarget.src = resolveGuideRemedyImage({ en: { name: '' } });
+                              const fallback = guideImageFallback(item);
+                              if (e.currentTarget.src !== fallback) {
+                                e.currentTarget.src = fallback;
+                              } else {
+                                e.currentTarget.onerror = null;
+                                e.currentTarget.style.display = 'none';
+                                e.currentTarget.parentElement?.classList.add('remedy-image--missing');
+                              }
                             }}
                           />
                           <div className="remedy-badge">{data.badge}</div>

@@ -10,15 +10,12 @@ const U = {
   spices: 'https://images.unsplash.com/photo-1596040033229-a9821ebd058d?auto=format&fit=crop&q=80&w=800',
   herbs: 'https://images.unsplash.com/photo-1611591437281-460bfbe1220a?auto=format&fit=crop&q=80&w=800',
   greens: 'https://images.unsplash.com/photo-1512621776951-a57141f2eefd?auto=format&fit=crop&q=80&w=800',
-  teapot: 'https://images.unsplash.com/photo-1544787219-7f47ccb76574?auto=format&fit=crop&q=80&w=800',
   teacup: 'https://images.unsplash.com/photo-1571934811356-5cc061b6821f?auto=format&fit=crop&q=80&w=800',
   leaves: 'https://images.unsplash.com/photo-1597318181409-cf64d0b5d8a2?auto=format&fit=crop&q=80&w=800',
   salad: 'https://images.unsplash.com/photo-1505576391880-b3f9d713dc4f?auto=format&fit=crop&q=80&w=800',
-  honeyLemon: 'https://images.unsplash.com/photo-1627435601361-ec25f5b1d0e5?auto=format&fit=crop&q=80&w=800',
   berries: 'https://images.unsplash.com/photo-1464305795204-6f5bbfc7fb81?auto=format&fit=crop&q=80&w=800',
   juice: 'https://images.unsplash.com/photo-1600271886742-f049cd451bba?auto=format&fit=crop&q=80&w=800',
   greenTea: 'https://images.unsplash.com/photo-1582793988951-9aed5509eb97?auto=format&fit=crop&q=80&w=800',
-  iced: 'https://images.unsplash.com/photo-1556679343-c7306c1976bc?auto=format&fit=crop&q=80&w=800',
 };
 
 const GUIDE_IMAGE_BY_NAME = {
@@ -45,21 +42,29 @@ const GUIDE_IMAGE_BY_NAME = {
 
 function isEphemeralGuideUploadUrl(url = '') {
   const u = String(url || '');
-  return /\/api\/uploads\//i.test(u) || /\/uploads\/\d{10,}-/i.test(u);
+  return /\/api\/uploads\//i.test(u) || /onrender\.com\/.*\/uploads\//i.test(u);
 }
 
-function resolveGuideRemedyImage(remedy) {
-  const name = remedy?.en?.name || remedy?.name || '';
-  const url = (remedy?.image || '').trim();
-  if (url && !isEphemeralGuideUploadUrl(url) && /^https?:\/\//i.test(url)) {
-    return url;
-  }
+function guideImageFallback(remedyOrName) {
+  const name =
+    typeof remedyOrName === 'string'
+      ? remedyOrName
+      : remedyOrName?.en?.name || remedyOrName?.name || '';
   return GUIDE_IMAGE_BY_NAME[name] || GUIDE_IMAGE_DEFAULT;
+}
+
+/** Used by repair endpoint only — replaces wiped disk URLs with durable fallbacks. */
+function resolveGuideRemedyImage(remedy) {
+  const url = (remedy?.image || '').trim();
+  if (url.startsWith('data:image/')) return url;
+  if (url && /^https?:\/\//i.test(url) && !isEphemeralGuideUploadUrl(url)) return url;
+  return guideImageFallback(remedy);
 }
 
 module.exports = {
   GUIDE_IMAGE_DEFAULT,
   GUIDE_IMAGE_BY_NAME,
   isEphemeralGuideUploadUrl,
+  guideImageFallback,
   resolveGuideRemedyImage,
 };

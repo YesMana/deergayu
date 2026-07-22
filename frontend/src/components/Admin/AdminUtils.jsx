@@ -12,6 +12,7 @@ export const userInitials = (u) => (u?.name || u?.email || 'U').slice(0, 2).toUp
 export const resolveMediaUrl = (url) => {
   if (!url || typeof url !== 'string') return '';
   const trimmed = url.trim();
+  if (/^data:image\//i.test(trimmed)) return trimmed;
   if (/^https?:\/\//i.test(trimmed)) return trimmed;
   const apiBase = (import.meta.env.VITE_API_URL || 'https://deergayu-api.onrender.com').replace(/\/$/, '');
   const path = trimmed.startsWith('/') ? trimmed : `/${trimmed}`;
