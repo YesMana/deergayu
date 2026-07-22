@@ -17,6 +17,17 @@ const queryClient = new QueryClient({
   },
 })
 
+// After a deploy, stale HTML can point at deleted hashed assets — reload once.
+window.addEventListener('vite:preloadError', (event) => {
+  event.preventDefault?.()
+  const key = 'deergayu_preload_reload'
+  const last = Number(sessionStorage.getItem(key) || 0)
+  if (Date.now() - last > 15000) {
+    sessionStorage.setItem(key, String(Date.now()))
+    window.location.reload()
+  }
+})
+
 createRoot(document.getElementById('root')).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>

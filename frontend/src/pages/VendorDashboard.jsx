@@ -7,9 +7,9 @@ import { doc, updateDoc, collection, query, where, orderBy, onSnapshot } from 'f
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import PartnerSupportCard from '../components/PartnerSupportCard';
 import './AdminDashboard.css';
+import { API_URL } from '../config/api';
 
 
-const API_URL = import.meta.env.VITE_API_URL || '';
 
 // Client-side image compression utility to convert any image to lightweight WebP
 // Fallback guarantees it resolves with the original file if anything fails

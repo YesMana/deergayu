@@ -1,17 +1,16 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Search, Filter, ShoppingCart, Heart } from 'lucide-react';
-import { db } from '../firebase';
 import { useInfiniteProductsQuery } from '../hooks/queries/useProducts';
 import { useCart } from '../context/CartContext';
 import { useToast } from '../context/ToastContext';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import SEO from '../components/SEO';
 import './Shop.css';
 
 const Shop = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All');
-  
+
   const { addToCart } = useCart();
   const { success, error } = useToast();
   const navigate = useNavigate();
@@ -20,13 +19,14 @@ const Shop = () => {
     data,
     fetchNextPage,
     hasNextPage,
-    isFetching,
     isFetchingNextPage,
-    status
+    status,
+    error: queryError,
+    refetch,
+    isRefetching,
   } = useInfiniteProductsQuery({ pageSize: 12, status: 'approved' });
 
-  // Flatten infinite pages into a single products array
-  const products = data ? data.pages.flatMap(page => page.products) : [];
+  const products = data ? data.pages.flatMap((page) => page.products) : [];
 
   const handleAddToCart = async (product) => {
     try {
@@ -35,23 +35,23 @@ const Shop = () => {
         success(`${product.name} added to cart!`);
       }
     } catch (err) {
-      if (err.message.includes("log in")) {
-        error("Please log in to add items to your cart.");
+      if (err.message.includes('log in')) {
+        error('Please log in to add items to your cart.');
         navigate('/login?returnUrl=/shop');
       } else {
-        error("Failed to add item to cart.");
+        error('Failed to add item to cart.');
       }
     }
   };
 
-  const categories = ['All', ...new Set(products.map(p => p.category))];
-  
-  const filteredProducts = products.filter(p => {
+  const categories = ['All', ...new Set(products.map((p) => p.category).filter(Boolean))];
+
+  const filteredProducts = products.filter((p) => {
     const matchSearch = (p.name || '').toLowerCase().includes(searchTerm.toLowerCase());
     const matchCategory = selectedCategory === 'All' || p.category === selectedCategory;
     return matchSearch && matchCategory;
   });
-  
+
   return (
     <div className="shop-page animate-fade-in" style={{ position: 'relative' }}>
       <SEO title="Deergayu Shop | Authentic Herbal Remedies" />
@@ -59,26 +59,26 @@ const Shop = () => {
         <div className="container">
           <h1 className="shop-title">Ayurvedic Pharmacy</h1>
           <p className="shop-subtitle">Authentic, pure, and trusted herbal remedies for your holistic wellbeing.</p>
-          
+
           <div className="shop-controls" style={{ display: 'flex', flexWrap: 'wrap', gap: '1rem', alignItems: 'center' }}>
             <div className="search-bar glass-panel" style={{ flex: '1', minWidth: '250px' }}>
               <Search size={20} className="search-icon" />
-              <input 
-                type="text" 
-                placeholder="Search for medicines, herbs..." 
+              <input
+                type="text"
+                placeholder="Search for medicines, herbs..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
             </div>
-            
+
             <div className="filter-dropdown glass-panel" style={{ display: 'flex', alignItems: 'center', padding: '0 1rem', borderRadius: '30px' }}>
               <Filter size={20} style={{ color: 'var(--primary-color)', marginRight: '0.5rem' }} />
-              <select 
-                value={selectedCategory} 
+              <select
+                value={selectedCategory}
                 onChange={(e) => setSelectedCategory(e.target.value)}
                 style={{ border: 'none', background: 'transparent', padding: '0.8rem', color: 'var(--text-primary)', outline: 'none', cursor: 'pointer' }}
               >
-                {categories.map(cat => (
+                {categories.map((cat) => (
                   <option key={cat} value={cat}>{cat}</option>
                 ))}
               </select>
@@ -92,16 +92,31 @@ const Shop = () => {
           {status === 'pending' ? (
             <div style={{ padding: '2rem', textAlign: 'center', width: '100%', color: 'var(--text-secondary)' }}>Loading products...</div>
           ) : status === 'error' ? (
-            <div style={{ padding: '2rem', textAlign: 'center', width: '100%', color: '#ff6b6b' }}>Error loading products.</div>
+            <div style={{ padding: '2rem', textAlign: 'center', width: '100%' }}>
+              <p style={{ color: '#ff6b6b', marginBottom: '1rem' }}>
+                Could not load products{queryError?.message ? `: ${queryError.message}` : '.'}
+              </p>
+              <button className="btn btn-primary" onClick={() => refetch()} disabled={isRefetching}>
+                {isRefetching ? 'Retrying…' : 'Retry'}
+              </button>
+            </div>
           ) : filteredProducts.length === 0 ? (
             <div style={{ padding: '2rem', textAlign: 'center', width: '100%', color: 'var(--text-secondary)' }}>No products match your search.</div>
-          ) : 
-            filteredProducts.map(product => (
-              <div key={product.id} className="product-card glass-panel" style={{ cursor: 'pointer' }}
-                onClick={() => navigate(`/product/${product.id}`)}>
-                <div className="product-image-container" onClick={e => e.stopPropagation()}>
-                  <img src={product.imageUrl || product.image || "https://images.unsplash.com/photo-1611078516086-6ab28122db63?w=500&q=80"} alt={product.name} className="product-image" />
-                  <button className="wishlist-btn" onClick={e => { e.stopPropagation(); success('Added to wishlist! (Coming soon)'); }}>
+          ) : (
+            filteredProducts.map((product) => (
+              <div
+                key={product.id}
+                className="product-card glass-panel"
+                style={{ cursor: 'pointer' }}
+                onClick={() => navigate(`/product/${product.id}`)}
+              >
+                <div className="product-image-container" onClick={(e) => e.stopPropagation()}>
+                  <img
+                    src={product.imageUrl || product.image || 'https://images.unsplash.com/photo-1611078516086-6ab28122db63?w=500&q=80'}
+                    alt={product.name}
+                    className="product-image"
+                  />
+                  <button className="wishlist-btn" onClick={(e) => { e.stopPropagation(); success('Added to wishlist! (Coming soon)'); }}>
                     <Heart size={20} />
                   </button>
                   <div className="product-category">{product.category}</div>
@@ -111,29 +126,35 @@ const Shop = () => {
                 </div>
                 <div className="product-info">
                   <h3 className="product-name">{product.name}</h3>
-                  {product.description && <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', margin: '0 0 0.5rem', lineHeight: 1.5, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{product.description}</p>}
+                  {product.description && (
+                    <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', margin: '0 0 0.5rem', lineHeight: 1.5, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+                      {product.description}
+                    </p>
+                  )}
                   <div className="product-meta">
                     <span className="product-rating">★ {product.rating || '4.5'}</span>
                     <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginLeft: 'auto' }}>By {product.vendorName || 'Deergayu'}</span>
                   </div>
                   <div className="product-bottom">
                     <span className="product-price">Rs. {product.price}</span>
-                    <button className="btn btn-primary add-to-cart-btn"
+                    <button
+                      className="btn btn-primary add-to-cart-btn"
                       disabled={product.stock === 0}
-                      onClick={e => { e.stopPropagation(); handleAddToCart(product); }}
+                      onClick={(e) => { e.stopPropagation(); handleAddToCart(product); }}
                       style={product.stock === 0 ? { opacity: 0.5, cursor: 'not-allowed' } : {}}
                     >
                       <ShoppingCart size={18} /> {product.stock === 0 ? 'Out of Stock' : 'Add'}
                     </button>
                   </div>
                 </div>
-            </div>
-          ))}
+              </div>
+            ))
+          )}
         </div>
-        
+
         {hasNextPage && (
           <div style={{ textAlign: 'center', marginTop: '3rem' }}>
-            <button 
+            <button
               className="btn btn-outline"
               onClick={() => fetchNextPage()}
               disabled={isFetchingNextPage}

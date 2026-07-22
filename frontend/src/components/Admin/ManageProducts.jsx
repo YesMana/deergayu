@@ -4,8 +4,8 @@ import { auth } from '../../firebase';
 import { useToast } from '../../context/ToastContext';
 import { fmtCurrency, StatusPill } from './AdminUtils';
 import { useInfiniteProductsQuery } from '../../hooks/queries/useProducts';
+import { API_URL } from '../../config/api';
 
-const API_URL = import.meta.env.VITE_API_URL || '';
 const ITEMS_PER_PAGE = 20;
 
 export default function ManageProducts() {

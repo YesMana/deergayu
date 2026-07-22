@@ -2,8 +2,8 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Video, Trash2 } from 'lucide-react';
 import { auth } from '../../firebase';
 import { useToast } from '../../context/ToastContext';
+import { API_URL } from '../../config/api';
 
-const API_URL = import.meta.env.VITE_API_URL || '';
 
 const ManageVideos = () => {
   const { success, error } = useToast();

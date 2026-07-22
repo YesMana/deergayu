@@ -9,8 +9,8 @@ import {
 } from 'firebase/auth';
 import { auth, googleProvider, db } from '../firebase';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { API_URL } from '../config/api';
 
-const API_URL = import.meta.env.VITE_API_URL || 'https://deergayu-api.onrender.com';
 const AuthContext = createContext();
 
 export const useAuth = () => useContext(AuthContext);

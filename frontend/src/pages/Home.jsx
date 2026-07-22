@@ -7,8 +7,8 @@ import SEO from '../components/SEO';
 import SocialLinks from '../components/SocialLinks';
 import { displayHomeStats } from '../constants/homeStats';
 import './Home.css';
+import { API_URL } from '../config/api';
 
-const API_URL = import.meta.env.VITE_API_URL || '';
 
 const Home = () => {
   const { t, lang } = useLanguage();

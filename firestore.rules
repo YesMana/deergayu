@@ -1,0 +1,53 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    // Public catalog — approved products only
+    match /products/{productId} {
+      allow read: if resource.data.status == 'approved'
+                  || (signedIn() && resource.data.vendorId == request.auth.uid);
+      allow create: if signedIn();
+      allow update, delete: if signedIn()
+                            && (resource.data.vendorId == request.auth.uid);
+
+      match /reviews/{reviewId} {
+        allow read: if true;
+        allow create: if signedIn();
+        allow update, delete: if signedIn()
+                              && resource.data.userId == request.auth.uid;
+      }
+    }
+
+    // Public experts — approved doctors/clinics/orgs/vendors
+    match /users/{userId} {
+      allow read: if resource.data.role in ['doctor', 'clinic', 'organization', 'vendor']
+                  && resource.data.status == 'approved'
+                  || (signedIn() && request.auth.uid == userId);
+      allow create: if signedIn() && request.auth.uid == userId;
+      allow update: if signedIn() && request.auth.uid == userId;
+    }
+
+    match /herbal_remedies/{id} {
+      allow read: if !('status' in resource.data) || resource.data.status == 'published';
+    }
+
+    match /daily_routines/{id} {
+      allow read: if !('status' in resource.data) || resource.data.status == 'published';
+    }
+
+    match /videos/{id} {
+      allow read: if !('status' in resource.data) || resource.data.status == 'published';
+    }
+
+    match /settings/{docId} {
+      allow read: if true;
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

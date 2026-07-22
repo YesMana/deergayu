@@ -1,8 +1,7 @@
 import React, { createContext, useState, useContext, useEffect, useCallback } from 'react';
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from '../firebase';
-
-const API_URL = import.meta.env.VITE_API_URL || '';
+import { API_URL } from '../config/api';
 
 const CartContext = createContext();
 

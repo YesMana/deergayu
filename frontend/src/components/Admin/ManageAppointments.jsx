@@ -4,8 +4,8 @@ import { auth } from '../../firebase';
 import { useToast } from '../../context/ToastContext';
 import { useAppointmentsQuery } from '../../hooks/queries/useAppointments';
 import { StatusPill } from './AdminUtils';
+import { API_URL } from '../../config/api';
 
-const API_URL = import.meta.env.VITE_API_URL || '';
 
 export default function ManageAppointments() {
   const { success, error } = useToast();

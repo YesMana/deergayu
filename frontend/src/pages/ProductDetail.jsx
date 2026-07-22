@@ -9,8 +9,7 @@ import { ShoppingCart, Star, Heart, ArrowLeft, UserCircle } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import SEO from '../components/SEO';
 import { resolveMediaUrl } from '../components/Admin/AdminUtils';
-
-const API_URL = import.meta.env.VITE_API_URL || '';
+import { API_URL } from '../config/api';
 
 const ProductDetail = () => {
   const { id } = useParams();
@@ -35,26 +34,40 @@ const ProductDetail = () => {
   useEffect(() => {
     const fetchProductAndReviews = async () => {
       try {
-        const productRef = doc(db, 'products', id);
-        const productSnap = await getDoc(productRef);
-        
-        if (productSnap.exists()) {
-          setProduct({ id: productSnap.id, ...productSnap.data() });
-        } else {
-          error("Product not found");
-          navigate('/shop');
-          return;
+        let loaded = null;
+        try {
+          const productRef = doc(db, 'products', id);
+          const productSnap = await getDoc(productRef);
+          if (productSnap.exists()) {
+            loaded = { id: productSnap.id, ...productSnap.data() };
+          }
+        } catch (fsErr) {
+          console.warn('Product Firestore read failed, trying API:', fsErr?.code || fsErr?.message);
         }
 
-        // Fetch reviews
-        const reviewsRef = collection(db, 'products', id, 'reviews');
-        const q = query(reviewsRef, orderBy('createdAt', 'desc'));
-        const reviewSnap = await getDocs(q);
-        const fetchedReviews = reviewSnap.docs.map(d => ({ id: d.id, ...d.data() }));
-        setReviews(fetchedReviews);
+        if (!loaded) {
+          const res = await fetch(`${API_URL}/api/products/${id}`);
+          if (!res.ok) {
+            error('Product not found');
+            navigate('/shop');
+            return;
+          }
+          loaded = await res.json();
+        }
+
+        setProduct(loaded);
+
+        try {
+          const reviewsRef = collection(db, 'products', id, 'reviews');
+          const q = query(reviewsRef, orderBy('createdAt', 'desc'));
+          const reviewSnap = await getDocs(q);
+          setReviews(reviewSnap.docs.map((d) => ({ id: d.id, ...d.data() })));
+        } catch {
+          setReviews([]);
+        }
       } catch (err) {
-        console.error("Error fetching product:", err);
-        error("Failed to load product details");
+        console.error('Error fetching product:', err);
+        error('Failed to load product details');
       } finally {
         setLoading(false);
       }
