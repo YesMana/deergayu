@@ -13,7 +13,21 @@ import { useFocusEffect } from 'expo-router';
 import { useLanguage } from '../../context/LanguageContext';
 import { fetchGuideRemedies, type GuideItem } from '../../lib/api';
 import { mediaUrl } from '../../constants/api';
+import { guideImageFallback, resolveGuideRemedyImage } from '../../constants/guideImages';
 import { BlurView } from 'expo-blur';
+
+function GuideCardImage({ uri, fallback }: { uri: string | null; fallback: string }) {
+  const [src, setSrc] = useState(uri || fallback);
+  return (
+    <Image
+      source={{ uri: src }}
+      style={styles.image}
+      onError={() => {
+        if (src !== fallback) setSrc(fallback);
+      }}
+    />
+  );
+}
 
 export default function GuideScreen() {
   const { lang, t } = useLanguage();
@@ -72,13 +86,19 @@ export default function GuideScreen() {
           contentContainerStyle={{ padding: 16, paddingBottom: 40 }}
           ListEmptyComponent={<Text style={styles.empty}>{t('empty_guide')}</Text>}
           renderItem={({ item }) => {
-            const img = mediaUrl(item.image);
+            const name = label(item);
+            const raw = resolveGuideRemedyImage({
+              image: item.image,
+              en: (item as any).en,
+              name,
+            });
+            const img = mediaUrl(raw) || guideImageFallback(name);
             return (
               <BlurView intensity={20} tint="dark" style={styles.card}>
-                {img ? <Image source={{ uri: img }} style={styles.image} /> : null}
+                <GuideCardImage uri={img} fallback={guideImageFallback(name)} />
                 <View style={styles.body}>
                   <Text style={styles.cat}>{item.category || 'General'}</Text>
-                  <Text style={styles.name}>{label(item)}</Text>
+                  <Text style={styles.name}>{name}</Text>
                   <Text style={styles.desc} numberOfLines={4}>
                     {body(item)}
                   </Text>
