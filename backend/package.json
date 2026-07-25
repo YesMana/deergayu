@@ -5,7 +5,7 @@
   "scripts": {
     "start": "node server.js",
     "test": "node tests/security.unit.test.js && node tests/firestore.rules.static.test.js",
-    "test:rules:emulator": "node tests/firestore.rules.emulator.test.js"
+    "test:rules:emulator": "cd .. && npx --prefix backend firebase emulators:exec --only firestore,storage --project deergayu-rules-test \"node backend/tests/firestore.rules.emulator.test.js\""
   },
   "keywords": [],
   "author": "",
@@ -23,5 +23,10 @@
     "sequelize": "^6.37.8",
     "sqlite3": "^6.0.1"
   },
-  "description": ""
+  "description": "",
+  "devDependencies": {
+    "@firebase/rules-unit-testing": "^5.0.1",
+    "firebase": "^12.16.0",
+    "firebase-tools": "^15.24.0"
+  }
 }
