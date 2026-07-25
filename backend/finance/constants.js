@@ -13,7 +13,11 @@ const PRICING_MODELS = {
   CUSTOM: 'CUSTOM',
 };
 
-/** Defaults for admin “create terms” UI only — booking must load live terms. */
+/**
+ * Suggested ADMIN FORM values only (UI hint).
+ * Backend NEVER applies these when money fields are omitted.
+ * Booking NEVER creates a snapshot from this template.
+ */
 const DEFAULT_LAUNCH_COMMERCIAL_TEMPLATE = {
   currency: CURRENCY_LKR,
   pricingModel: PRICING_MODELS.FIXED_SPLIT,
@@ -22,6 +26,10 @@ const DEFAULT_LAUNCH_COMMERCIAL_TEMPLATE = {
   platformGross: 400,
   facilityFee: 0,
 };
+
+/** Canonical equation (pre-discount): consultationFee = providerPayout + platformGross + facilityFee */
+const CANONICAL_SPLIT_EQUATION =
+  'consultationFee = providerPayout + platformGrossRevenue + facilityFee';
 
 const PAYMENT_STATUSES = {
   CREATED: 'CREATED',
@@ -125,6 +133,7 @@ module.exports = {
   CONSULTATION_TYPES,
   PRICING_MODELS,
   DEFAULT_LAUNCH_COMMERCIAL_TEMPLATE,
+  CANONICAL_SPLIT_EQUATION,
   PAYMENT_STATUSES,
   PAYMENT_TRANSITIONS,
   APPOINTMENT_STATUSES,

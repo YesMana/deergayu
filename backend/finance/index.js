@@ -1,5 +1,7 @@
 module.exports = {
   ...require('./constants'),
+  ...require('./money'),
+  ...require('./time'),
   ...require('./pricing'),
   ...require('./commercialTerms'),
   ...require('./references'),

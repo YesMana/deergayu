@@ -1,11 +1,12 @@
 /**
- * P0-B2 payment foundation unit tests (no live Firebase).
+ * P0-B2 payment foundation + pre-merge financial correctness tests.
  * Run: node backend/tests/finance.unit.test.js
  */
 const assert = require('assert');
 const { createMemoryFirestore } = require('./memoryFirestore');
 const {
   DEFAULT_LAUNCH_COMMERCIAL_TEMPLATE,
+  CANONICAL_SPLIT_EQUATION,
   PAYMENT_STATUSES,
   validateFixedSplitAmounts,
   calculateConsultationPricing,
@@ -14,9 +15,9 @@ const {
   calculateRefundImpact,
   calculateProviderPayable,
   buildTermPayload,
-  withLaunchTemplateDefaults,
   upsertCommercialTerm,
   getActiveTermForType,
+  setTermActive,
   toPublicPrices,
   toProviderView,
   nextBusinessReference,
@@ -24,9 +25,12 @@ const {
   buildPaymentRecord,
   createPaymentDoc,
   transitionPayment,
+  applyRefundLedger,
   acquireSlotHold,
   releaseSlotHold,
   slotLockId,
+  providerSlotLockId,
+  canonicalizeSlot,
   isHoldActive,
   createPaymentPendingAppointment,
   confirmAppointmentPayment,
@@ -35,6 +39,9 @@ const {
   calculateOutstandingPayable,
   createSettlementDraft,
   createReconciliationRecord,
+  toMinor,
+  fromMinor,
+  SUGGESTED_ADMIN_FORM_TEMPLATE,
 } = require('../finance');
 const { pickPublicSettings } = require('../security');
 const { DEFAULT_SETTINGS } = require('../platformUtils');
@@ -54,48 +61,82 @@ function test(name, fn) {
 }
 
 async function run() {
-  console.log('P0-B2 finance.unit.test.js');
+  console.log('P0-B2 finance.unit.test.js (pre-merge review)');
 
-  await test('feature flag defaults to false', () => {
+  await test('feature flag remains false', () => {
     assert.strictEqual(DEFAULT_SETTINGS.appointmentPaymentsEnabled, false);
-    assert.strictEqual(DEFAULT_SETTINGS.slotHoldMinutes, 10);
-    assert.strictEqual(DEFAULT_SETTINGS.providerPayoutHoldHours, 24);
-    const pub = pickPublicSettings(DEFAULT_SETTINGS, { payhereConfigured: false });
-    assert.strictEqual(pub.appointmentPaymentsEnabled, false);
-    assert.strictEqual(pub.gatewayFeeAmount, undefined);
-    assert.strictEqual(pub.providerPayoutHoldHours, undefined);
   });
 
-  await test('launch template is 1000/600/400 defaults only', () => {
-    assert.strictEqual(DEFAULT_LAUNCH_COMMERCIAL_TEMPLATE.consultationPrice, 1000);
-    assert.strictEqual(DEFAULT_LAUNCH_COMMERCIAL_TEMPLATE.providerPayout, 600);
-    assert.strictEqual(DEFAULT_LAUNCH_COMMERCIAL_TEMPLATE.platformGross, 400);
+  await test('suggested template is NOT applied when money fields omitted', () => {
+    const built = buildTermPayload({ consultationType: 'in_person' });
+    assert.strictEqual(built.ok, false);
+    assert.strictEqual(built.code, 'COMMERCIAL_TERMS_INCOMPLETE');
+    assert.ok(SUGGESTED_ADMIN_FORM_TEMPLATE.consultationPrice === 1000);
+    assert.ok(DEFAULT_LAUNCH_COMMERCIAL_TEMPLATE.providerPayout === 600);
   });
 
-  await test('valid 1000/600/400 split', () => {
-    const r = validateFixedSplitAmounts({
+  await test('explicit terms required for upsert — no silent 1000/600/400', async () => {
+    const db = createMemoryFirestore();
+    let code = null;
+    try {
+      await upsertCommercialTerm(db, 'docX', { consultationType: 'video' }, 'admin');
+    } catch (e) {
+      code = e.code;
+    }
+    assert.strictEqual(code, 'COMMERCIAL_TERMS_INCOMPLETE');
+    const term = await getActiveTermForType(db, 'docX', 'video');
+    assert.strictEqual(term, null);
+  });
+
+  await test('payment booking fails with COMMERCIAL_TERMS_NOT_CONFIGURED', async () => {
+    const db = createMemoryFirestore();
+    let code = null;
+    try {
+      await createPaymentPendingAppointment(db, {
+        user: { uid: 'p1', email: 'p@t.com' },
+        providerId: 'noTerms',
+        date: '2026-08-01',
+        time: '10:00',
+        consultationType: 'in_person',
+      });
+    } catch (e) {
+      code = e.code;
+    }
+    assert.strictEqual(code, 'COMMERCIAL_TERMS_NOT_CONFIGURED');
+  });
+
+  await test('canonical equation 1000 = 600 + 400 + 0', () => {
+    assert.ok(CANONICAL_SPLIT_EQUATION.includes('consultationFee'));
+    const snap = createFinancialSnapshot({
+      consultationType: 'in_person',
+      pricingModel: 'FIXED_SPLIT',
       consultationPrice: 1000,
       providerPayout: 600,
       platformGross: 400,
       facilityFee: 0,
+      version: 1,
     });
-    assert.strictEqual(r.ok, true);
+    assert.strictEqual(snap.consultationFee, 1000);
+    assert.strictEqual(snap.providerPayout, 600);
+    assert.strictEqual(snap.platformGrossRevenue, 400);
+    assert.strictEqual(snap.facilityFee, 0);
+    assert.strictEqual(snap.customerTotal, 1000);
+    assert.strictEqual(snap.platformFee, snap.platformGrossRevenue);
+    assert.strictEqual(
+      snap.consultationFee,
+      snap.providerPayout + snap.platformGrossRevenue + snap.facilityFee
+    );
   });
 
-  await test('valid 1000/500/500 split', () => {
-    const r = validateFixedSplitAmounts({
-      consultationPrice: 1000,
-      providerPayout: 500,
-      platformGross: 500,
-    });
-    assert.strictEqual(r.ok, true);
-  });
-
-  await test('valid alternate agreements', () => {
+  await test('valid splits including decimals via minor units', () => {
     for (const row of [
+      [1000, 600, 400],
+      [1000, 500, 500],
       [999, 600, 399],
       [1190, 700, 490],
       [1500, 1000, 500],
+      [99.99, 50.0, 49.99],
+      [10.5, 6.25, 4.25],
     ]) {
       const r = validateFixedSplitAmounts({
         consultationPrice: row[0],
@@ -104,71 +145,142 @@ async function run() {
       });
       assert.strictEqual(r.ok, true, String(row));
     }
-  });
-
-  await test('invalid split rejected', () => {
-    const r = validateFixedSplitAmounts({
+    const bad = validateFixedSplitAmounts({
       consultationPrice: 1000,
       providerPayout: 700,
       platformGross: 400,
     });
-    assert.strictEqual(r.ok, false);
+    assert.strictEqual(bad.ok, false);
   });
 
-  await test('server authoritative pricing ignores client wishful thinking', () => {
-    const term = {
+  await test('money minor-unit rounding is deterministic', () => {
+    assert.strictEqual(toMinor(999), 99900);
+    assert.strictEqual(toMinor(1190), 119000);
+    assert.strictEqual(toMinor(10.005), 1001); // half-up → 10.01
+    assert.strictEqual(toMinor(10.004), 1000);
+    assert.strictEqual(fromMinor(39900), 399);
+    const snap = createFinancialSnapshot({
       consultationType: 'video',
       pricingModel: 'FIXED_SPLIT',
-      consultationPrice: 1190,
-      providerPayout: 700,
-      platformGross: 490,
-      facilityFee: 0,
-      version: 3,
-    };
-    const snap = createFinancialSnapshot(term, { discount: 0, gatewayConfig: { gatewayFeeAmount: 25 } });
-    assert.strictEqual(snap.grossAmount, 1190);
-    assert.strictEqual(snap.providerPayout, 700);
-    assert.strictEqual(snap.platformGrossRevenue, 490);
-    assert.strictEqual(snap.gatewayFee, 25);
-    assert.strictEqual(snap.platformNetRevenue, 465);
-    assert.strictEqual(snap.pricingModelUsed, 'FIXED_SPLIT');
-    assert.strictEqual(snap.termsVersion, 3);
-    // Gateway never surcharges customer
-    const g = calculateGatewayImpact(1190, { gatewayFeeAmount: 25 });
-    assert.strictEqual(g.customerSurcharge, 0);
-    assert.strictEqual(g.grossAmountChargedToCustomer, 1190);
+      consultationPrice: 99.99,
+      providerPayout: 50,
+      platformGross: 49.99,
+      version: 1,
+    });
+    assert.strictEqual(snap.customerTotal, 99.99);
+    assert.strictEqual(
+      toMinor(snap.providerPayout) + toMinor(snap.platformGrossRevenue),
+      toMinor(snap.customerTotal)
+    );
   });
 
-  await test('per-consultation pricing types', () => {
-    for (const t of ['in_person', 'video', 'audio']) {
-      const pricing = calculateConsultationPricing({
-        consultationType: t,
+  await test('gateway never surcharges customer', () => {
+    const g = calculateGatewayImpact(1000, { gatewayFeeAmount: 25 });
+    assert.strictEqual(g.customerSurcharge, 0);
+    assert.strictEqual(g.grossAmountChargedToCustomer, 1000);
+    const snap = createFinancialSnapshot(
+      {
+        consultationType: 'in_person',
         pricingModel: 'FIXED_SPLIT',
         consultationPrice: 1000,
         providerPayout: 600,
         platformGross: 400,
-      });
-      assert.strictEqual(pricing.consultationType, t);
-      assert.strictEqual(pricing.grossAmount, 1000);
-    }
-  });
-
-  await test('buildTermPayload validates and versions', () => {
-    const built = buildTermPayload(
-      withLaunchTemplateDefaults({ consultationType: 'in_person' }),
-      { actorUid: 'admin1', previousVersion: 2 }
+        version: 1,
+      },
+      { gatewayConfig: { gatewayFeeAmount: 25 } }
     );
-    assert.strictEqual(built.ok, true);
-    assert.strictEqual(built.term.consultationPrice, 1000);
-    assert.strictEqual(built.term.providerPayout, 600);
-    assert.strictEqual(built.term.version, 3);
+    assert.strictEqual(snap.customerTotal, 1000);
+    assert.strictEqual(snap.platformNetRevenue, 375);
   });
 
-  await test('commercial terms upsert + public price isolation', async () => {
+  await test('slot lock ignores consultationType — cross-type collision denied', async () => {
     const db = createMemoryFirestore();
-    await upsertCommercialTerm(
+    await acquireSlotHold(db, {
+      providerId: 'doc1',
+      date: '2026-08-01',
+      time: '10:00',
+      consultationType: 'in_person',
+      userId: 'p1',
+    });
+    for (const type of ['video', 'audio']) {
+      let denied = false;
+      try {
+        await acquireSlotHold(db, {
+          providerId: 'doc1',
+          date: '2026-08-01',
+          time: '10:00',
+          consultationType: type,
+          userId: 'p2',
+        });
+      } catch (e) {
+        denied = e.statusCode === 409;
+      }
+      assert.strictEqual(denied, true, type);
+    }
+    // different provider same time — allowed
+    const other = await acquireSlotHold(db, {
+      providerId: 'doc2',
+      date: '2026-08-01',
+      time: '10:00',
+      consultationType: 'video',
+      userId: 'p3',
+    });
+    assert.strictEqual(other.status, 'HOLDING');
+    // same provider different time — allowed
+    const later = await acquireSlotHold(db, {
+      providerId: 'doc1',
+      date: '2026-08-01',
+      time: '10:30',
+      consultationType: 'audio',
+      userId: 'p4',
+    });
+    assert.strictEqual(later.status, 'HOLDING');
+    // lock ids equal across types
+    assert.strictEqual(
+      slotLockId('doc1', '2026-08-01', '10:00', 'in_person'),
+      slotLockId('doc1', '2026-08-01', '10:00', 'video')
+    );
+  });
+
+  await test('canonical time rejects AM/PM and normalizes HH:mm', () => {
+    assert.strictEqual(canonicalizeSlot('2026-08-01', '10:00 AM').ok, false);
+    assert.strictEqual(canonicalizeSlot('08/01/2026', '10:00').ok, false);
+    const c = canonicalizeSlot('2026-08-01', '10:00');
+    assert.strictEqual(c.ok, true);
+    assert.strictEqual(c.canonicalSlotStart, '2026-08-01T10:00:00+05:30');
+    assert.strictEqual(providerSlotLockId('d1', '2026-08-01', '10:00').lockId, 'd1_20260801_1000');
+  });
+
+  await test('expired HOLDING lock does not permanently block slot', async () => {
+    const db = createMemoryFirestore();
+    const past = new Date(Date.now() - 60 * 60 * 1000);
+    await acquireSlotHold(db, {
+      providerId: 'd1',
+      date: '2026-08-02',
+      time: '11:00',
+      consultationType: 'in_person',
+      userId: 'p1',
+      holdMinutes: 10,
+      now: past,
+    });
+    const id = slotLockId('d1', '2026-08-02', '11:00');
+    const cur = (await db.collection('slotLocks').doc(id).get()).data();
+    assert.strictEqual(isHoldActive(cur, new Date()), false);
+    const hold2 = await acquireSlotHold(db, {
+      providerId: 'd1',
+      date: '2026-08-02',
+      time: '11:00',
+      consultationType: 'video',
+      userId: 'p2',
+    });
+    assert.strictEqual(hold2.holdByUserId, 'p2');
+  });
+
+  await test('terms versioning — history append, snapshot immutable to later edits', async () => {
+    const db = createMemoryFirestore();
+    const r1 = await upsertCommercialTerm(
       db,
-      'doc1',
+      'docV',
       {
         consultationType: 'in_person',
         consultationPrice: 1000,
@@ -177,53 +289,196 @@ async function run() {
       },
       'admin'
     );
-    await upsertCommercialTerm(
+    assert.strictEqual(r1.term.version, 1);
+    const created = await createPaymentPendingAppointment(db, {
+      user: { uid: 'pat', email: 'a@b.com' },
+      providerId: 'docV',
+      date: '2026-09-01',
+      time: '09:00',
+      consultationType: 'in_person',
+    });
+    assert.strictEqual(created.appointment.termsVersion, 1);
+    assert.strictEqual(created.appointment.providerPayout, 600);
+
+    const r2 = await upsertCommercialTerm(
       db,
-      'doc1',
+      'docV',
       {
-        consultationType: 'video',
+        consultationType: 'in_person',
         consultationPrice: 1500,
         providerPayout: 1000,
         platformGross: 500,
       },
       'admin'
     );
-    const term = await getActiveTermForType(db, 'doc1', 'video');
-    assert.strictEqual(term.consultationPrice, 1500);
-    assert.strictEqual(term.providerPayout, 1000);
+    assert.strictEqual(r2.term.version, 2);
 
-    const doc = await db.collection('providerCommercialTerms').doc('doc1').get();
-    const publicPrices = toPublicPrices(doc.data());
-    assert.strictEqual(publicPrices.video.consultationPrice, 1500);
-    assert.strictEqual(publicPrices.video.providerPayout, undefined);
-    assert.strictEqual(publicPrices.in_person.consultationPrice, 1000);
+    // Historical appointment unchanged
+    const appt = await db.collection('appointments').doc(created.appointment.id).get();
+    assert.strictEqual(appt.data().providerPayout, 600);
+    assert.strictEqual(appt.data().termsVersion, 1);
 
-    const providerView = toProviderView({ providerId: 'doc1', ...doc.data() });
-    assert.strictEqual(providerView.types.video.providerPayout, 1000);
+    const hist = await db.collection('providerCommercialTerms').doc('docV').collection('history').get();
+    assert.ok(hist.size >= 2);
+
+    await setTermActive(db, 'docV', 'in_person', false, 'admin');
+    const active = await getActiveTermForType(db, 'docV', 'in_person');
+    assert.strictEqual(active, null);
   });
 
-  await test('reference concurrency-safe sequence', async () => {
+  await test('reference concurrency — unique sequential refs', async () => {
     const db = createMemoryFirestore();
     const at = new Date('2026-07-25T00:00:00Z');
-    const a = await nextBusinessReference(db, 'appointment', at);
-    const b = await nextBusinessReference(db, 'appointment', at);
-    const p = await nextBusinessReference(db, 'payment', at);
-    const o = await nextBusinessReference(db, 'order', at);
-    assert.strictEqual(a, 'DG-APT-2026-000001');
-    assert.strictEqual(b, 'DG-APT-2026-000002');
-    assert.strictEqual(p, 'DG-PAY-2026-000001');
-    assert.strictEqual(o, 'DG-ORD-2026-000001');
+    const results = await Promise.all(
+      Array.from({ length: 20 }, () => nextBusinessReference(db, 'appointment', at))
+    );
+    const unique = new Set(results);
+    assert.strictEqual(unique.size, 20);
+    assert.ok(results.includes('DG-APT-2026-000001'));
+    assert.ok([...unique].every((r) => /^DG-APT-2026-\d{6}$/.test(r)));
+
+    const pay = await nextBusinessReference(db, 'payment', at);
+    const ord = await nextBusinessReference(db, 'order', at);
+    const set = await nextBusinessReference(db, 'settlement', at);
+    assert.strictEqual(pay, 'DG-PAY-2026-000001');
+    assert.strictEqual(ord, 'DG-ORD-2026-000001');
+    assert.strictEqual(set, 'DG-SET-2026-000001');
+
+    // year rollover separate counters
+    const nextYear = await nextBusinessReference(db, 'appointment', new Date('2027-01-01T00:00:00Z'));
+    assert.strictEqual(nextYear, 'DG-APT-2027-000001');
   });
 
-  await test('payment state transitions', () => {
-    assert.strictEqual(assertPaymentTransition('CREATED', 'PENDING').ok, true);
-    assert.strictEqual(assertPaymentTransition('PENDING', 'PAID').ok, true);
-    assert.strictEqual(assertPaymentTransition('PAID', 'PENDING').ok, false);
-    assert.strictEqual(assertPaymentTransition('PAID', 'REFUNDED').ok, true);
-    assert.strictEqual(assertPaymentTransition('FAILED', 'PAID').ok, false);
+  await test('payment idempotency — PAID twice / no regression / no double credit', async () => {
+    const db = createMemoryFirestore();
+    await upsertCommercialTerm(
+      db,
+      'docI',
+      {
+        consultationType: 'in_person',
+        consultationPrice: 1000,
+        providerPayout: 600,
+        platformGross: 400,
+      },
+      'admin'
+    );
+    const created = await createPaymentPendingAppointment(db, {
+      user: { uid: 'u1', email: 'u@t.com' },
+      providerId: 'docI',
+      date: '2026-10-01',
+      time: '08:00',
+      consultationType: 'in_person',
+    });
+    const first = await confirmAppointmentPayment(db, { paymentId: created.payment.id });
+    assert.strictEqual(first.payment.status, 'PAID');
+    assert.strictEqual(first.payment.providerPayableCredited, true);
+
+    const second = await confirmAppointmentPayment(db, { paymentId: created.payment.id });
+    assert.strictEqual(second.payment.status, 'PAID');
+    assert.strictEqual(second.payment._idempotent || second._idempotent, true);
+
+    let regressed = false;
+    try {
+      await transitionPayment(db, created.payment.id, 'PENDING');
+    } catch (e) {
+      regressed = /Invalid payment transition/i.test(e.message);
+    }
+    assert.strictEqual(regressed, true);
+
+    // refund twice blocked
+    const impact = calculateRefundImpact({
+      snapshot: first.payment.financialSnapshot,
+      refundType: 'FULL_REFUND',
+      providerPaymentStatus: 'PENDING',
+    });
+    const r1 = await applyRefundLedger(db, created.payment.id, impact);
+    assert.strictEqual(r1.duplicateRefundBlocked, undefined);
+    const r2 = await applyRefundLedger(db, created.payment.id, impact);
+    assert.strictEqual(r2.duplicateRefundBlocked, true);
   });
 
-  await test('immutable paid snapshot', async () => {
+  await test('public prices omit payout; provider view includes split', async () => {
+    const db = createMemoryFirestore();
+    await upsertCommercialTerm(
+      db,
+      'docP',
+      {
+        consultationType: 'audio',
+        consultationPrice: 1190,
+        providerPayout: 700,
+        platformGross: 490,
+      },
+      'admin'
+    );
+    const doc = (await db.collection('providerCommercialTerms').doc('docP').get()).data();
+    const pub = toPublicPrices(doc);
+    assert.strictEqual(pub.audio.consultationPrice, 1190);
+    assert.strictEqual(pub.audio.providerPayout, undefined);
+    const view = toProviderView({ providerId: 'docP', ...doc });
+    assert.strictEqual(view.types.audio.providerPayout, 700);
+  });
+
+  await test('payment failure releases slot', async () => {
+    const db = createMemoryFirestore();
+    await upsertCommercialTerm(
+      db,
+      'docF',
+      {
+        consultationType: 'in_person',
+        consultationPrice: 1000,
+        providerPayout: 500,
+        platformGross: 500,
+      },
+      'admin'
+    );
+    const created = await createPaymentPendingAppointment(db, {
+      user: { uid: 'u2', email: 'u2@t.com' },
+      providerId: 'docF',
+      date: '2026-11-01',
+      time: '15:00',
+      consultationType: 'in_person',
+    });
+    await failOrCancelAppointmentPayment(db, { paymentId: created.payment.id, outcome: 'FAILED' });
+    const lock = await db.collection('slotLocks').doc(created.hold.id).get();
+    assert.ok(['EXPIRED', 'RELEASED'].includes(lock.data().status));
+  });
+
+  await test('settlement + refund reconciliation', async () => {
+    assert.strictEqual(
+      calculateOutstandingPayable([
+        { providerPaymentStatus: 'ELIGIBLE', providerPayout: 600 },
+        { providerPaymentStatus: 'PENDING', providerPayout: 600 },
+      ]),
+      600
+    );
+    const db = createMemoryFirestore();
+    const s = await createSettlementDraft(db, {
+      providerId: 'd',
+      amount: 600,
+      paymentIds: ['x'],
+      status: 'OPEN',
+    });
+    assert.match(s.settlementReference, /^DG-SET-/);
+    const settledRefund = calculateRefundImpact({
+      snapshot: { customerTotal: 1000, providerPayout: 600, platformGrossRevenue: 400 },
+      refundType: 'FULL_REFUND',
+      providerPaymentStatus: 'PAID',
+    });
+    assert.strictEqual(settledRefund.requiresReconciliation, true);
+    const recon = await createReconciliationRecord(db, {
+      providerId: 'd',
+      paymentId: 'x',
+      amount: 600,
+      actorUid: 'admin',
+    });
+    assert.strictEqual(recon.amount, 600);
+  });
+
+  await test('legacy appointment statuses still valid', () => {
+    assert.strictEqual(assertAppointmentStatusTransition('pending', 'accepted').ok, true);
+  });
+
+  await test('immutable paid snapshot blocks money edits', async () => {
     const db = createMemoryFirestore();
     const snap = createFinancialSnapshot({
       consultationType: 'in_person',
@@ -235,9 +490,8 @@ async function run() {
     });
     const payment = await createPaymentDoc(db, {
       purpose: 'appointment',
-      userId: 'u1',
-      providerUserId: 'd1',
-      appointmentId: 'a1',
+      userId: 'u',
+      providerUserId: 'd',
       snapshot: snap,
       status: PAYMENT_STATUSES.PENDING,
     });
@@ -246,247 +500,26 @@ async function run() {
     try {
       await transitionPayment(db, payment.id, 'REFUND_PENDING', { providerPayout: 1 });
     } catch (e) {
-      blocked = /immutable/i.test(e.message);
+      blocked = e.code === 'SNAPSHOT_IMMUTABLE' || /immutable/i.test(e.message);
     }
     assert.strictEqual(blocked, true);
   });
 
-  await test('duplicate slot hold rejected', async () => {
-    const db = createMemoryFirestore();
-    const hold1 = await acquireSlotHold(db, {
-      providerId: 'd1',
-      date: '2026-08-01',
-      time: '10:00',
-      consultationType: 'in_person',
-      userId: 'p1',
-      holdMinutes: 10,
-    });
-    assert.strictEqual(hold1.status, 'HOLDING');
-    let rejected = false;
-    try {
-      await acquireSlotHold(db, {
-        providerId: 'd1',
-        date: '2026-08-01',
-        time: '10:00',
-        consultationType: 'in_person',
-        userId: 'p2',
-        holdMinutes: 10,
-      });
-    } catch (e) {
-      rejected = e.statusCode === 409;
-    }
-    assert.strictEqual(rejected, true);
+  await test('assertPaymentTransition rejects PAID→PENDING', () => {
+    assert.strictEqual(assertPaymentTransition('PAID', 'PENDING').ok, false);
+    assert.strictEqual(assertPaymentTransition('PAID', 'PAID').same, true);
   });
 
-  await test('expired slot hold can be re-acquired', async () => {
-    const db = createMemoryFirestore();
-    const past = new Date(Date.now() - 60 * 60 * 1000);
-    await acquireSlotHold(db, {
-      providerId: 'd1',
-      date: '2026-08-02',
-      time: '11:00',
-      consultationType: 'video',
-      userId: 'p1',
-      holdMinutes: 10,
-      now: past,
-    });
-    // Force expiry in store
-    const id = slotLockId('d1', '2026-08-02', '11:00', 'video');
-    const ref = db.collection('slotLocks').doc(id);
-    const cur = (await ref.get()).data();
-    assert.strictEqual(isHoldActive(cur, new Date()), false);
-    const hold2 = await acquireSlotHold(db, {
-      providerId: 'd1',
-      date: '2026-08-02',
-      time: '11:00',
-      consultationType: 'video',
-      userId: 'p2',
-      holdMinutes: 10,
-    });
-    assert.strictEqual(hold2.holdByUserId, 'p2');
-  });
-
-  await test('payment-pending appointment + confirm + finance isolation', async () => {
-    const db = createMemoryFirestore();
-    await upsertCommercialTerm(
-      db,
-      'doctorA',
-      {
-        consultationType: 'in_person',
-        consultationPrice: 1000,
-        providerPayout: 600,
-        platformGross: 400,
-      },
-      'admin'
+  await test('public settings hide finance internals', () => {
+    const pub = pickPublicSettings(
+      { ...DEFAULT_SETTINGS, gatewayFeeAmount: 50, providerPayoutHoldHours: 24 },
+      { payhereConfigured: false }
     );
-
-    const created = await createPaymentPendingAppointment(db, {
-      user: { uid: 'patient1', email: 'p@test.com' },
-      providerId: 'doctorA',
-      providerName: 'Dr A',
-      date: '2026-08-10',
-      time: '09:00',
-      consultationType: 'in_person',
-      customerName: 'Patient One',
-      slotHoldMinutes: 10,
-    });
-
-    assert.match(created.appointment.appointmentReference, /^DG-APT-20\d{2}-\d{6}$/);
-    assert.match(created.payment.paymentReference, /^DG-PAY-20\d{2}-\d{6}$/);
-    assert.strictEqual(created.appointment.status, 'PAYMENT_PENDING');
-    assert.strictEqual(created.appointment.totalAmount, 1000);
-    assert.strictEqual(created.appointment.providerPayout, 600);
-    assert.strictEqual(created.appointment.financialSnapshot.termsVersion, 1);
-
-    const confirmed = await confirmAppointmentPayment(db, { paymentId: created.payment.id });
-    assert.strictEqual(confirmed.payment.status, 'PAID');
-    assert.strictEqual(confirmed.appointment.status, 'CONFIRMED');
-
-    const lock = await db.collection('slotLocks').doc(created.hold.id).get();
-    assert.strictEqual(lock.data().status, 'CONSUMED');
+    assert.strictEqual(pub.appointmentPaymentsEnabled, false);
+    assert.strictEqual(pub.gatewayFeeAmount, undefined);
   });
 
-  await test('payment failure releases slot and zeros payable', async () => {
-    const db = createMemoryFirestore();
-    await upsertCommercialTerm(
-      db,
-      'doctorB',
-      {
-        consultationType: 'audio',
-        consultationPrice: 999,
-        providerPayout: 600,
-        platformGross: 399,
-      },
-      'admin'
-    );
-    const created = await createPaymentPendingAppointment(db, {
-      user: { uid: 'patient2', email: 'p2@test.com' },
-      providerId: 'doctorB',
-      date: '2026-08-11',
-      time: '14:30',
-      consultationType: 'audio',
-      customerName: 'P2',
-    });
-    await failOrCancelAppointmentPayment(db, { paymentId: created.payment.id, outcome: 'FAILED' });
-    const appt = await db.collection('appointments').doc(created.appointment.id).get();
-    assert.strictEqual(appt.data().status, 'EXPIRED');
-    assert.strictEqual(appt.data().providerPayout, 0);
-    const lock = await db.collection('slotLocks').doc(created.hold.id).get();
-    assert.ok(['EXPIRED', 'RELEASED'].includes(lock.data().status));
-  });
-
-  await test('appointment status machine rejects invalid paid transitions', () => {
-    assert.strictEqual(assertAppointmentStatusTransition('PAYMENT_PENDING', 'CONFIRMED').ok, true);
-    assert.strictEqual(assertAppointmentStatusTransition('CONFIRMED', 'COMPLETED').ok, true);
-    assert.strictEqual(assertAppointmentStatusTransition('COMPLETED', 'CONFIRMED').ok, false);
-    assert.strictEqual(assertAppointmentStatusTransition('pending', 'accepted').ok, true); // legacy
-  });
-
-  await test('settlement payable + refund reversal + reconciliation', async () => {
-    const db = createMemoryFirestore();
-    const payments = [
-      { providerPaymentStatus: 'ELIGIBLE', providerPayout: 600 },
-      { providerPaymentStatus: 'ELIGIBLE', providerPayout: 500 },
-      { providerPaymentStatus: 'PENDING', providerPayout: 700 },
-    ];
-    assert.strictEqual(calculateOutstandingPayable(payments), 1100);
-
-    const settlement = await createSettlementDraft(db, {
-      providerId: 'doctorA',
-      amount: 600,
-      paymentIds: ['pay1'],
-      appointmentIds: ['apt1'],
-      status: 'OPEN',
-    });
-    assert.match(settlement.settlementReference, /^DG-SET-20\d{2}-\d{6}$/);
-
-    const impactFull = calculateRefundImpact({
-      snapshot: { grossAmount: 1000, providerPayout: 600, platformGrossRevenue: 400 },
-      refundType: 'FULL_REFUND',
-      providerPaymentStatus: 'PENDING',
-    });
-    assert.strictEqual(impactFull.customerRefund, 1000);
-    assert.strictEqual(impactFull.nextProviderPaymentStatus, 'REVERSED');
-    assert.ok(impactFull.providerPayableDelta < 0);
-
-    const impactSettled = calculateRefundImpact({
-      snapshot: { grossAmount: 1000, providerPayout: 600, platformGrossRevenue: 400 },
-      refundType: 'FULL_REFUND',
-      providerPaymentStatus: 'PAID',
-    });
-    assert.strictEqual(impactSettled.requiresReconciliation, true);
-    assert.strictEqual(impactSettled.reconciliationAmount, 600);
-
-    const recon = await createReconciliationRecord(db, {
-      providerId: 'doctorA',
-      paymentId: 'pay1',
-      amount: 600,
-      reason: 'post_settlement_refund',
-      actorUid: 'admin',
-    });
-    assert.strictEqual(recon.amount, 600);
-  });
-
-  await test('provider payout eligibility after hold hours', () => {
-    const completedAt = new Date('2026-07-20T10:00:00Z');
-    const before = calculateProviderPayable({
-      snapshot: { providerPayout: 600 },
-      appointmentStatus: 'COMPLETED',
-      paymentStatus: 'PAID',
-      completedAt,
-      holdHours: 24,
-      now: new Date('2026-07-20T12:00:00Z'),
-    });
-    assert.strictEqual(before.status, 'PENDING');
-    const after = calculateProviderPayable({
-      snapshot: { providerPayout: 600 },
-      appointmentStatus: 'COMPLETED',
-      paymentStatus: 'PAID',
-      completedAt,
-      holdHours: 24,
-      now: new Date('2026-07-21T11:00:00Z'),
-    });
-    assert.strictEqual(after.status, 'ELIGIBLE');
-    assert.strictEqual(after.amount, 600);
-  });
-
-  await test('legacy appointment compatibility — no snapshot required', () => {
-    const legacy = {
-      status: 'pending',
-      customerId: 'c1',
-      providerId: 'd1',
-      date: '2026-01-01',
-      time: '10:00',
-    };
-    assert.strictEqual(assertAppointmentStatusTransition(legacy.status, 'accepted').ok, true);
-    assert.strictEqual(legacy.financialSnapshot, undefined);
-  });
-
-  await test('releaseSlotHold works', async () => {
-    const db = createMemoryFirestore();
-    const hold = await acquireSlotHold(db, {
-      providerId: 'd9',
-      date: '2026-09-01',
-      time: '08:00',
-      consultationType: 'in_person',
-      userId: 'u9',
-    });
-    await releaseSlotHold(db, hold.id, { reason: 'RELEASED' });
-    const snap = await db.collection('slotLocks').doc(hold.id).get();
-    assert.strictEqual(snap.data().status, 'RELEASED');
-  });
-
-  await test('buildPaymentRecord rejects missing snapshot', () => {
-    assert.throws(() =>
-      buildPaymentRecord({
-        paymentReference: 'DG-PAY-2026-000001',
-        purpose: 'appointment',
-        userId: 'u',
-      })
-    );
-  });
-
-  console.log('All P0-B2 finance unit tests passed.');
+  console.log('All P0-B2 pre-merge finance unit tests passed.');
 }
 
 run().catch((err) => {

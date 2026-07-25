@@ -21,6 +21,7 @@ const {
   releaseSlotHold,
   consumeSlotHold,
   slotLockId,
+  providerSlotLockId,
 } = require('./slotLock');
 
 function isLegacyAppointmentStatus(status) {
@@ -34,9 +35,8 @@ function isPaidLifecycleStatus(status) {
 function assertAppointmentStatusTransition(from, to) {
   const f = String(from);
   const t = String(to);
-  if (f === t) return { ok: true };
+  if (f === t) return { ok: true, same: true };
 
-  // Legacy path — keep permissive for old admin/vendor flows
   if (isLegacyAppointmentStatus(f) && (isLegacyAppointmentStatus(t) || t === 'confirmed')) {
     return { ok: true, legacy: true };
   }
@@ -57,10 +57,6 @@ function assertAppointmentStatusTransition(from, to) {
   return { ok: true };
 }
 
-/**
- * Create hold + appointment (PAYMENT_PENDING) + payment (CREATED/PENDING) with snapshot.
- * Requires appointmentPaymentsEnabled === true at the route layer.
- */
 async function createPaymentPendingAppointment(db, {
   user,
   providerId,
@@ -78,10 +74,14 @@ async function createPaymentPendingAppointment(db, {
   const type = normalizeConsultationType(consultationType || 'in_person');
   const term = await getActiveTermForType(db, providerId, type);
   if (!term) {
-    const err = new Error('No active commercial terms for this provider/consultation type');
+    const err = new Error('COMMERCIAL_TERMS_NOT_CONFIGURED');
     err.statusCode = 400;
+    err.code = 'COMMERCIAL_TERMS_NOT_CONFIGURED';
     throw err;
   }
+
+  // Validate canonical time before any writes
+  const slotMeta = providerSlotLockId(providerId, date, time);
 
   const snapshot = createFinancialSnapshot(term, {
     discount,
@@ -91,8 +91,8 @@ async function createPaymentPendingAppointment(db, {
 
   const hold = await acquireSlotHold(db, {
     providerId,
-    date,
-    time,
+    date: slotMeta.date,
+    time: slotMeta.time,
     consultationType: type,
     userId: user.uid,
     holdMinutes: slotHoldMinutes,
@@ -110,8 +110,10 @@ async function createPaymentPendingAppointment(db, {
       customerPhone: phone || '',
       providerId,
       providerName: providerName || '',
-      date,
-      time,
+      date: slotMeta.date,
+      time: slotMeta.time,
+      canonicalSlotStart: slotMeta.canonicalSlotStart,
+      businessTimezone: slotMeta.businessTimezone,
       consultationType: type,
       notes: notes || '',
       status: APPOINTMENT_STATUSES.PAYMENT_PENDING,
@@ -119,13 +121,13 @@ async function createPaymentPendingAppointment(db, {
       paymentReference: null,
       paymentId: null,
       slotLockId: hold.id,
-      // Financial snapshot (immutable after PAID except refund/reconciliation)
       financialSnapshot: snapshot,
       consultationFee: snapshot.consultationFee,
       facilityFee: snapshot.facilityFee,
-      platformFee: snapshot.platformFee,
+      platformGrossRevenue: snapshot.platformGrossRevenue,
       discount: snapshot.discount,
-      totalAmount: snapshot.grossAmount,
+      customerTotal: snapshot.customerTotal,
+      totalAmount: snapshot.customerTotal,
       providerPayout: snapshot.providerPayout,
       gatewayFee: snapshot.gatewayFee,
       platformNetRevenue: snapshot.platformNetRevenue,
@@ -138,7 +140,7 @@ async function createPaymentPendingAppointment(db, {
     const apptRef = await db.collection('appointments').add(appointmentData);
 
     const payment = await createPaymentDoc(db, {
-      provider: PAYMENT_PROVIDERS.NONE, // Dialog Pay later
+      provider: PAYMENT_PROVIDERS.NONE,
       purpose: PAYMENT_PURPOSES.APPOINTMENT,
       appointmentId: apptRef.id,
       resourceId: apptRef.id,
@@ -147,6 +149,7 @@ async function createPaymentPendingAppointment(db, {
       snapshot,
       status: PAYMENT_STATUSES.PENDING,
       metadata: { slotLockId: hold.id, appointmentReference },
+      idempotencyKey: `appt-hold:${apptRef.id}`,
     });
 
     await apptRef.update({
@@ -161,7 +164,12 @@ async function createPaymentPendingAppointment(db, {
     );
 
     return {
-      appointment: { id: apptRef.id, ...appointmentData, paymentId: payment.id, paymentReference: payment.paymentReference },
+      appointment: {
+        id: apptRef.id,
+        ...appointmentData,
+        paymentId: payment.id,
+        paymentReference: payment.paymentReference,
+      },
       payment,
       hold,
     };
@@ -171,12 +179,9 @@ async function createPaymentPendingAppointment(db, {
   }
 }
 
-/**
- * Mark payment PAID → confirm appointment → consume hold.
- */
 async function confirmAppointmentPayment(db, { paymentId, providerTransactionId = null }) {
   const payment = await transitionPayment(db, paymentId, PAYMENT_STATUSES.PAID, {
-    providerTransactionId,
+    providerTransactionId: providerTransactionId || null,
   });
 
   if (!payment.appointmentId) return { payment };
@@ -186,8 +191,18 @@ async function confirmAppointmentPayment(db, { paymentId, providerTransactionId 
   if (!apptSnap.exists) return { payment };
 
   const appt = apptSnap.data();
+
+  // Idempotent: already confirmed
+  if (appt.status === APPOINTMENT_STATUSES.CONFIRMED && appt.paymentStatus === PAYMENT_STATUSES.PAID) {
+    return {
+      payment,
+      appointment: { id: payment.appointmentId, ...appt },
+      _idempotent: true,
+    };
+  }
+
   const check = assertAppointmentStatusTransition(appt.status, APPOINTMENT_STATUSES.CONFIRMED);
-  if (!check.ok && appt.status !== APPOINTMENT_STATUSES.CONFIRMED) {
+  if (!check.ok && !check.same) {
     const err = new Error(check.error);
     err.statusCode = 400;
     throw err;
@@ -198,7 +213,7 @@ async function confirmAppointmentPayment(db, { paymentId, providerTransactionId 
     status: APPOINTMENT_STATUSES.CONFIRMED,
     paymentStatus: PAYMENT_STATUSES.PAID,
     updatedAt: now,
-    confirmedAt: now,
+    confirmedAt: appt.confirmedAt || now,
   });
 
   if (appt.slotLockId) {
@@ -211,12 +226,10 @@ async function confirmAppointmentPayment(db, { paymentId, providerTransactionId 
   return {
     payment,
     appointment: { id: payment.appointmentId, ...appt, status: APPOINTMENT_STATUSES.CONFIRMED },
+    _idempotent: !!payment._idempotent,
   };
 }
 
-/**
- * Payment failure / cancel → release slot, expire/cancel appointment, no provider payable.
- */
 async function failOrCancelAppointmentPayment(db, { paymentId, outcome = 'FAILED' }) {
   const to =
     outcome === 'CANCELLED' ? PAYMENT_STATUSES.CANCELLED : PAYMENT_STATUSES.FAILED;
@@ -227,6 +240,10 @@ async function failOrCancelAppointmentPayment(db, { paymentId, outcome = 'FAILED
     const apptSnap = await apptRef.get();
     if (apptSnap.exists) {
       const appt = apptSnap.data();
+      // Already terminal — idempotent
+      if (['CANCELLED', 'EXPIRED'].includes(appt.status) && payment._idempotent) {
+        return { payment, _idempotent: true };
+      }
       const now = new Date().toISOString();
       const nextStatus =
         outcome === 'CANCELLED' ? APPOINTMENT_STATUSES.CANCELLED : APPOINTMENT_STATUSES.EXPIRED;

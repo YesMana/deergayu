@@ -5,7 +5,6 @@
 
 const {
   CONSULTATION_TYPES,
-  DEFAULT_LAUNCH_COMMERCIAL_TEMPLATE,
   SETTLEMENT_STATUSES,
 } = require('./constants');
 const {
@@ -15,6 +14,7 @@ const {
   createChangeRequest,
   toProviderView,
   toPublicPrices,
+  SUGGESTED_ADMIN_FORM_TEMPLATE,
 } = require('./commercialTerms');
 const {
   createPaymentPendingAppointment,
@@ -22,7 +22,7 @@ const {
   failOrCancelAppointmentPayment,
   assertAppointmentStatusTransition,
 } = require('./appointmentFinance');
-const { transitionPayment, assertPaymentTransition } = require('./payments');
+const { transitionPayment, assertPaymentTransition, applyRefundLedger } = require('./payments');
 const {
   createSettlementDraft,
   completeSettlement,
@@ -36,9 +36,12 @@ function registerFinanceRoutes(apiRouter, { db, verifyUser, verifyAdmin, require
   // ---------- Defaults (admin) ----------
   apiRouter.get('/admin/commercial-defaults', verifyAdmin, (req, res) => {
     res.json({
-      template: DEFAULT_LAUNCH_COMMERCIAL_TEMPLATE,
+      suggestedAdminFormTemplate: SUGGESTED_ADMIN_FORM_TEMPLATE,
       consultationTypes: CONSULTATION_TYPES,
-      note: 'Template defaults only — booking always loads per-provider active terms.',
+      note:
+        'Suggested UI form values only. PUT commercial-terms requires explicit consultationPrice, providerPayout, and platformGross. Backend never applies these silently.',
+      equation:
+        'consultationFee = providerPayout + platformGrossRevenue + facilityFee (pre-discount)',
     });
   });
 
@@ -75,7 +78,10 @@ function registerFinanceRoutes(apiRouter, { db, verifyUser, verifyAdmin, require
       const result = await upsertCommercialTerm(db, req.params.providerId, body, req.user.uid);
       res.json({ message: 'Terms saved', term: result.term });
     } catch (error) {
-      res.status(error.statusCode || 500).json({ error: error.message });
+      res.status(error.statusCode || 500).json({
+        error: error.message,
+        code: error.code || undefined,
+      });
     }
   });
 
@@ -206,7 +212,10 @@ function registerFinanceRoutes(apiRouter, { db, verifyUser, verifyAdmin, require
         hold: { id: result.hold.id, expiresAt: result.hold.expiresAt, status: result.hold.status },
       });
     } catch (error) {
-      res.status(error.statusCode || 500).json({ error: error.message });
+      res.status(error.statusCode || 500).json({
+        error: error.message,
+        code: error.code || undefined,
+      });
     }
   });
 
@@ -453,6 +462,7 @@ function registerFinanceRoutes(apiRouter, { db, verifyUser, verifyAdmin, require
 
       const impact = calculateRefundImpact({
         snapshot: payment.financialSnapshot || {
+          customerTotal: payment.customerTotal ?? payment.grossAmount,
           grossAmount: payment.grossAmount,
           providerPayout: payment.providerPayout,
           platformGrossRevenue: payment.platformGrossRevenue,
@@ -462,29 +472,14 @@ function registerFinanceRoutes(apiRouter, { db, verifyUser, verifyAdmin, require
         providerPaymentStatus: payment.providerPaymentStatus,
       });
 
-      const nextPaymentStatus =
-        refundType === 'FULL_REFUND'
-          ? 'REFUNDED'
-          : refundType === 'NO_REFUND'
-            ? payment.status
-            : 'PARTIALLY_REFUNDED';
-
-      if (refundType !== 'NO_REFUND') {
-        const check = assertPaymentTransition(payment.status, nextPaymentStatus);
-        if (!check.ok) return res.status(400).json({ error: check.error });
+      const applied = await applyRefundLedger(db, req.params.paymentId, impact);
+      if (applied.duplicateRefundBlocked) {
+        return res.json({
+          message: 'Refund already applied (idempotent)',
+          impact: applied.lastRefund || impact,
+          duplicateRefundBlocked: true,
+        });
       }
-
-      const now = new Date().toISOString();
-      const patch = {
-        updatedAt: now,
-        lastRefund: impact,
-        providerPaymentStatus: impact.nextProviderPaymentStatus,
-      };
-      if (refundType !== 'NO_REFUND') {
-        patch.status = nextPaymentStatus;
-        patch.refundedAt = now;
-      }
-      await ref.update(patch);
 
       let reconciliation = null;
       if (impact.requiresReconciliation) {
@@ -502,8 +497,8 @@ function registerFinanceRoutes(apiRouter, { db, verifyUser, verifyAdmin, require
         await db.collection('appointments').doc(payment.appointmentId).set(
           {
             providerPaymentStatus: impact.nextProviderPaymentStatus,
-            paymentStatus: nextPaymentStatus,
-            updatedAt: now,
+            paymentStatus: applied.status,
+            updatedAt: new Date().toISOString(),
           },
           { merge: true }
         );

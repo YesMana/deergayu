@@ -1,6 +1,7 @@
 /**
  * Minimal in-memory Firestore mock for finance unit tests.
  * Supports: doc get/set/update, add, where==, limit, runTransaction, subcollections.
+ * Transaction writes are applied synchronously (like Admin SDK transaction buffer semantics).
  */
 
 function deepClone(v) {
@@ -21,7 +22,7 @@ function createMemoryFirestore() {
       id: parts[parts.length - 1],
       path: key,
       collection(sub) {
-        return makeCollection([...parts, sub]);
+        return makeCollectionFixed([...parts, sub]);
       },
       async get() {
         const data = store.get(key);
@@ -42,6 +43,26 @@ function createMemoryFirestore() {
         if (!store.has(key)) throw new Error(`NOT_FOUND: ${key}`);
         store.set(key, { ...store.get(key), ...deepClone(value) });
       },
+      /** Sync helpers for transactions */
+      _setSync(value, opts = {}) {
+        if (opts.merge && store.has(key)) {
+          store.set(key, { ...store.get(key), ...deepClone(value) });
+        } else {
+          store.set(key, deepClone(value));
+        }
+      },
+      _updateSync(value) {
+        if (!store.has(key)) throw new Error(`NOT_FOUND: ${key}`);
+        store.set(key, { ...store.get(key), ...deepClone(value) });
+      },
+      _getSync() {
+        const data = store.get(key);
+        return {
+          id: parts[parts.length - 1],
+          exists: data !== undefined,
+          data: () => (data === undefined ? undefined : deepClone(data)),
+        };
+      },
     };
   }
 
@@ -55,14 +76,13 @@ function createMemoryFirestore() {
         return makeQuery(colParts, filters, n);
       },
       async get() {
-        const prefix = pathKey(colParts) + '/';
+        const prefix = `${pathKey(colParts)}/`;
         const depth = colParts.length + 1;
         let docs = [];
         for (const [k, v] of store.entries()) {
           const segs = k.split('/');
-          if (!k.startsWith(prefix) && k !== pathKey(colParts)) continue;
           if (segs.length !== depth) continue;
-          if (!k.startsWith(pathKey(colParts) + '/')) continue;
+          if (!k.startsWith(prefix)) continue;
           let ok = true;
           for (const f of filters) {
             if (v?.[f.field] !== f.value) ok = false;
@@ -77,43 +97,13 @@ function createMemoryFirestore() {
           }
         }
         if (lim != null) docs = docs.slice(0, lim);
-        return {
-          empty: docs.length === 0,
-          docs,
-          size: docs.length,
-        };
+        return { empty: docs.length === 0, docs, size: docs.length };
       },
     };
   }
 
-  function makeCollection(parts) {
-    return {
-      doc(id) {
-        return makeDocRef([...parts, id || `auto_${Math.random().toString(36).slice(2, 10)}`]);
-      },
-      async add(value) {
-        const id = `auto_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-        const ref = makeDocRef([...parts, id]);
-        await ref.set(value);
-        return ref;
-      },
-      where(field, op, value) {
-        return makeQuery(parts, [{ field, value }]).where
-          ? makeQuery(parts, [{ field, value }])
-          : makeQuery(parts, [{ field, value }]);
-      },
-      limit(n) {
-        return makeQuery(parts, [], n);
-      },
-      async get() {
-        return makeQuery(parts).get();
-      },
-    };
-  }
-
-  // Fix where chaining — redefine collection properly
   function makeCollectionFixed(parts) {
-    const api = {
+    return {
       doc(id) {
         if (!id) id = `auto_${Math.random().toString(36).slice(2, 10)}`;
         return makeDocRef([...parts, id]);
@@ -134,27 +124,34 @@ function createMemoryFirestore() {
         return makeQuery(parts).get();
       },
     };
-    return api;
   }
+
+  /** Serialize transactions to approximate Firestore contention safety in tests */
+  let txChain = Promise.resolve();
 
   return {
     collection(name) {
       return makeCollectionFixed([name]);
     },
     async runTransaction(fn) {
-      const tx = {
-        async get(ref) {
-          return ref.get();
-        },
-        set(ref, value, opts) {
-          // synchronous queue — apply immediately for this mock
-          return ref.set(value, opts || {});
-        },
-        update(ref, value) {
-          return ref.update(value);
-        },
+      const run = async () => {
+        const tx = {
+          async get(ref) {
+            return ref._getSync();
+          },
+          set(ref, value, opts) {
+            ref._setSync(value, opts || {});
+          },
+          update(ref, value) {
+            ref._updateSync(value);
+          },
+        };
+        return fn(tx);
       };
-      return fn(tx);
+      const next = txChain.then(run, run);
+      // Keep chain alive even if a transaction fails
+      txChain = next.catch(() => {});
+      return next;
     },
     _store: store,
   };

@@ -1,15 +1,18 @@
 /**
  * Server-authoritative transactional slot locking.
- * Deterministic doc id: providerId_date_time_consultationType
+ *
+ * Capacity model: ONE simultaneous consultation per provider.
+ * Lock identity: providerId + canonical Colombo slot start (NOT consultationType).
+ * consultationType is metadata only and cannot bypass availability.
  */
 
 const { SLOT_HOLD_STATUSES } = require('./constants');
 const { normalizeConsultationType } = require('./commercialTerms');
+const { providerSlotLockId, canonicalizeSlot } = require('./time');
 
-function slotLockId(providerId, date, time, consultationType) {
-  const type = normalizeConsultationType(consultationType);
-  const safeTime = String(time || '').replace(/:/g, '');
-  return `${providerId}_${date}_${safeTime}_${type}`;
+/** @deprecated use providerSlotLockId — kept for call-site migration */
+function slotLockId(providerId, date, time /* consultationType ignored */) {
+  return providerSlotLockId(providerId, date, time).lockId;
 }
 
 function isHoldActive(data, now = new Date()) {
@@ -20,7 +23,7 @@ function isHoldActive(data, now = new Date()) {
 
 /**
  * Acquire a hold inside a Firestore transaction.
- * Releases expired holds automatically.
+ * Lazy-expires HOLDING locks whose expiresAt has passed (crashed checkout cannot block forever).
  */
 async function acquireSlotHold(db, {
   providerId,
@@ -36,8 +39,10 @@ async function acquireSlotHold(db, {
   if (!providerId || !date || !time || !userId) {
     throw Object.assign(new Error('providerId, date, time, userId required'), { statusCode: 400 });
   }
+
+  const slot = providerSlotLockId(providerId, date, time);
   const type = normalizeConsultationType(consultationType || 'in_person');
-  const id = slotLockId(providerId, date, time, type);
+  const id = slot.lockId;
   const ref = db.collection('slotLocks').doc(id);
   const minutes = Math.max(1, Number(holdMinutes) || 10);
   const expiresAt = new Date(now.getTime() + minutes * 60 * 1000).toISOString();
@@ -46,22 +51,41 @@ async function acquireSlotHold(db, {
     const snap = await tx.get(ref);
     if (snap.exists) {
       const data = snap.data();
-      if (data.status === SLOT_HOLD_STATUSES.CONSUMED) {
-        throw Object.assign(new Error('This time slot is already booked.'), { statusCode: 409 });
-      }
-      if (isHoldActive(data, now) && data.holdByUserId !== userId) {
+
+      // Lazy-expire stale HOLDING locks inside the transaction
+      if (data.status === SLOT_HOLD_STATUSES.HOLDING && !isHoldActive(data, now)) {
+        tx.set(
+          ref,
+          {
+            ...data,
+            status: SLOT_HOLD_STATUSES.EXPIRED,
+            updatedAt: now.toISOString(),
+            releasedAt: now.toISOString(),
+          },
+          { merge: true }
+        );
+        // fall through to re-acquire
+      } else if (data.status === SLOT_HOLD_STATUSES.CONSUMED) {
+        throw Object.assign(new Error('This time slot is already booked.'), {
+          statusCode: 409,
+          code: 'SLOT_CONSUMED',
+        });
+      } else if (isHoldActive(data, now) && data.holdByUserId !== userId) {
         throw Object.assign(new Error('This time slot is temporarily held by another patient.'), {
           statusCode: 409,
+          code: 'SLOT_HELD',
         });
       }
-      // Same user can refresh hold; expired → re-acquire
+      // Same user may refresh an active hold; EXPIRED/RELEASED → re-acquire
     }
 
     const record = {
       providerId,
-      date,
-      time,
-      consultationType: type,
+      date: slot.date,
+      time: slot.time,
+      canonicalSlotStart: slot.canonicalSlotStart,
+      businessTimezone: slot.businessTimezone,
+      consultationType: type, // metadata only
       status: SLOT_HOLD_STATUSES.HOLDING,
       holdByUserId: userId,
       appointmentId: appointmentId || null,
@@ -104,11 +128,14 @@ async function consumeSlotHold(db, lockId, { appointmentId, paymentId, now = new
       throw Object.assign(new Error('Slot hold not found'), { statusCode: 404 });
     }
     const data = snap.data();
-    if (data.status === SLOT_HOLD_STATUSES.CONSUMED) return;
-    if (!isHoldActive(data, now) && data.status === SLOT_HOLD_STATUSES.HOLDING) {
-      throw Object.assign(new Error('Slot hold has expired'), { statusCode: 409 });
+    if (data.status === SLOT_HOLD_STATUSES.CONSUMED) return; // idempotent
+    if (data.status === SLOT_HOLD_STATUSES.HOLDING && !isHoldActive(data, now)) {
+      throw Object.assign(new Error('Slot hold has expired'), {
+        statusCode: 409,
+        code: 'SLOT_EXPIRED',
+      });
     }
-    if (data.status !== SLOT_HOLD_STATUSES.HOLDING && data.status !== SLOT_HOLD_STATUSES.CONSUMED) {
+    if (data.status !== SLOT_HOLD_STATUSES.HOLDING) {
       throw Object.assign(new Error(`Cannot consume slot in status ${data.status}`), {
         statusCode: 409,
       });
@@ -124,7 +151,6 @@ async function consumeSlotHold(db, lockId, { appointmentId, paymentId, now = new
   return { id: lockId, status: SLOT_HOLD_STATUSES.CONSUMED };
 }
 
-/** Lazy expiry helper for availability reads. */
 async function expireSlotHoldIfNeeded(db, lockDoc, now = new Date()) {
   if (!lockDoc?.exists && !lockDoc?.data) return null;
   const data = typeof lockDoc.data === 'function' ? lockDoc.data() : lockDoc;
@@ -143,5 +169,7 @@ module.exports = {
   releaseSlotHold,
   consumeSlotHold,
   expireSlotHoldIfNeeded,
+  canonicalizeSlot,
+  providerSlotLockId,
   SLOT_HOLD_STATUSES,
 };
