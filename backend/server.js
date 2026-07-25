@@ -37,6 +37,8 @@ const {
   resolveGuideRemedyImage,
   GUIDE_IMAGE_BY_NAME,
 } = require('./guideImages');
+const { registerFinanceRoutes } = require('./finance/routes');
+const { nextOrderReference } = require('./finance/references');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 const multer = require('multer');
 
@@ -218,6 +220,14 @@ const requireApprovedProvider = async (req, res, next) => {
 };
 
 const apiRouter = express.Router();
+
+// P0-B2 payment foundation routes (appointment payments gated by feature flag)
+registerFinanceRoutes(apiRouter, {
+  db,
+  verifyUser,
+  verifyAdmin,
+  requireApprovedProvider,
+});
 
 // ============================================================
 // HEALTH CHECK
@@ -1299,6 +1309,12 @@ apiRouter.post('/settings', verifyAdmin, async (req, res) => {
     payhereEnabled,
     contactEmail,
     socialLinks,
+    appointmentPaymentsEnabled,
+    slotHoldMinutes,
+    providerPayoutHoldHours,
+    settlementCadence,
+    gatewayFeeAmount,
+    absorbGatewayFees,
   } = req.body;
   try {
     const payload = {
@@ -1325,6 +1341,22 @@ apiRouter.post('/settings', verifyAdmin, async (req, res) => {
     if (socialLinks && typeof socialLinks === 'object') {
       payload.socialLinks = normalizeSocialLinks(socialLinks);
     }
+    if (appointmentPaymentsEnabled !== undefined) {
+      payload.appointmentPaymentsEnabled = !!appointmentPaymentsEnabled;
+    }
+    if (slotHoldMinutes !== undefined) {
+      payload.slotHoldMinutes = Math.max(1, Number(slotHoldMinutes) || 10);
+    }
+    if (providerPayoutHoldHours !== undefined) {
+      payload.providerPayoutHoldHours = Math.max(0, Number(providerPayoutHoldHours) || 0);
+    }
+    if (settlementCadence !== undefined) {
+      payload.settlementCadence = String(settlementCadence || 'WEEKLY').toUpperCase();
+    }
+    if (gatewayFeeAmount !== undefined) {
+      payload.gatewayFeeAmount = Math.max(0, Number(gatewayFeeAmount) || 0);
+    }
+    if (absorbGatewayFees !== undefined) payload.absorbGatewayFees = !!absorbGatewayFees;
 
     await db.collection('settings').doc('admin').set(payload, { merge: true });
     res.json({ message: 'Settings saved successfully', socialLinks: payload.socialLinks });
@@ -2221,6 +2253,14 @@ apiRouter.post('/checkout', verifyUser, async (req, res) => {
       const totalPrice = itemsTotal + orderShipping;
       const { vendorEarnings, platformFee } = calcOrderEarnings(group.items);
       
+      // Additive human reference — PayHere continues to use Firestore document id
+      let orderReference = null;
+      try {
+        orderReference = await nextOrderReference(db);
+      } catch (refErr) {
+        console.warn('Order reference generation failed (non-fatal):', refErr.message);
+      }
+
       const orderData = {
         customerId: req.user.uid,
         customerName: userName,
@@ -2236,6 +2276,7 @@ apiRouter.post('/checkout', verifyUser, async (req, res) => {
         platformFee: Math.round(platformFee),
         status: paymentMethod === 'payhere' ? 'awaiting_payment' : 'pending',
         paymentMethod: paymentMethod || 'cash_on_delivery',
+        orderReference,
         deliveryAddress: deliveryAddress || '',
         phone: phone || '',
         notes: notes || '',

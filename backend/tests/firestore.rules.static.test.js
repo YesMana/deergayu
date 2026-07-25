@@ -48,6 +48,14 @@ test('appointments / orders writes denied (API only)', () => {
   assert.match(firestoreRules, /match \/orders\/\{id\}[\s\S]*allow create, update, delete:\s*if false/);
 });
 
+test('P0-B2 finance collections are API-owned', () => {
+  assert.match(firestoreRules, /match \/providerCommercialTerms\/\{providerId\}[\s\S]*allow create, update, delete:\s*if false/);
+  assert.match(firestoreRules, /match \/payments\/\{id\}[\s\S]*allow create, update, delete:\s*if false/);
+  assert.match(firestoreRules, /match \/slotLocks\/\{id\}[\s\S]*allow read, write:\s*if false/);
+  assert.match(firestoreRules, /match \/settlements\/\{id\}[\s\S]*allow create, update, delete:\s*if false/);
+  assert.match(firestoreRules, /match \/counters\/\{id\}[\s\S]*allow read, write:\s*if false/);
+});
+
 test('default deny present', () => {
   assert.match(firestoreRules, /match \/\{document=\*\*\}[\s\S]*allow read, write:\s*if false/);
 });

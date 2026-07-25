@@ -149,6 +149,72 @@ async function main() {
       date: '2026-08-01',
       time: '10:00',
     });
+    // P0-B2 finance seed (Admin SDK / rules-disabled)
+    await db.doc('providerCommercialTerms/approved1').set({
+      providerId: 'approved1',
+      currency: 'LKR',
+      types: {
+        in_person: {
+          consultationType: 'in_person',
+          consultationPrice: 1000,
+          providerPayout: 600,
+          platformGross: 400,
+          facilityFee: 0,
+          active: true,
+          version: 1,
+        },
+      },
+    });
+    await db.doc('providerCommercialTerms/otherProvider').set({
+      providerId: 'otherProvider',
+      types: {
+        in_person: {
+          consultationPrice: 1500,
+          providerPayout: 1000,
+          platformGross: 500,
+          active: true,
+          version: 1,
+        },
+      },
+    });
+    await db.doc('payments/pay1').set({
+      userId: 'patient1',
+      providerUserId: 'approved1',
+      status: 'PAID',
+      providerPayout: 600,
+      platformGrossRevenue: 400,
+      grossAmount: 1000,
+    });
+    await db.doc('payments/payOther').set({
+      userId: 'someoneElse',
+      providerUserId: 'otherProvider',
+      status: 'PAID',
+      providerPayout: 1000,
+      platformGrossRevenue: 500,
+      grossAmount: 1500,
+    });
+    await db.doc('settlements/set1').set({
+      providerId: 'approved1',
+      amount: 600,
+      status: 'OPEN',
+    });
+    await db.doc('settlements/setOther').set({
+      providerId: 'otherProvider',
+      amount: 1000,
+      status: 'OPEN',
+    });
+    await db.doc('slotLocks/lock1').set({
+      providerId: 'approved1',
+      status: 'HOLDING',
+      date: '2026-08-01',
+      time: '10:00',
+    });
+    await db.doc('counters/appointment-2026').set({ seq: 1, kind: 'appointment', year: 2026 });
+    await db.doc('settlementReconciliations/rec1').set({
+      providerId: 'approved1',
+      amount: 100,
+      status: 'OPEN',
+    });
   });
 
   console.log('\n=== P0-A LIVE EMULATOR RULES TESTS ===\n');
@@ -313,6 +379,65 @@ async function main() {
       'admin: /medical/** still inaccessible to clients',
       storage.ref('medical/patient1/note.jpg').put(tinyJpeg(), { contentType: 'image/jpeg' })
     );
+  }
+
+  // ─── 6. P0-B2 FINANCE COLLECTIONS ─────────────────────────────────
+  console.log('\n=== P0-B2 FINANCE RULES ===\n');
+  {
+    const unauth = testEnv.unauthenticatedContext().firestore();
+    await expectDenied('unauth: cannot read commercial terms', unauth.doc('providerCommercialTerms/approved1').get());
+    await expectDenied('unauth: cannot write payments', unauth.doc('payments/pay1').set({ status: 'PAID' }));
+    await expectDenied('unauth: cannot write counters', unauth.doc('counters/appointment-2026').set({ seq: 99 }));
+    await expectDenied('unauth: cannot write slotLocks', unauth.doc('slotLocks/lock1').set({ status: 'RELEASED' }));
+  }
+  {
+    const db = testEnv.authenticatedContext('patient1', { email: 'patient@test.com' }).firestore();
+    // Patients must not read internal commercial split via client SDK
+    await expectDenied('patient: cannot read commercial terms (API public price only)', db.doc('providerCommercialTerms/approved1').get());
+    await expectDenied('patient: cannot write commercial terms', db.doc('providerCommercialTerms/approved1').set({ hack: true }));
+    await expectAllowed('patient: can read own payment', db.doc('payments/pay1').get());
+    await expectDenied('patient: cannot read other payment', db.doc('payments/payOther').get());
+    await expectDenied('patient: cannot write payments', db.doc('payments/pay1').update({ providerPayout: 1 }));
+    await expectDenied('patient: cannot write settlements', db.doc('settlements/set1').set({ amount: 0 }));
+    await expectDenied('patient: cannot write counters', db.doc('counters/appointment-2026').update({ seq: 999 }));
+    await expectDenied('patient: cannot manipulate slot locks', db.doc('slotLocks/lock1').update({ status: 'RELEASED' }));
+    await expectDenied('patient: cannot read slot locks', db.doc('slotLocks/lock1').get());
+  }
+  {
+    const db = testEnv.authenticatedContext('pending1', { email: 'pending@test.com' }).firestore();
+    await expectDenied('pending provider: cannot read another provider terms', db.doc('providerCommercialTerms/approved1').get());
+    await expectDenied('pending provider: cannot write own terms', db.doc('providerCommercialTerms/pending1').set({
+      types: { in_person: { consultationPrice: 1, providerPayout: 1, platformGross: 0 } },
+    }));
+  }
+  {
+    const db = testEnv.authenticatedContext('approved1', { email: 'vendor@test.com' }).firestore();
+    await expectAllowed('approved provider: can read own commercial terms', db.doc('providerCommercialTerms/approved1').get());
+    await expectDenied('approved provider: cannot read other provider terms', db.doc('providerCommercialTerms/otherProvider').get());
+    await expectDenied('approved provider: cannot modify own commercial terms', db.doc('providerCommercialTerms/approved1').update({
+      types: { in_person: { consultationPrice: 1, providerPayout: 1, platformGross: 0, active: true } },
+    }));
+    await expectAllowed('approved provider: can read own payment', db.doc('payments/pay1').get());
+    await expectDenied('approved provider: cannot read other provider payment', db.doc('payments/payOther').get());
+    await expectDenied('approved provider: cannot write payments', db.doc('payments/pay1').update({ status: 'REFUNDED' }));
+    await expectAllowed('approved provider: can read own settlement', db.doc('settlements/set1').get());
+    await expectDenied('approved provider: cannot read other settlement', db.doc('settlements/setOther').get());
+    await expectDenied('approved provider: cannot write settlements', db.doc('settlements/set1').update({ status: 'COMPLETED' }));
+    await expectDenied('approved provider: cannot write counters', db.doc('counters/appointment-2026').update({ seq: 1 }));
+    await expectDenied('approved provider: cannot write slotLocks', db.doc('slotLocks/lock1').update({ status: 'CONSUMED' }));
+  }
+  {
+    const db = testEnv.authenticatedContext('admin1', { email: 'admin@test.com' }).firestore();
+    await expectAllowed('admin: can read commercial terms', db.doc('providerCommercialTerms/approved1').get());
+    await expectAllowed('admin: can read payments', db.doc('payments/pay1').get());
+    await expectAllowed('admin: can read settlements', db.doc('settlements/set1').get());
+    await expectAllowed('admin: can read reconciliations', db.doc('settlementReconciliations/rec1').get());
+    // Sensitive writes remain Admin SDK / Express authoritative
+    await expectDenied('admin client: cannot write commercial terms (API/Admin SDK)', db.doc('providerCommercialTerms/approved1').update({ version: 99 }));
+    await expectDenied('admin client: cannot write payments', db.doc('payments/pay1').update({ status: 'REFUNDED' }));
+    await expectDenied('admin client: cannot write settlements', db.doc('settlements/set1').update({ status: 'COMPLETED' }));
+    await expectDenied('admin client: cannot write counters', db.doc('counters/appointment-2026').update({ seq: 50 }));
+    await expectDenied('admin client: cannot write slotLocks', db.doc('slotLocks/lock1').update({ status: 'RELEASED' }));
   }
 
   await testEnv.cleanup();

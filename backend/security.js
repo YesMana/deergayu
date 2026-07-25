@@ -51,6 +51,7 @@ const PUBLIC_SETTINGS_KEYS = [
   'payhereEnabled',
   'contactEmail',
   'socialLinks',
+  'appointmentPaymentsEnabled',
 ];
 
 /** Settings that must never leave admin APIs. */
@@ -63,6 +64,10 @@ const PRIVATE_SETTINGS_KEYS = [
   'autoApproveExperts',
   'autoApproveProducts',
   'homeStatsFloor',
+  'providerPayoutHoldHours',
+  'settlementCadence',
+  'gatewayFeeAmount',
+  'absorbGatewayFees',
 ];
 
 function isProviderRole(role) {
@@ -85,6 +90,8 @@ function pickPublicSettings(settings = {}, { payhereConfigured = false } = {}) {
     payhereEnabled: Boolean(settings.payhereEnabled && payhereConfigured),
     contactEmail: String(settings.contactEmail || ''),
     socialLinks: settings.socialLinks || {},
+    // Safe flag only — never expose payout hold / gateway fee internals
+    appointmentPaymentsEnabled: Boolean(settings.appointmentPaymentsEnabled),
   };
 }
 
