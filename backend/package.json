@@ -4,7 +4,7 @@
   "main": "index.js",
   "scripts": {
     "start": "node server.js",
-    "test": "node tests/security.unit.test.js && node tests/firestore.rules.static.test.js",
+    "test": "node tests/security.unit.test.js && node tests/firestore.rules.static.test.js && node tests/finance.unit.test.js",
     "test:rules:emulator": "cd .. && npx --prefix backend firebase emulators:exec --only firestore,storage --project deergayu-rules-test \"node backend/tests/firestore.rules.emulator.test.js\""
   },
   "keywords": [],

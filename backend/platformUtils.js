@@ -42,6 +42,14 @@ const DEFAULT_SETTINGS = {
     productCount: 120,
     appointmentCount: 1000,
   },
+  // P0-B2 payment foundation — appointment payments OFF until Dialog Pay approval
+  appointmentPaymentsEnabled: false,
+  slotHoldMinutes: 10,
+  providerPayoutHoldHours: 24,
+  settlementCadence: 'WEEKLY',
+  /** Explicit gateway fee amount only (never invent Dialog %); Deergayu absorbs. */
+  gatewayFeeAmount: 0,
+  absorbGatewayFees: true,
 };
 
 async function getSettings(db) {

@@ -76,11 +76,17 @@ test('public settings never include adminEmails or commissions', () => {
     payhereEnabled: true,
     contactEmail: 'info@deergayu.com',
     shippingZones: [{ id: 'island', fee: 500 }],
+    appointmentPaymentsEnabled: false,
+    gatewayFeeAmount: 99,
+    providerPayoutHoldHours: 24,
   }, { payhereConfigured: true });
   assert.strictEqual(pub.adminEmails, undefined);
   assert.strictEqual(pub.commissionPercent, undefined);
   assert.strictEqual(pub.bankDetails.bank, 'PB');
   assert.strictEqual(pub.payhereEnabled, true);
+  assert.strictEqual(pub.appointmentPaymentsEnabled, false);
+  assert.strictEqual(pub.gatewayFeeAmount, undefined);
+  assert.strictEqual(pub.providerPayoutHoldHours, undefined);
   assert.ok(!('categories' in pub));
 });
 

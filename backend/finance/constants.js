@@ -1,0 +1,140 @@
+/**
+ * P0-B2 payment foundation constants.
+ * Launch commercial numbers live only as DEFAULT TEMPLATES — never in booking math.
+ */
+
+const CURRENCY_LKR = 'LKR';
+
+const CONSULTATION_TYPES = ['in_person', 'video', 'audio'];
+
+const PRICING_MODELS = {
+  FIXED_SPLIT: 'FIXED_SPLIT',
+  PERCENTAGE_SPLIT: 'PERCENTAGE_SPLIT',
+  CUSTOM: 'CUSTOM',
+};
+
+/** Defaults for admin “create terms” UI only — booking must load live terms. */
+const DEFAULT_LAUNCH_COMMERCIAL_TEMPLATE = {
+  currency: CURRENCY_LKR,
+  pricingModel: PRICING_MODELS.FIXED_SPLIT,
+  consultationPrice: 1000,
+  providerPayout: 600,
+  platformGross: 400,
+  facilityFee: 0,
+};
+
+const PAYMENT_STATUSES = {
+  CREATED: 'CREATED',
+  PENDING: 'PENDING',
+  PROCESSING: 'PROCESSING',
+  PAID: 'PAID',
+  FAILED: 'FAILED',
+  CANCELLED: 'CANCELLED',
+  REFUND_PENDING: 'REFUND_PENDING',
+  PARTIALLY_REFUNDED: 'PARTIALLY_REFUNDED',
+  REFUNDED: 'REFUNDED',
+};
+
+/** Allowed payment status transitions (server-authoritative). */
+const PAYMENT_TRANSITIONS = {
+  CREATED: ['PENDING', 'PROCESSING', 'CANCELLED', 'FAILED'],
+  PENDING: ['PROCESSING', 'PAID', 'FAILED', 'CANCELLED'],
+  PROCESSING: ['PAID', 'FAILED', 'CANCELLED'],
+  PAID: ['REFUND_PENDING', 'PARTIALLY_REFUNDED', 'REFUNDED'],
+  FAILED: [],
+  CANCELLED: [],
+  REFUND_PENDING: ['PARTIALLY_REFUNDED', 'REFUNDED', 'PAID'],
+  PARTIALLY_REFUNDED: ['REFUND_PENDING', 'REFUNDED'],
+  REFUNDED: [],
+};
+
+const APPOINTMENT_STATUSES = {
+  // Paid lifecycle
+  PAYMENT_PENDING: 'PAYMENT_PENDING',
+  CONFIRMED: 'CONFIRMED',
+  COMPLETED: 'COMPLETED',
+  CANCELLED: 'CANCELLED',
+  NO_SHOW: 'NO_SHOW',
+  EXPIRED: 'EXPIRED',
+  // Legacy (pre-payment)
+  PENDING: 'pending',
+  ACCEPTED: 'accepted',
+  REJECTED: 'rejected',
+};
+
+const LEGACY_APPOINTMENT_STATUSES = ['pending', 'accepted', 'rejected', 'confirmed', 'completed', 'cancelled'];
+
+const PAID_APPOINTMENT_STATUSES = [
+  'PAYMENT_PENDING',
+  'CONFIRMED',
+  'COMPLETED',
+  'CANCELLED',
+  'NO_SHOW',
+  'EXPIRED',
+];
+
+const SLOT_HOLD_STATUSES = {
+  HOLDING: 'HOLDING',
+  CONSUMED: 'CONSUMED',
+  EXPIRED: 'EXPIRED',
+  RELEASED: 'RELEASED',
+};
+
+const PROVIDER_PAYMENT_STATUSES = {
+  PENDING: 'PENDING',
+  ELIGIBLE: 'ELIGIBLE',
+  PAID: 'PAID',
+  HELD: 'HELD',
+  REVERSED: 'REVERSED',
+};
+
+const SETTLEMENT_STATUSES = {
+  DRAFT: 'DRAFT',
+  OPEN: 'OPEN',
+  COMPLETED: 'COMPLETED',
+  CANCELLED: 'CANCELLED',
+};
+
+const REFUND_TYPES = {
+  FULL_REFUND: 'FULL_REFUND',
+  PARTIAL_REFUND: 'PARTIAL_REFUND',
+  NO_REFUND: 'NO_REFUND',
+};
+
+const PAYMENT_PURPOSES = {
+  APPOINTMENT: 'appointment',
+  ORDER: 'order',
+};
+
+const PAYMENT_PROVIDERS = {
+  DIALOG_PAY: 'dialog_pay',
+  PAYHERE: 'payhere',
+  MANUAL: 'manual',
+  NONE: 'none',
+};
+
+const REFERENCE_PREFIXES = {
+  appointment: 'DG-APT',
+  payment: 'DG-PAY',
+  order: 'DG-ORD',
+  settlement: 'DG-SET',
+};
+
+module.exports = {
+  CURRENCY_LKR,
+  CONSULTATION_TYPES,
+  PRICING_MODELS,
+  DEFAULT_LAUNCH_COMMERCIAL_TEMPLATE,
+  PAYMENT_STATUSES,
+  PAYMENT_TRANSITIONS,
+  APPOINTMENT_STATUSES,
+  LEGACY_APPOINTMENT_STATUSES,
+  PAID_APPOINTMENT_STATUSES,
+  SLOT_HOLD_STATUSES,
+  PROVIDER_PAYMENT_STATUSES,
+  SETTLEMENT_STATUSES,
+  REFUND_TYPES,
+  PAYMENT_PURPOSES,
+  PAYMENT_PROVIDERS,
+  REFERENCE_PREFIXES,
+};

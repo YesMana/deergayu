@@ -155,6 +155,51 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    // ---------- P0-B2 payment foundation (API-only writes) ----------
+    match /providerCommercialTerms/{providerId} {
+      allow read: if isAdmin() || (signedIn() && request.auth.uid == providerId);
+      allow create, update, delete: if false;
+
+      match /history/{historyId} {
+        allow read: if isAdmin();
+        allow write: if false;
+      }
+    }
+
+    match /providerCommercialChangeRequests/{id} {
+      allow read: if isAdmin()
+                  || (signedIn() && resource.data.providerId == request.auth.uid);
+      allow create, update, delete: if false;
+    }
+
+    match /payments/{id} {
+      allow read: if isAdmin()
+                  || (signedIn() && (
+                    resource.data.userId == request.auth.uid
+                    || resource.data.providerUserId == request.auth.uid
+                  ));
+      allow create, update, delete: if false;
+    }
+
+    match /slotLocks/{id} {
+      allow read, write: if false;
+    }
+
+    match /settlements/{id} {
+      allow read: if isAdmin()
+                  || (signedIn() && resource.data.providerId == request.auth.uid);
+      allow create, update, delete: if false;
+    }
+
+    match /settlementReconciliations/{id} {
+      allow read: if isAdmin();
+      allow create, update, delete: if false;
+    }
+
+    match /counters/{id} {
+      allow read, write: if false;
+    }
+
     // Default deny
     match /{document=**} {
       allow read, write: if false;
