@@ -254,8 +254,7 @@ export default function HomeScreen() {
             { icon: 'groups' as const, value: shown.expertCount, label: 'Experts' },
             { icon: 'inventory-2' as const, value: shown.productCount, label: 'Products' },
             { icon: 'event-available' as const, value: shown.appointmentCount, label: 'Bookings' },
-            { icon: 'verified' as const, value: '100%', label: 'Natural' },
-          ];
+          ].filter((s) => Number(s.value) > 0);
         })().map((s) => (
           <View key={s.label} style={styles.statCard}>
             <View style={styles.statIconWrap}>
