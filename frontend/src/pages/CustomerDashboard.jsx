@@ -80,13 +80,18 @@ const CustomerDashboard = () => {
     }
   };
 
-  const upcomingAppts = appointments.filter(a => ['pending', 'accepted'].includes(a.status));
+  const upcomingAppts = appointments.filter(a => ['pending', 'accepted', 'confirmed'].includes(a.status));
+  const cancelledAppts = appointments.filter(a => ['cancelled', 'rejected'].includes(a.status));
+  const pastAppts = appointments.filter(
+    (a) => !['pending', 'accepted', 'confirmed'].includes(a.status) && !['cancelled', 'rejected'].includes(a.status)
+  );
   const recentOrders = orders.slice(0, 3);
 
   const tabs = [
     { id: 'overview', label: 'Overview', icon: User },
     { id: 'orders', label: `Orders${orders.length > 0 ? ` (${orders.length})` : ''}`, icon: Package },
     { id: 'appointments', label: `Appointments${upcomingAppts.length > 0 ? ` (${upcomingAppts.length})` : ''}`, icon: Calendar },
+    { id: 'profile', label: 'Profile', icon: User },
   ];
 
   const profileInitial = (user?.displayName || user?.email || 'U')[0].toUpperCase();
@@ -107,7 +112,7 @@ const CustomerDashboard = () => {
             <div className="dashboard-profile-info">
               <h1>Welcome back, {user?.displayName || user?.email?.split('@')[0]}!</h1>
               <p>{user?.email}</p>
-              <span className="member-badge"><Star size={12} fill="var(--secondary-color)" stroke="none" /> Premium Member</span>
+              <span className="member-badge"><Star size={12} fill="var(--secondary-color)" stroke="none" /> Patient account</span>
             </div>
           </div>
 
@@ -217,8 +222,8 @@ const CustomerDashboard = () => {
                   <div className="empty-state" style={{ padding: '2rem' }}>
                     <Calendar size={36} style={{ opacity: 0.4, marginBottom: '0.5rem' }} />
                     <p>No upcoming appointments</p>
-                    <Link to="/channeling" className="btn btn-primary btn-sm" style={{ marginTop: '0.75rem' }}>
-                      <Calendar size={14} /> Book a Doctor
+                    <Link to="/doctors" className="btn btn-primary btn-sm" style={{ marginTop: '0.75rem' }}>
+                      <Calendar size={14} /> Find a Doctor
                     </Link>
                   </div>
                 ) : upcomingAppts.slice(0, 3).map(apt => {
@@ -247,9 +252,9 @@ const CustomerDashboard = () => {
                 <span>Browse Ayurvedic Shop</span>
                 <ChevronRight size={16} color="var(--text-muted)" />
               </Link>
-              <Link to="/channeling" className="quick-link-card glass-panel glass-panel-hover">
+              <Link to="/doctors" className="quick-link-card glass-panel glass-panel-hover">
                 <Calendar size={28} color="var(--secondary-color)" />
-                <span>Book a Doctor</span>
+                <span>Find a Doctor</span>
                 <ChevronRight size={16} color="var(--text-muted)" />
               </Link>
               <Link to="/ayurvedic-guide" className="quick-link-card glass-panel glass-panel-hover">
@@ -346,8 +351,8 @@ const CustomerDashboard = () => {
                 <Calendar size={48} style={{ opacity: 0.4, margin: '0 auto 1rem' }} />
                 <h3>No Appointments Yet</h3>
                 <p>Book a session with an Ayurvedic doctor.</p>
-                <Link to="/channeling" className="btn btn-primary" style={{ marginTop: '1rem' }}>
-                  <Calendar size={18} /> Book Appointment
+                <Link to="/doctors" className="btn btn-primary" style={{ marginTop: '1rem' }}>
+                  <Calendar size={18} /> Find a Doctor
                 </Link>
               </div>
             ) : (
@@ -365,7 +370,13 @@ const CustomerDashboard = () => {
                               <div>
                                 <h3>{apt.providerName || 'Doctor'}</h3>
                                 <p className="appt-time"><Calendar size={13} /> {apt.date} &nbsp;<Clock size={13} /> {apt.time}</p>
-                                {apt.notes && <p className="appt-notes">📝 {apt.notes}</p>}
+                                {apt.consultationType && (
+                                  <p className="appt-notes">Type: {String(apt.consultationType).replace('_', ' ')}</p>
+                                )}
+                                {apt.notes && <p className="appt-notes">{apt.notes}</p>}
+                                {apt.paymentReference && (
+                                  <p className="appt-notes">Payment ref: {apt.paymentReference}</p>
+                                )}
                               </div>
                               <div className="appt-actions">
                                 <span className="status-pill" style={{ background: s.bg, color: s.color }}>
@@ -386,15 +397,43 @@ const CustomerDashboard = () => {
                   </div>
                 )}
 
-                {appointments.filter(a => !['pending', 'accepted'].includes(a.status)).length > 0 && (
+                {pastAppts.length > 0 && (
                   <div>
-                    <h2 className="appt-section-title" style={{ opacity: 0.7 }}>Past Appointments</h2>
+                    <h2 className="appt-section-title" style={{ opacity: 0.7 }}>Past ({pastAppts.length})</h2>
                     <div className="appt-list">
-                      {appointments.filter(a => !['pending', 'accepted'].includes(a.status)).map(apt => {
+                      {pastAppts.map(apt => {
+                        const s = statusConfig[apt.status] || statusConfig.pending;
+                        const Icon = s.Icon;
+                        return (
+                          <div key={apt.id} className="appt-card glass-panel" style={{ opacity: 0.85 }}>
+                            <div className="appt-card-body">
+                              <div>
+                                <h3>{apt.providerName || 'Doctor'}</h3>
+                                <p className="appt-time"><Calendar size={13} /> {apt.date} &nbsp;<Clock size={13} /> {apt.time}</p>
+                                {apt.consultationType && (
+                                  <p className="appt-notes">Type: {String(apt.consultationType).replace('_', ' ')}</p>
+                                )}
+                              </div>
+                              <span className="status-pill" style={{ background: s.bg, color: s.color }}>
+                                <Icon size={12} /> {s.label}
+                              </span>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {cancelledAppts.length > 0 && (
+                  <div>
+                    <h2 className="appt-section-title" style={{ opacity: 0.7 }}>Cancelled ({cancelledAppts.length})</h2>
+                    <div className="appt-list">
+                      {cancelledAppts.map(apt => {
                         const s = statusConfig[apt.status] || statusConfig.cancelled;
                         const Icon = s.Icon;
                         return (
-                          <div key={apt.id} className="appt-card glass-panel" style={{ opacity: 0.75 }}>
+                          <div key={apt.id} className="appt-card glass-panel" style={{ opacity: 0.7 }}>
                             <div className="appt-card-body">
                               <div>
                                 <h3>{apt.providerName || 'Doctor'}</h3>
@@ -412,6 +451,27 @@ const CustomerDashboard = () => {
                 )}
               </div>
             )}
+          </div>
+        )}
+
+        {activeTab === 'profile' && (
+          <div className="tab-content animate-fade-in">
+            <div className="glass-panel" style={{ padding: '1.5rem', maxWidth: 520 }}>
+              <h2 style={{ marginTop: 0 }}>Your profile</h2>
+              <p><strong>Name:</strong> {user?.displayName || '—'}</p>
+              <p><strong>Email:</strong> {user?.email || '—'}</p>
+              <p><strong>Role:</strong> Patient</p>
+              <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>
+                Appointment online payments may appear here later when enabled. Current bookings remain readable.
+              </p>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.65rem', marginTop: '1rem' }}>
+                <Link to="/doctors" className="btn btn-primary btn-sm">Find a Doctor</Link>
+                <Link to="/contact" className="btn btn-outline btn-sm">Contact support</Link>
+                <button type="button" className="btn btn-outline btn-sm" onClick={() => window.location.href = '/login'}>
+                  Account / logout via menu
+                </button>
+              </div>
+            </div>
           </div>
         )}
       </div>

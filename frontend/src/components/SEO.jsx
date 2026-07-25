@@ -2,8 +2,8 @@ import React from 'react';
 import { Helmet } from 'react-helmet-async';
 
 const SEO = ({
-  title = "Deergayu | Sri Lanka's #1 Ayurvedic Platform",
-  description = "Deergayu is Sri Lanka's #1 Ayurvedic Platform. Connect with certified doctors, shop authentic herbal remedies, and embrace holistic wellness.",
+  title = 'Deergayu | Sri Lankan Digital Healthcare & Ayurveda',
+  description = 'Deergayu connects patients with approved healthcare providers and Ayurveda services in Sri Lanka — book consultations, read the guide, and shop wellness products.',
   image = "https://deergayu.com/weda-gedara.png",
   url = "https://deergayu.com",
   type = "website",

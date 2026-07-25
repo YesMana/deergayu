@@ -330,7 +330,9 @@ apiRouter.get('/sitemap-data', async (req, res) => {
     res.json({
       baseUrl: 'https://deergayu.com',
       static: [
-        '/', '/shop', '/channeling', '/ayurvedic-guide', '/videos', '/astrology',
+        '/', '/shop', '/doctors', '/specialties', '/channeling', '/ayurveda',
+        '/online-consultation', '/about', '/faq', '/join-as-doctor', '/join-as-clinic',
+        '/ayurvedic-guide', '/videos', '/astrology',
         '/contact', '/privacy', '/terms', '/refund-policy',
       ],
       products,

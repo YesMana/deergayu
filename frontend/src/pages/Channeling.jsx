@@ -36,12 +36,14 @@ const Channeling = () => {
   const [searchParams] = useSearchParams();
   const initialTab = searchParams.get('tab') || 'all';
   const initialService = searchParams.get('service') || 'all';
+  const bookProviderId = searchParams.get('book') || '';
 
   const [filterType, setFilterType] = useState(initialTab);
   const [searchQuery, setSearchQuery] = useState('');
   const [provinceFilter, setProvinceFilter] = useState('all');
   const [districtFilter, setDistrictFilter] = useState('all');
   const [specialtyFilter, setSpecialtyFilter] = useState(initialService);
+  const [bookDeepLinkHandled, setBookDeepLinkHandled] = useState(false);
   
   // Booking Modal State
   const [selectedProvider, setSelectedProvider] = useState(null);
@@ -73,6 +75,19 @@ const Channeling = () => {
       fetchAvailableSlots(bookingDate);
     }
   }, [bookingDate, selectedProvider]);
+
+  // Deep-link: /channeling?book=:providerId opens booking for that provider
+  useEffect(() => {
+    if (bookDeepLinkHandled || !bookProviderId || !providers.length) return;
+    const provider = providers.find((p) => p.id === bookProviderId);
+    if (!provider) {
+      setBookDeepLinkHandled(true);
+      return;
+    }
+    setBookDeepLinkHandled(true);
+    handleBookClick(provider, 'in_person');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bookProviderId, providers, bookDeepLinkHandled]);
 
   const fetchAvailableSlots = async (date) => {
     setLoadingSlots(true);

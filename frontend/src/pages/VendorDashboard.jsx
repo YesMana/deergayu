@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Package, ShoppingBag, Settings, CheckCircle, Clock, Calendar, Trash2 } from 'lucide-react';
+import { Package, ShoppingBag, Settings, CheckCircle, Clock, Calendar, Trash2, Wallet } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { db, auth } from '../firebase';
@@ -124,6 +124,9 @@ const VendorDashboard = () => {
   const [editImages, setEditImages] = useState([null, null, null, null]);
   const [editUploadingSlot, setEditUploadingSlot] = useState(null);
   const [savingEdit, setSavingEdit] = useState(false);
+
+  const [commercialTerms, setCommercialTerms] = useState(null);
+  const [loadingCommercial, setLoadingCommercial] = useState(false);
 
   const [schedule, setSchedule] = useState({
     slotDuration: 30,
@@ -818,6 +821,33 @@ const VendorDashboard = () => {
 
   const isDoctor = ['doctor', 'clinic', 'organization'].includes(user?.role);
 
+  useEffect(() => {
+    if (!user || activeTab !== 'commercial') return;
+    let cancelled = false;
+    (async () => {
+      setLoadingCommercial(true);
+      try {
+        const token = await auth.currentUser.getIdToken();
+        const res = await fetch(`${API_URL}/api/vendor/commercial-terms`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!res.ok) throw new Error('Failed to load commercial terms');
+        const data = await res.json();
+        if (!cancelled) setCommercialTerms(data);
+      } catch (e) {
+        if (!cancelled) {
+          setCommercialTerms(null);
+          error(e.message || 'Could not load commercial terms');
+        }
+      } finally {
+        if (!cancelled) setLoadingCommercial(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [user, activeTab, error]);
+
   return (
     <div className="admin-layout animate-fade-in">
       {/* ── Premium Sidebar ── */}
@@ -858,6 +888,11 @@ const VendorDashboard = () => {
               <Clock size={17} /> My Schedule
             </li>
           )}
+          {isDoctor && (
+            <li className={activeTab === 'commercial' ? 'active' : ''} onClick={() => setActiveTab('commercial')}>
+              <Wallet size={17} /> Commercial Terms
+            </li>
+          )}
           <li className={activeTab === 'settings' ? 'active' : ''} onClick={() => setActiveTab('settings')}>
             <Settings size={17} /> {isDoctor ? 'My Profile' : 'Settings'}
           </li>
@@ -874,7 +909,8 @@ const VendorDashboard = () => {
                activeTab === 'products' ? 'My Products' :
                activeTab === 'orders' ? 'Customer Orders' :
                activeTab === 'appointments' ? 'Appointments' :
-               activeTab === 'schedule' ? 'My Schedule' : 'Settings'}
+               activeTab === 'schedule' ? 'My Schedule' :
+               activeTab === 'commercial' ? 'Commercial Terms' : 'Settings'}
             </h1>
             <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', margin: '0.3rem 0 0' }}>
               {activeTab === 'overview' ? `Welcome back, ${user?.displayName || user?.name || 'User'}` :
@@ -1699,6 +1735,38 @@ const VendorDashboard = () => {
                     )}
                   </tbody>
                 </table>
+              )}
+            </div>
+          )}
+
+          {activeTab === 'commercial' && isDoctor && (
+            <div className="glass-panel table-container" style={{ maxWidth: 720 }}>
+              <h2 style={{ color: 'var(--text-primary)', marginTop: 0 }}>Your commercial terms</h2>
+              <p style={{ color: 'var(--text-secondary)', fontSize: '0.875rem' }}>
+                Read-only view of patient fee, your payout, and Deergayu gross for each consultation type.
+                Changes require admin agreement. Appointment online payments may still be disabled platform-wide.
+              </p>
+              {loadingCommercial ? (
+                <p>Loading…</p>
+              ) : !commercialTerms || !commercialTerms.types || !Object.keys(commercialTerms.types).length ? (
+                <p style={{ color: 'var(--text-secondary)' }}>
+                  No commercial terms configured yet. Contact Deergayu admin to set patient price and payout.
+                </p>
+              ) : (
+                <div style={{ display: 'grid', gap: '0.85rem', marginTop: '1rem' }}>
+                  {Object.entries(commercialTerms.types).map(([type, term]) => (
+                    <div key={type} style={{ border: '1px solid var(--glass-border)', borderRadius: 12, padding: '1rem' }}>
+                      <strong style={{ textTransform: 'capitalize' }}>{String(type).replace('_', ' ')}</strong>
+                      {term.active === false && <span style={{ marginLeft: 8, color: '#ef5350' }}>(inactive)</span>}
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '0.65rem', marginTop: '0.65rem', fontSize: '0.9rem' }}>
+                        <div>Patient price<br /><strong>LKR {Number(term.consultationPrice || 0).toLocaleString()}</strong></div>
+                        <div>Your payout<br /><strong>LKR {Number(term.providerPayout || 0).toLocaleString()}</strong></div>
+                        <div>Deergayu gross<br /><strong>LKR {Number(term.platformGross || 0).toLocaleString()}</strong></div>
+                        <div>Facility fee<br /><strong>LKR {Number(term.facilityFee || 0).toLocaleString()}</strong></div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               )}
             </div>
           )}
