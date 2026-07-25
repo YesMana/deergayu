@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   LayoutDashboard,
   Users,
@@ -13,8 +13,8 @@ import {
   Mail,
   Share2,
 } from 'lucide-react';
-import { collection, getCountFromServer, query, where } from 'firebase/firestore';
-import { db } from '../firebase';
+import { auth } from '../firebase';
+import { API_URL } from '../config/api';
 
 // Components
 import OverviewDashboard from '../components/Admin/OverviewDashboard';
@@ -43,42 +43,27 @@ const AdminDashboard = () => {
   const [pendingOrders, setPendingOrders] = useState(0);
   const [newInquiries, setNewInquiries] = useState(0);
 
+  const fetchBadgeCounts = useCallback(async () => {
+    try {
+      const token = await auth.currentUser?.getIdToken();
+      if (!token) return;
+      const res = await fetch(`${API_URL}/api/admin/overview`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) return;
+      const data = await res.json();
+      setPendingExperts(Number(data.pendingExperts) || 0);
+      setPendingProducts(Number(data.pendingProducts) || 0);
+      setPendingOrders(Number(data.pendingOrders) || 0);
+      setNewInquiries(Number(data.newInquiries ?? data.pendingContacts ?? 0) || 0);
+    } catch (e) {
+      console.error('Failed to fetch badge counts', e);
+    }
+  }, []);
+
   useEffect(() => {
-    const fetchBadgeCounts = async () => {
-      try {
-        const usersQ = query(
-          collection(db, 'users'),
-          where('status', '==', 'pending'),
-          where('role', 'in', ['doctor', 'clinic', 'organization', 'vendor'])
-        );
-        const usersSnap = await getCountFromServer(usersQ);
-        setPendingExperts(usersSnap.data().count);
-
-        const productsQ = query(collection(db, 'products'), where('status', '==', 'pending'));
-        const productsSnap = await getCountFromServer(productsQ);
-        setPendingProducts(productsSnap.data().count);
-
-        const ordersQ = query(collection(db, 'orders'), where('status', '==', 'pending'));
-        const ordersSnap = await getCountFromServer(ordersQ);
-        setPendingOrders(ordersSnap.data().count);
-
-        try {
-          const contactQ = query(
-            collection(db, 'contact_messages'),
-            where('status', '==', 'new')
-          );
-          const contactSnap = await getCountFromServer(contactQ);
-          setNewInquiries(contactSnap.data().count);
-        } catch {
-          /* index may be missing — ignore badge */
-        }
-      } catch (e) {
-        console.error('Failed to fetch badge counts', e);
-      }
-    };
-
     fetchBadgeCounts();
-  }, [activeTab]);
+  }, [activeTab, fetchBadgeCounts]);
 
   const navItems = [
     { id: 'dashboard', label: 'Overview', Icon: LayoutDashboard },

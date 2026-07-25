@@ -3,7 +3,7 @@ import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
 import { db } from '../firebase';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { doc, getDoc } from 'firebase/firestore';
 import './Login.css';
 import { API_URL } from '../config/api';
 
@@ -41,7 +41,7 @@ const Login = () => {
     else if (location.state?.role) setRole(location.state.role);
   }, [location.state, searchParams]);
   
-  const { loginWithEmail, signupWithEmail, loginWithGoogle, resetPassword } = useAuth();
+  const { loginWithEmail, signupWithEmail, loginWithGoogle, resetPassword, completeRegistration } = useAuth();
   const { t } = useLanguage();
   const navigate = useNavigate();
 
@@ -123,25 +123,28 @@ const Login = () => {
       const userDoc = await getDoc(userDocRef);
       
       if (!userDoc.exists()) {
-        const isSuperAdmin = user.email && user.email.toLowerCase() === 'yes.manujaya@gmail.com';
-        const newUserData = {
+        // Never set admin/role/status from the client — Admin SDK handles privilege fields
+        await completeRegistration(user, {
           name: user.displayName || 'New User',
-          email: user.email,
-          role: isSuperAdmin ? 'admin' : 'user',
-          status: 'approved',
-          createdAt: new Date().toISOString()
-        };
-        await setDoc(userDocRef, newUserData);
-
-        fetch(`${API_URL}/api/auth/register-notify`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            name: newUserData.name,
-            email: newUserData.email,
-            role: newUserData.role,
-          }),
-        }).catch(e => console.error('Register notify error:', e));
+          role: 'user',
+        });
+        try {
+          const token = await user.getIdToken();
+          await fetch(`${API_URL}/api/auth/register-notify`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({
+              name: user.displayName || 'New User',
+              email: user.email,
+              role: 'user',
+            }),
+          });
+        } catch (e) {
+          console.error('Register notify error:', e);
+        }
       }
       await handleAdminRouting(user);
     } catch (err) {

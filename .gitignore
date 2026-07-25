@@ -7,3 +7,10 @@ _ref_agency-agents/
 .cursor/
 _ref_agency-agents
 .cursor
+
+# Firebase emulators
+firebase-debug.log
+firestore-debug.log
+storage-debug.log
+ui-debug.log
+.firebase/

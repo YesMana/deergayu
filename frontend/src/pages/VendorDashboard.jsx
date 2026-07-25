@@ -2,9 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { Package, ShoppingBag, Settings, CheckCircle, Clock, Calendar, Trash2 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
-import { db, auth, storage } from '../firebase';
-import { doc, updateDoc, collection, query, where, orderBy, onSnapshot } from 'firebase/firestore';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { db, auth } from '../firebase';
+import { collection, query, where, orderBy, onSnapshot } from 'firebase/firestore';
 import PartnerSupportCard from '../components/PartnerSupportCard';
 import './AdminDashboard.css';
 import { API_URL } from '../config/api';
@@ -214,8 +213,12 @@ const VendorDashboard = () => {
       fetchProducts();
       fetchOrders();
       fetchEarnings();
-      fetch(`${API_URL}/api/categories`)
-        .then((r) => r.ok ? r.json() : null)
+      auth.currentUser?.getIdToken().then((token) =>
+        fetch(`${API_URL}/api/categories`, {
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+        })
+      )
+        .then((r) => (r && r.ok ? r.json() : null))
         .then((data) => {
           if (data?.categories?.length) {
             setPlatformCategories(data.categories);
@@ -494,29 +497,38 @@ const VendorDashboard = () => {
     setEditImages(slots);
   };
 
-  // Save edited product to Firestore directly (pending re-approval not needed for minor edits)
+  // Save edited product via API (server validates ownership + pricing; cannot self-publish)
   const handleSaveEdit = async (e) => {
     if (e && e.preventDefault) e.preventDefault();
     if (!editingProduct) return;
     setSavingEdit(true);
     try {
-      const sitePrice = calculateSitePrice(editingProduct.basePrice, editingProduct.category);
-      const { updateDoc, doc: firestoreDoc } = await import('firebase/firestore');
-      await updateDoc(firestoreDoc(db, 'products', editingProduct.id), {
-        name: editingProduct.name,
-        category: editingProduct.category,
-        description: editingProduct.description || '',
-        imageUrl: editingProduct.imageUrl || '',
-        images: editingProduct.images || [],
-        basePrice: Number(editingProduct.basePrice),
-        price: sitePrice, // Recalculate and update the site price shown to customers!
+      const token = await auth.currentUser.getIdToken();
+      const res = await fetch(`${API_URL}/api/vendor/products/${editingProduct.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          name: editingProduct.name,
+          category: editingProduct.category,
+          description: editingProduct.description || '',
+          imageUrl: editingProduct.imageUrl || '',
+          images: editingProduct.images || [],
+          basePrice: Number(editingProduct.basePrice),
+        }),
       });
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || 'Failed to save changes');
+      }
       success('Product updated successfully!');
       setEditingProduct(null);
       fetchProducts();
     } catch (err) {
       console.error('Edit product error:', err);
-      error('Failed to save changes.');
+      error(err.message || 'Failed to save changes.');
     } finally {
       setSavingEdit(false);
     }
@@ -590,16 +602,25 @@ const VendorDashboard = () => {
     e.preventDefault();
     setSubmittingProfile(true);
     try {
-      await updateDoc(doc(db, 'users', user.uid), {
-        profileDetails: profileData
+      const token = await auth.currentUser.getIdToken();
+      const res = await fetch(`${API_URL}/api/me/profile`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ profileDetails: profileData }),
       });
-      // Update local state temporarily to avoid reload
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || 'Failed to save profile details');
+      }
       user.profileDetails = profileData;
       success("Profile details saved!");
-      window.location.reload(); // Reload to clear pending state
+      window.location.reload();
     } catch (err) {
       console.error("Error updating profile", err);
-      error("Failed to save profile details");
+      error(err.message || "Failed to save profile details");
     } finally {
       setSubmittingProfile(false);
     }
@@ -609,7 +630,6 @@ const VendorDashboard = () => {
     if (e && e.preventDefault) e.preventDefault();
     setSavingSettings(true);
     try {
-      const userRef = doc(db, 'users', user.uid);
       const existingDetails = user.profileDetails || {};
       const specialtyVal = settingsData.specialty.includes(',')
         ? settingsData.specialty.split(',').map((s) => s.trim()).filter(Boolean)
@@ -624,10 +644,22 @@ const VendorDashboard = () => {
         doctorType: settingsData.doctorType || '',
         bio: settingsData.bio || '',
       };
-      await updateDoc(userRef, {
-        name: settingsData.name,
-        profileDetails: nextDetails,
+      const token = await auth.currentUser.getIdToken();
+      const res = await fetch(`${API_URL}/api/me/profile`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          name: settingsData.name,
+          profileDetails: nextDetails,
+        }),
       });
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || 'Failed to save profile');
+      }
       if (refreshUser) await refreshUser();
       user.profileDetails = nextDetails;
       user.displayName = settingsData.name;
@@ -635,7 +667,7 @@ const VendorDashboard = () => {
       success('Profile updated — photo and details are live on the site.');
     } catch (err) {
       console.error('Error saving settings:', err);
-      error('Failed to save profile. Please try again.');
+      error(err.message || 'Failed to save profile. Please try again.');
     } finally {
       setSavingSettings(false);
     }

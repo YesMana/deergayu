@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Search, ShieldAlert, ChevronLeft, ChevronRight } from 'lucide-react';
-import { collection, getDocs, doc, deleteDoc, query, orderBy, limit, startAfter, getCountFromServer, where } from 'firebase/firestore';
+import { collection, getDocs, query, orderBy, limit, startAfter, getCountFromServer, where } from 'firebase/firestore';
 import { db, auth } from '../../firebase';
 import { useToast } from '../../context/ToastContext';
 import { fmtDate, userInitials, StatusPill } from './AdminUtils';
@@ -134,13 +134,17 @@ export default function ManageUsers() {
   const handleDeleteUser = async (uid, name) => {
     if (!window.confirm(`Delete ${name || 'this user'}? This cannot be undone.`)) return;
     try {
-      await deleteDoc(doc(db, 'users', uid));
+      const token = await getToken();
+      const res = await fetch(`${API_URL}/api/users/${uid}/delete`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || 'Failed to delete user');
+      }
       setPlatformUsers(prev => prev.filter(u => u.id !== uid));
       success('User deleted.');
-      try {
-        const token = await getToken();
-        await fetch(`${API_URL}/api/users/${uid}/delete`, { method: 'POST', headers: { Authorization: `Bearer ${token}` } });
-      } catch {}
     } catch (e) { 
       error(`Error: ${e.message}`); 
     }

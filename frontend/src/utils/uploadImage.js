@@ -105,7 +105,7 @@ export async function uploadImageDurable(file, folder = 'uploads') {
   const prepared = await compressForUpload(file);
   const ext = (prepared.name.split('.').pop() || 'jpg').toLowerCase().replace(/[^a-z0-9]/g, '') || 'jpg';
   const filename = `${Date.now()}-${Math.round(Math.random() * 1e9)}.${ext}`;
-  const objectPath = `${String(folder || 'uploads').replace(/^\/+|\/+$/g, '')}/${filename}`;
+  const objectPath = `${String(folder || 'uploads').replace(/^\/+|\/+$/g, '')}/${user.uid}/${filename}`;
   const errors = [];
 
   // 1) Firebase Storage first — survives Render disk wipes
