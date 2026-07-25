@@ -13,7 +13,7 @@ import * as Linking from 'expo-linking';
 import { Platform } from 'react-native';
 import { auth } from '../lib/firebase';
 import { API_URL } from '../constants/api';
-import { fetchAuthMe, postRegisterNotify } from '../lib/api';
+import { fetchAuthMe, postRegisterNotify, postCompleteRegistration } from '../lib/api';
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -133,11 +133,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     const cred = await signInWithCustomToken(auth, data.customToken);
+    try {
+      await postCompleteRegistration({
+        name: cred.user.displayName || 'New User',
+        role: 'user',
+      });
+    } catch {
+      /* profile may already exist */
+    }
     postRegisterNotify({
-      uid: cred.user.uid,
       email: cred.user.email,
-      name: cred.user.displayName,
-      provider: 'google',
+      name: cred.user.displayName || 'New User',
+      role: 'user',
     }).catch(() => {});
   };
 
@@ -154,10 +161,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       register: async (name, email, password) => {
         const cred = await createUserWithEmailAndPassword(auth, email.trim(), password);
         if (name) await updateProfile(cred.user, { displayName: name });
+        await postCompleteRegistration({
+          name: name || email.split('@')[0],
+          role: 'user',
+        });
         postRegisterNotify({
-          uid: cred.user.uid,
           email: cred.user.email,
-          name,
+          name: name || email.split('@')[0],
+          role: 'user',
         }).catch(() => {});
       },
       loginWithGoogle,

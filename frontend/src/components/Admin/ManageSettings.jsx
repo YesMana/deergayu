@@ -83,10 +83,19 @@ const ManageSettings = () => {
   useEffect(() => { fetchSettings(); }, [fetchSettings]);
 
   useEffect(() => {
-    fetch(`${API_URL}/api/email/status`)
-      .then((r) => r.json())
-      .then(setEmailStatus)
-      .catch(() => setEmailStatus(null));
+    (async () => {
+      try {
+        const token = await auth.currentUser?.getIdToken();
+        if (!token) return;
+        const r = await fetch(`${API_URL}/api/admin/email/status`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (r.ok) setEmailStatus(await r.json());
+        else setEmailStatus(null);
+      } catch {
+        setEmailStatus(null);
+      }
+    })();
   }, []);
 
   const handleEmailTest = async () => {

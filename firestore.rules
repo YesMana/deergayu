@@ -1,51 +1,161 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+
     function signedIn() {
       return request.auth != null;
     }
 
-    // Public catalog — approved products only
+    function isOwner(userId) {
+      return signedIn() && request.auth.uid == userId;
+    }
+
+    // Admin: Firestore role, hardcoded super-admin email, or settings.adminEmails
+    // (settings doc is readable from rules via get() even when client read is denied)
+    function isAdmin() {
+      return signedIn() && (
+        request.auth.token.email == 'yes.manujaya@gmail.com'
+        || (
+          exists(/databases/$(database)/documents/users/$(request.auth.uid))
+          && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin'
+        )
+        || (
+          exists(/databases/$(database)/documents/settings/admin)
+          && 'adminEmails' in get(/databases/$(database)/documents/settings/admin).data
+          && request.auth.token.email in get(/databases/$(database)/documents/settings/admin).data.adminEmails
+        )
+      );
+    }
+
+    function isApprovedProvider() {
+      return signedIn()
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['doctor', 'clinic', 'organization', 'vendor']
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.status == 'approved';
+    }
+
+    // Privilege / security fields — clients must never create or change these
+    function privilegedUserKeys() {
+      return ['role', 'status', 'isAdmin', 'admin', 'approvalStatus', 'verificationStatus',
+              'commission', 'commissionPercent', 'permissions', 'createdBy', 'approvedBy',
+              'rejectedBy', 'adminEmails'];
+    }
+
+    function userCreateKeysSafe() {
+      // Client creates are denied entirely — registration uses Admin SDK.
+      // Kept for documentation / future constrained creates.
+      return !request.resource.data.keys().hasAny(privilegedUserKeys())
+        || false;
+    }
+
+    function userUpdateKeysSafe() {
+      return !request.resource.data.diff(resource.data).affectedKeys()
+        .hasAny(privilegedUserKeys());
+    }
+
+    // ---------- products ----------
     match /products/{productId} {
       allow read: if resource.data.status == 'approved'
-                  || (signedIn() && resource.data.vendorId == request.auth.uid);
-      allow create: if signedIn();
-      allow update, delete: if signedIn()
-                            && (resource.data.vendorId == request.auth.uid);
+                  || (signedIn() && resource.data.vendorId == request.auth.uid)
+                  || isAdmin();
+
+      // Product create/update/delete must go through Express + Admin SDK
+      allow create, update, delete: if false;
 
       match /reviews/{reviewId} {
         allow read: if true;
-        allow create: if signedIn();
+        allow create: if signedIn()
+                      && request.resource.data.userId == request.auth.uid
+                      && request.resource.data.keys().hasAll(['rating', 'userId']);
+        allow update, delete: if signedIn()
+                              && resource.data.userId == request.auth.uid
+                              && !request.resource.data.diff(resource.data).affectedKeys()
+                                   .hasAny(['userId', 'status']);
+      }
+    }
+
+    // ---------- users ----------
+    match /users/{userId} {
+      // Public: approved providers. Self: own doc. Admin: all.
+      allow read: if (
+                    resource.data.role in ['doctor', 'clinic', 'organization', 'vendor']
+                    && resource.data.status == 'approved'
+                  )
+                  || isOwner(userId)
+                  || isAdmin();
+
+      // Registration creates users via Admin SDK only
+      allow create: if false;
+
+      // Self may update safe profile fields only; admin via Admin SDK / API
+      allow update: if isOwner(userId) && userUpdateKeysSafe();
+
+      allow delete: if false;
+
+      match /reviews/{reviewId} {
+        allow read: if true;
+        allow create: if signedIn()
+                      && request.resource.data.userId == request.auth.uid;
         allow update, delete: if signedIn()
                               && resource.data.userId == request.auth.uid;
       }
     }
 
-    // Public experts — approved doctors/clinics/orgs/vendors
-    match /users/{userId} {
-      allow read: if resource.data.role in ['doctor', 'clinic', 'organization', 'vendor']
-                  && resource.data.status == 'approved'
-                  || (signedIn() && request.auth.uid == userId);
-      allow create: if signedIn() && request.auth.uid == userId;
-      allow update: if signedIn() && request.auth.uid == userId;
+    // ---------- appointments (read for participants; writes via API) ----------
+    match /appointments/{id} {
+      allow read: if signedIn() && (
+        resource.data.customerId == request.auth.uid
+        || resource.data.providerId == request.auth.uid
+        || isAdmin()
+      );
+      allow create, update, delete: if false;
     }
 
+    // ---------- orders ----------
+    match /orders/{id} {
+      allow read: if signedIn() && (
+        resource.data.customerId == request.auth.uid
+        || resource.data.vendorId == request.auth.uid
+        || isAdmin()
+      );
+      allow create, update, delete: if false;
+    }
+
+    // ---------- carts / wishlists (API-owned; deny client) ----------
+    match /carts/{id} {
+      allow read, write: if false;
+    }
+    match /wishlists/{id} {
+      allow read, write: if false;
+    }
+
+    // ---------- settings (PRIVATE — API only) ----------
+    match /settings/{docId} {
+      allow read, write: if false;
+    }
+
+    // ---------- public content ----------
     match /herbal_remedies/{id} {
-      allow read: if !('status' in resource.data) || resource.data.status == 'published';
+      allow read: if !('status' in resource.data) || resource.data.status == 'published' || isAdmin();
+      allow write: if false;
     }
 
     match /daily_routines/{id} {
-      allow read: if !('status' in resource.data) || resource.data.status == 'published';
+      allow read: if !('status' in resource.data) || resource.data.status == 'published' || isAdmin();
+      allow write: if false;
     }
 
     match /videos/{id} {
-      allow read: if !('status' in resource.data) || resource.data.status == 'published';
+      allow read: if !('status' in resource.data) || resource.data.status == 'published' || isAdmin();
+      allow write: if false;
     }
 
-    match /settings/{docId} {
-      allow read: if true;
+    // Contact messages — admin read via API; deny client
+    match /contact_messages/{id} {
+      allow read, write: if false;
     }
 
+    // Default deny
     match /{document=**} {
       allow read, write: if false;
     }

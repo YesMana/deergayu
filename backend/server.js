@@ -22,6 +22,17 @@ const {
   DEFAULT_SETTINGS,
 } = require('./platformUtils');
 const {
+  PROVIDER_ROLES,
+  isProviderRole,
+  isApprovedProviderStatus,
+  pickPublicSettings,
+  pickVendorCategories,
+  pickPublicCategories,
+  sanitizeSelfProfileUpdate,
+  normalizeRegistrableRole,
+  registrationStatusForRole,
+} = require('./security');
+const {
   isEphemeralGuideUploadUrl,
   resolveGuideRemedyImage,
   GUIDE_IMAGE_BY_NAME,
@@ -102,10 +113,10 @@ const db = getFirestore();
 const auth = getAuth();
 
 // ============================================================
-// MIDDLEWARE
+// MIDDLEWARE (centralized authz — P0-A)
 // ============================================================
 
-// Verify any authenticated user
+/** requireAuth — any valid Firebase ID token + load role/status */
 const verifyUser = async (req, res, next) => {
   const token = req.headers.authorization?.split('Bearer ')[1];
   if (!token) return res.status(401).json({ error: 'No token provided' });
@@ -113,23 +124,27 @@ const verifyUser = async (req, res, next) => {
   try {
     const decodedToken = await auth.verifyIdToken(token);
     req.user = decodedToken;
-    
-    // Fetch user role from Firestore
+
     const userDoc = await db.collection('users').doc(decodedToken.uid).get();
     if (userDoc.exists) {
-      req.userRole = userDoc.data().role || 'user';
-      req.userStatus = userDoc.data().status || 'approved';
+      const data = userDoc.data() || {};
+      req.userRole = data.role || 'user';
+      req.userStatus = data.status || 'approved';
+      req.userDoc = data;
     } else {
       req.userRole = 'user';
       req.userStatus = 'approved';
+      req.userDoc = null;
     }
+    req.isAdmin = await isAdminUser(db, decodedToken);
     next();
   } catch (error) {
     return res.status(401).json({ error: 'Invalid token' });
   }
 };
+const requireAuth = verifyUser;
 
-// Verify Admin Token (multi-admin: Firestore role, adminEmails list, or super-admin)
+/** requireAdmin — Firestore role, adminEmails list, or super-admin email */
 const verifyAdmin = async (req, res, next) => {
   const token = req.headers.authorization?.split('Bearer ')[1];
   if (!token) return res.status(401).json({ error: 'No token provided' });
@@ -141,13 +156,18 @@ const verifyAdmin = async (req, res, next) => {
       return res.status(403).json({ error: 'Unauthorized: Admin access required' });
     }
     req.user = decodedToken;
+    req.isAdmin = true;
     next();
   } catch (error) {
     return res.status(401).json({ error: 'Invalid token' });
   }
 };
+const requireAdmin = verifyAdmin;
 
-// Verify vendor/doctor/clinic/organization
+/**
+ * requireProvider — doctor/clinic/organization/vendor (or admin).
+ * Pending providers may access onboarding endpoints (profile/schedule).
+ */
 const verifyVendor = async (req, res, next) => {
   const token = req.headers.authorization?.split('Bearer ')[1];
   if (!token) return res.status(401).json({ error: 'No token provided' });
@@ -155,25 +175,46 @@ const verifyVendor = async (req, res, next) => {
   try {
     const decodedToken = await auth.verifyIdToken(token);
     req.user = decodedToken;
-    
+
     const userDoc = await db.collection('users').doc(decodedToken.uid).get();
     if (!userDoc.exists) {
       return res.status(403).json({ error: 'User profile not found' });
     }
-    
-    const userData = userDoc.data();
-    const vendorRoles = ['vendor', 'doctor', 'clinic', 'organization'];
+
+    const userData = userDoc.data() || {};
     const isAdmin = await isAdminUser(db, decodedToken);
-    if (!vendorRoles.includes(userData.role) && !isAdmin) {
+    if (!isProviderRole(userData.role) && !isAdmin) {
       return res.status(403).json({ error: 'Vendor/Doctor access required' });
     }
-    
+
     req.userRole = userData.role;
     req.userStatus = userData.status;
+    req.userDoc = userData;
+    req.isAdmin = isAdmin;
     next();
   } catch (error) {
     return res.status(401).json({ error: 'Invalid token' });
   }
+};
+const requireProvider = verifyVendor;
+
+/**
+ * requireApprovedProvider — provider with status approved (or admin).
+ * Patients and pending/rejected/suspended/hidden providers cannot call
+ * protected commerce / booking management APIs.
+ */
+const requireApprovedProvider = async (req, res, next) => {
+  await verifyVendor(req, res, () => {
+    if (res.headersSent) return;
+    if (req.isAdmin) return next();
+    if (!isApprovedProviderStatus(req.userStatus)) {
+      return res.status(403).json({
+        error: 'Provider account must be approved before using this feature',
+        status: req.userStatus || 'unknown',
+      });
+    }
+    return next();
+  });
 };
 
 const apiRouter = express.Router();
@@ -185,8 +226,14 @@ apiRouter.get('/health', (req, res) => {
   res.json({ status: 'OK', message: 'Deergayu API is running', timestamp: new Date().toISOString() });
 });
 
-// Public-safe email config probe (no secrets)
+// Public-safe email availability probe (no secrets / config leakage)
 apiRouter.get('/email/status', (req, res) => {
+  const s = getEmailStatus();
+  res.json({ available: Boolean(s.configured) });
+});
+
+// Admin-only detailed email diagnostics
+apiRouter.get('/admin/email/status', verifyAdmin, (req, res) => {
   const s = getEmailStatus();
   res.json({
     configured: s.configured,
@@ -246,18 +293,17 @@ apiRouter.get('/auth/me', verifyUser, async (req, res) => {
   }
 });
 
-// Public storefront settings (shipping, bank, payhere flag, social)
+// Public storefront settings — PUBLIC_SETTINGS only (no adminEmails / commissions)
 apiRouter.get('/storefront-settings', async (req, res) => {
   try {
     const settings = await getSettings(db);
     const socialLinks = normalizeSocialLinks(settings.socialLinks || {});
-    res.json({
-      shippingZones: settings.shippingZones || DEFAULT_SETTINGS.shippingZones,
-      bankDetails: settings.bankDetails || DEFAULT_SETTINGS.bankDetails,
-      payhereEnabled: Boolean(settings.payhereEnabled && process.env.PAYHERE_MERCHANT_ID),
-      contactEmail: settings.contactEmail || DEFAULT_SETTINGS.contactEmail,
-      socialLinks,
-    });
+    res.json(
+      pickPublicSettings(
+        { ...settings, socialLinks },
+        { payhereConfigured: Boolean(process.env.PAYHERE_MERCHANT_ID) }
+      )
+    );
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -378,23 +424,126 @@ apiRouter.post(
   }
 });
 
-// Notify user + admin after registration (called from frontend after Firebase signup)
-apiRouter.post('/auth/register-notify', async (req, res) => {
-  const { name, email, role, profileDetails } = req.body;
-  if (!name || !email || !role) {
-    return res.status(400).json({ error: 'name, email, and role are required' });
+// Complete registration — creates users/{uid} via Admin SDK (clients cannot set role/status)
+apiRouter.post(
+  '/auth/complete-registration',
+  rateLimit({ windowMs: 60_000, max: 10, keyPrefix: 'reg-complete' }),
+  verifyUser,
+  async (req, res) => {
+    try {
+      const uid = req.user.uid;
+      const email = (req.user.email || '').toLowerCase();
+      const existing = await db.collection('users').doc(uid).get();
+      if (existing.exists) {
+        return res.json({ message: 'Profile already exists', user: { id: uid, ...existing.data() } });
+      }
+
+      const role = normalizeRegistrableRole(req.body?.role || 'user');
+      if (!role) {
+        return res.status(400).json({ error: 'Invalid role' });
+      }
+
+      const name = String(req.body?.name || req.user.name || req.user.email || 'User').trim().slice(0, 120);
+      const status = registrationStatusForRole(role);
+      const userData = {
+        name,
+        email,
+        role,
+        status,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        createdBy: uid,
+      };
+
+      if (role !== 'user' && req.body?.profileDetails && typeof req.body.profileDetails === 'object') {
+        const { updates } = sanitizeSelfProfileUpdate(
+          { profileDetails: req.body.profileDetails },
+          {}
+        );
+        if (updates.profileDetails) userData.profileDetails = updates.profileDetails;
+      }
+
+      await db.collection('users').doc(uid).set(userData);
+      res.status(201).json({ message: 'Registration complete', user: { id: uid, ...userData } });
+    } catch (error) {
+      console.error('complete-registration error:', error);
+      res.status(500).json({ error: 'Failed to complete registration' });
+    }
+  }
+);
+
+// Safe self profile update — strips privileged fields; Admin SDK write
+apiRouter.put('/me/profile', verifyUser, async (req, res) => {
+  try {
+    const uid = req.user.uid;
+    const ref = db.collection('users').doc(uid);
+    const snap = await ref.get();
+    if (!snap.exists) {
+      return res.status(404).json({ error: 'User profile not found' });
+    }
+    const existing = snap.data() || {};
+    const { updates, attemptedPrivileged } = sanitizeSelfProfileUpdate(
+      req.body || {},
+      existing.profileDetails || {}
+    );
+    if (attemptedPrivileged.length) {
+      return res.status(403).json({
+        error: 'Cannot modify privileged fields',
+        fields: attemptedPrivileged,
+      });
+    }
+    if (!Object.keys(updates).length) {
+      return res.status(400).json({ error: 'No valid profile fields to update' });
+    }
+    updates.updatedAt = new Date().toISOString();
+    await ref.set(updates, { merge: true });
+    const next = (await ref.get()).data();
+    res.json({ message: 'Profile updated', user: { id: uid, ...next } });
+  } catch (error) {
+    console.error('me/profile error:', error);
+    res.status(500).json({ error: 'Failed to update profile' });
+  }
+});
+
+// Notify user + admin after registration (auth required; email must match token; rate-limited)
+apiRouter.post(
+  '/auth/register-notify',
+  rateLimit({ windowMs: 60_000, max: 5, keyPrefix: 'reg-notify' }),
+  verifyUser,
+  async (req, res) => {
+  const tokenEmail = (req.user.email || '').toLowerCase();
+  const bodyEmail = String(req.body?.email || '').trim().toLowerCase();
+  if (!bodyEmail || bodyEmail !== tokenEmail) {
+    return res.status(403).json({ error: 'Email must match the authenticated account' });
   }
 
-  const isExpert = ['doctor', 'clinic', 'organization', 'vendor'].includes(role);
+  const name = String(req.body?.name || req.userDoc?.name || 'User').trim().slice(0, 120);
+  const role = normalizeRegistrableRole(req.body?.role || req.userRole || 'user') || 'user';
+  const profileDetails =
+    req.body?.profileDetails && typeof req.body.profileDetails === 'object'
+      ? req.body.profileDetails
+      : null;
+
+  const isExpert = isProviderRole(role);
   const statusLabel = isExpert ? 'Pending Admin Approval' : 'Active';
+  const safeName = escapeHtml(name);
+  const safeEmail = escapeHtml(bodyEmail);
+  const safeRole = escapeHtml(role);
+  const safePhone = profileDetails?.telephone ? escapeHtml(String(profileDetails.telephone)) : '';
+  const safeAddress = profileDetails?.address ? escapeHtml(String(profileDetails.address)) : '';
+  const safeSpecialty = profileDetails?.specialty
+    ? escapeHtml(Array.isArray(profileDetails.specialty)
+      ? profileDetails.specialty.join(', ')
+      : String(profileDetails.specialty))
+    : '';
 
   const welcomeHtml = `
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 8px;">
       <h2 style="color: #2e7d32; text-align: center;">Welcome to Deergayu!</h2>
-      <p>Hello <strong>${name}</strong>,</p>
+      <p>Hello <strong>${safeName}</strong>,</p>
       <p>Thank you for registering on the Deergayu Ayurvedic platform. Your account has been created successfully.</p>
       <div style="background: #f5f5f5; padding: 15px; border-radius: 8px; margin: 20px 0;">
-        <p style="margin: 5px 0;"><strong>Account Type:</strong> ${role}</p>
+        <p style="margin: 5px 0;"><strong>Account Type:</strong> ${safeRole}</p>
         <p style="margin: 5px 0;"><strong>Status:</strong> ${statusLabel}</p>
       </div>
       ${isExpert
@@ -412,13 +561,13 @@ apiRouter.post('/auth/register-notify', async (req, res) => {
       <h2 style="color: #1565c0;">New User Registration</h2>
       <p>A new user has registered on Deergayu:</p>
       <div style="background: #f5f5f5; padding: 15px; border-radius: 8px; margin: 20px 0;">
-        <p style="margin: 5px 0;"><strong>Name:</strong> ${name}</p>
-        <p style="margin: 5px 0;"><strong>Email:</strong> ${email}</p>
-        <p style="margin: 5px 0;"><strong>Role:</strong> ${role}</p>
+        <p style="margin: 5px 0;"><strong>Name:</strong> ${safeName}</p>
+        <p style="margin: 5px 0;"><strong>Email:</strong> ${safeEmail}</p>
+        <p style="margin: 5px 0;"><strong>Role:</strong> ${safeRole}</p>
         <p style="margin: 5px 0;"><strong>Status:</strong> ${statusLabel}</p>
-        ${profileDetails?.telephone ? `<p style="margin: 5px 0;"><strong>Phone:</strong> ${profileDetails.telephone}</p>` : ''}
-        ${profileDetails?.address ? `<p style="margin: 5px 0;"><strong>Address:</strong> ${profileDetails.address}</p>` : ''}
-        ${profileDetails?.specialty ? `<p style="margin: 5px 0;"><strong>Specialty:</strong> ${profileDetails.specialty}</p>` : ''}
+        ${safePhone ? `<p style="margin: 5px 0;"><strong>Phone:</strong> ${safePhone}</p>` : ''}
+        ${safeAddress ? `<p style="margin: 5px 0;"><strong>Address:</strong> ${safeAddress}</p>` : ''}
+        ${safeSpecialty ? `<p style="margin: 5px 0;"><strong>Specialty:</strong> ${safeSpecialty}</p>` : ''}
       </div>
       ${isExpert ? '<p><strong>Action required:</strong> Please review and approve this expert in the Admin Dashboard.</p>' : ''}
       <p><a href="https://deergayu.com/admin">Open Admin Dashboard</a></p>
@@ -426,7 +575,8 @@ apiRouter.post('/auth/register-notify', async (req, res) => {
   `;
 
   try {
-    sendEmail(email, 'Welcome to Deergayu!', '', welcomeHtml)
+    // Recipients are fixed: authenticated user + configured admin list (never arbitrary)
+    sendEmail(bodyEmail, 'Welcome to Deergayu!', '', welcomeHtml)
       .catch(e => console.error('Welcome email error:', e));
     sendAdminEmail(`New Registration: ${name} (${role})`, adminHtml)
       .catch(e => console.error('Admin registration email error:', e));
@@ -516,18 +666,21 @@ apiRouter.get('/admin/overview', verifyAdmin, async (req, res) => {
       ordersSnap,
       appointmentsSnap,
       settings,
+      contactSnap,
     ] = await Promise.all([
       db.collection('users').where('role', 'in', ['doctor', 'clinic', 'organization', 'vendor']).get(),
       db.collection('products').get(),
       db.collection('orders').get(),
       db.collection('appointments').get(),
       getSettings(db),
+      db.collection('contact_messages').where('status', '==', 'new').limit(200).get().catch(() => null),
     ]);
 
     const experts = expertsSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
     const products = productsSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
     const orders = ordersSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
     const appointments = appointmentsSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
+    const newInquiries = contactSnap ? contactSnap.size : 0;
 
     const sortByCreated = (a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || ''));
     orders.sort(sortByCreated);
@@ -551,6 +704,8 @@ apiRouter.get('/admin/overview', verifyAdmin, async (req, res) => {
       approvedProducts: products.filter((p) => p.status === 'approved').length,
       totalOrders: orders.length,
       pendingOrders: orders.filter((o) => o.status === 'pending').length,
+      newInquiries,
+      pendingContacts: newInquiries,
       totalAppointments: appointments.length,
       pendingAppointments: appointments.filter((a) => a.status === 'pending').length,
       thisWeekAppts,
@@ -1104,15 +1259,26 @@ apiRouter.get('/settings', verifyAdmin, async (req, res) => {
   }
 });
 
-// Public: product categories + commission rates (for vendor product form)
+// Categories: public gets names only; approved providers get commission rates for pricing UI
 apiRouter.get('/categories', async (req, res) => {
   try {
     const settings = await getSettings(db);
-    res.json({
-      categories: settings.categories || DEFAULT_SETTINGS.categories,
-      defaultCommissionPercent: settings.commissionPercent || 10,
-      minCommissionRs: settings.minCommissionRs || 300,
-    });
+    const token = req.headers.authorization?.split('Bearer ')[1];
+    if (token) {
+      try {
+        const decoded = await auth.verifyIdToken(token);
+        const isAdmin = await isAdminUser(db, decoded);
+        const userDoc = await db.collection('users').doc(decoded.uid).get();
+        const role = userDoc.exists ? userDoc.data().role : 'user';
+        const status = userDoc.exists ? userDoc.data().status : 'approved';
+        if (isAdmin || (isProviderRole(role) && isApprovedProviderStatus(status))) {
+          return res.json(pickVendorCategories(settings));
+        }
+      } catch {
+        /* fall through to public */
+      }
+    }
+    res.json(pickPublicCategories(settings));
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -1265,8 +1431,8 @@ apiRouter.get('/admin/users/:uid/profile', verifyAdmin, async (req, res) => {
 // VENDOR / DOCTOR ROUTES
 // ============================================================
 
-// Get vendor's own products
-apiRouter.get('/vendor/products', verifyVendor, async (req, res) => {
+// Get vendor's own products (approved providers only)
+apiRouter.get('/vendor/products', requireApprovedProvider, async (req, res) => {
   try {
     const snapshot = await db.collection('products')
       .where('vendorId', '==', req.user.uid)
@@ -1279,8 +1445,8 @@ apiRouter.get('/vendor/products', verifyVendor, async (req, res) => {
   }
 });
 
-// Add new product
-apiRouter.post('/vendor/products', verifyVendor, async (req, res) => {
+// Add new product (approved providers only; status set server-side)
+apiRouter.post('/vendor/products', requireApprovedProvider, async (req, res) => {
   const { name, description, category, imageUrl, images, stock } = req.body;
   const basePrice = Number(req.body.basePrice ?? req.body.price);
 
@@ -1309,12 +1475,16 @@ apiRouter.post('/vendor/products', verifyVendor, async (req, res) => {
       vendorId: req.user.uid,
       vendorEmail: req.user.email,
       vendorName,
+      // Always server-controlled — never trust client status/publish flags
       status: settings.autoApproveProducts ? 'approved' : 'pending',
       rating: 0,
       reviewCount: 0,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
+    // Ignore any client-supplied status / vendorId / commission overrides
+    delete req.body.status;
+    delete req.body.vendorId;
     
     const docRef = await db.collection('products').add(productData);
     
@@ -1344,7 +1514,7 @@ apiRouter.post('/vendor/products', verifyVendor, async (req, res) => {
 });
 
 // Vendor earnings — net payout only (not customer-facing totals)
-apiRouter.get('/vendor/earnings', verifyVendor, async (req, res) => {
+apiRouter.get('/vendor/earnings', requireApprovedProvider, async (req, res) => {
   try {
     const [ordersSnap, apptsSnap, settings] = await Promise.all([
       db.collection('orders').where('vendorId', '==', req.user.uid).get(),
@@ -1649,38 +1819,54 @@ apiRouter.post('/payments/payhere/notify', async (req, res) => {
   }
 });
 
-// Update product
-apiRouter.put('/vendor/products/:id', verifyVendor, async (req, res) => {
+// Update product (ownership + server-side pricing; cannot self-publish)
+apiRouter.put('/vendor/products/:id', requireApprovedProvider, async (req, res) => {
   const { id } = req.params;
-  const { name, description, price, category, imageUrl, stock } = req.body;
-  
+  const { name, description, category, imageUrl, images, stock } = req.body;
+  const basePriceRaw = req.body.basePrice ?? req.body.price;
+
   try {
-    // Verify ownership
     const productDoc = await db.collection('products').doc(id).get();
     if (!productDoc.exists) {
       return res.status(404).json({ error: 'Product not found' });
     }
-    if (productDoc.data().vendorId !== req.user.uid) {
+    if (productDoc.data().vendorId !== req.user.uid && !req.isAdmin) {
       return res.status(403).json({ error: 'You can only edit your own products' });
     }
 
     const updateData = { updatedAt: new Date().toISOString() };
-    if (name) updateData.name = name;
-    if (description !== undefined) updateData.description = description;
-    if (price) updateData.price = Number(price);
-    if (category) updateData.category = category;
-    if (imageUrl !== undefined) updateData.imageUrl = imageUrl;
-    if (stock !== undefined) updateData.stock = Number(stock);
+    if (name) updateData.name = String(name).trim();
+    if (description !== undefined) updateData.description = String(description || '');
+    if (category) updateData.category = String(category);
+    if (imageUrl !== undefined) updateData.imageUrl = String(imageUrl || '');
+    if (Array.isArray(images)) updateData.images = images;
+    if (stock !== undefined) updateData.stock = Number(stock) || 0;
+
+    if (basePriceRaw !== undefined && basePriceRaw !== null && basePriceRaw !== '') {
+      const settings = await getSettings(db);
+      const cat = category || productDoc.data().category || 'General';
+      const catCommission = await getCategoryCommission(db, cat);
+      const pricing = calcProductPricing(Number(basePriceRaw), catCommission, settings.minCommissionRs);
+      updateData.basePrice = pricing.basePrice;
+      updateData.commissionPercent = pricing.commissionPercent;
+      updateData.commissionAmount = pricing.commissionAmount;
+      updateData.price = pricing.price;
+    }
+
+    // Never allow client to set approval/status/vendorId
+    delete updateData.status;
+    delete updateData.vendorId;
+    delete updateData.vendorEmail;
 
     await db.collection('products').doc(id).update(updateData);
-    res.json({ message: 'Product updated successfully' });
+    res.json({ message: 'Product updated successfully', ...updateData });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 });
 
 // Delete product
-apiRouter.delete('/vendor/products/:id', verifyVendor, async (req, res) => {
+apiRouter.delete('/vendor/products/:id', requireApprovedProvider, async (req, res) => {
   const { id } = req.params;
   
   try {
@@ -1700,7 +1886,7 @@ apiRouter.delete('/vendor/products/:id', verifyVendor, async (req, res) => {
 });
 
 // Get vendor's orders
-apiRouter.get('/vendor/orders', verifyVendor, async (req, res) => {
+apiRouter.get('/vendor/orders', requireApprovedProvider, async (req, res) => {
   try {
     const snapshot = await db.collection('orders')
       .where('vendorId', '==', req.user.uid)
@@ -1714,7 +1900,7 @@ apiRouter.get('/vendor/orders', verifyVendor, async (req, res) => {
 });
 
 // Update order status (vendor)
-apiRouter.post('/vendor/orders/:id/status', verifyVendor, async (req, res) => {
+apiRouter.post('/vendor/orders/:id/status', requireApprovedProvider, async (req, res) => {
   const { id } = req.params;
   const { status } = req.body;
   
@@ -1738,7 +1924,7 @@ apiRouter.post('/vendor/orders/:id/status', verifyVendor, async (req, res) => {
 });
 
 // Get doctor's appointments
-apiRouter.get('/vendor/appointments', verifyVendor, async (req, res) => {
+apiRouter.get('/vendor/appointments', requireApprovedProvider, async (req, res) => {
   try {
     const snapshot = await db.collection('appointments')
       .where('providerId', '==', req.user.uid)
@@ -1752,7 +1938,7 @@ apiRouter.get('/vendor/appointments', verifyVendor, async (req, res) => {
 });
 
 // Update appointment status (doctor)
-apiRouter.post('/vendor/appointments/:id/status', verifyVendor, async (req, res) => {
+apiRouter.post('/vendor/appointments/:id/status', requireApprovedProvider, async (req, res) => {
   const { id } = req.params;
   const { status } = req.body;
   
@@ -2276,12 +2462,22 @@ apiRouter.post('/my-appointments/:id/cancel', verifyUser, async (req, res) => {
   }
 });
 
-// Save Vendor Schedule
-apiRouter.post('/vendor/schedule', verifyUser, async (req, res) => {
+// Save Vendor Schedule (provider role required — patients cannot write schedules)
+apiRouter.post('/vendor/schedule', requireProvider, async (req, res) => {
   try {
-    const { schedule } = req.body; // e.g. { slotDuration, workingDays, unavailableDates }
-    await db.collection('users').doc(req.user.uid).update({
-      'profileDetails.schedule': schedule
+    if (!req.isAdmin && ['rejected', 'suspended', 'hidden'].includes(String(req.userStatus || ''))) {
+      return res.status(403).json({ error: 'Account is not allowed to update schedule' });
+    }
+    const { schedule } = req.body;
+    if (!schedule || typeof schedule !== 'object') {
+      return res.status(400).json({ error: 'schedule object is required' });
+    }
+    const ref = db.collection('users').doc(req.user.uid);
+    const snap = await ref.get();
+    const existing = snap.data()?.profileDetails || {};
+    await ref.update({
+      profileDetails: { ...existing, schedule },
+      updatedAt: new Date().toISOString(),
     });
     res.json({ message: 'Schedule updated successfully' });
   } catch (error) {

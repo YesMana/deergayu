@@ -253,6 +253,9 @@ export const postAstrology = (body: Record<string, unknown>) =>
 export const postContact = (body: Record<string, unknown>) =>
   request('/api/contact', { method: 'POST', body: JSON.stringify(body) });
 
+export const postCompleteRegistration = (body: Record<string, unknown>) =>
+  request('/api/auth/complete-registration', { method: 'POST', body: JSON.stringify(body) });
+
 export const postRegisterNotify = (body: Record<string, unknown>) =>
   request('/api/auth/register-notify', { method: 'POST', body: JSON.stringify(body) });
 
