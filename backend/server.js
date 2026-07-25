@@ -827,13 +827,17 @@ apiRouter.get('/featured-providers', async (req, res) => {
       .get();
     const providers = snapshot.docs.map(doc => {
       const data = doc.data();
+      const pd = data.profileDetails || {};
+      const { telephone, ...publicProfile } = pd;
       return {
         id: doc.id,
         name: data.name,
         role: data.role,
-        profileDetails: data.profileDetails || {},
-        rating: data.rating || 4.5,
-        reviewCount: data.reviewCount || 0
+        status: data.status || 'approved',
+        profileDetails: publicProfile,
+        // Real ratings only — never invent a 4.5 floor for public UI
+        rating: Number(data.rating) || 0,
+        reviewCount: Number(data.reviewCount) || 0
       };
     });
     res.json(providers);
@@ -2036,11 +2040,16 @@ apiRouter.get('/providers', async (req, res) => {
       .get();
     const providers = snapshot.docs.map(doc => {
       const data = doc.data();
+      // Public DTO: include status so UI can label "Deergayu Approved" accurately.
+      // Endpoint already filters status==approved. Do not expose payout/finance fields.
+      const pd = data.profileDetails || {};
+      const { telephone, ...publicProfile } = pd;
       return {
         id: doc.id,
         name: data.name,
         role: data.role,
-        profileDetails: data.profileDetails || {},
+        status: data.status || 'approved',
+        profileDetails: publicProfile,
         rating: data.rating || 0,
         reviewCount: data.reviewCount || 0
       };

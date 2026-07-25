@@ -41,7 +41,6 @@ const Home = () => {
   const [doctorName, setDoctorName] = useState('');
   const [specialty, setSpecialty] = useState('');
   const [consultType, setConsultType] = useState('all');
-  const [date, setDate] = useState('');
 
   useEffect(() => {
     fetch(`${API_URL}/api/home-stats`)
@@ -73,7 +72,8 @@ const Home = () => {
     if (doctorName.trim()) params.set('q', doctorName.trim());
     if (specialty) params.set('specialty', specialty);
     if (consultType && consultType !== 'all') params.set('type', consultType);
-    if (date) params.set('date', date);
+    // Date filter deferred: homepage must not imply availability filtering until
+    // public search can use real schedule APIs per doctor (P1-B).
     navigate(`/doctors?${params.toString()}`);
   };
 
@@ -172,17 +172,6 @@ const Home = () => {
                     <option value="video">Video</option>
                     <option value="audio">Audio</option>
                   </select>
-                </div>
-                <div>
-                  <label htmlFor="home-date" className="sr-only">
-                    Preferred date
-                  </label>
-                  <input
-                    id="home-date"
-                    type="date"
-                    value={date}
-                    onChange={(e) => setDate(e.target.value)}
-                  />
                 </div>
                 <button type="submit" className="btn btn-primary search-btn">
                   Find a Doctor
@@ -312,7 +301,7 @@ const Home = () => {
                           <CheckCircle
                             size={16}
                             color="var(--secondary-color)"
-                            aria-label="Verified provider"
+                            aria-label="Deergayu Approved"
                           />
                         )}
                       </h3>
@@ -476,7 +465,7 @@ const Home = () => {
                 <Shield size={28} />
               </div>
               <h3>Approved providers</h3>
-              <p>Public listings show providers after admin review — not unverified profiles.</p>
+              <p>Public listings show providers after admin approval — not unreviewed profiles.</p>
             </div>
             <div className="service-card glass-panel">
               <div className="service-icon-wrapper">

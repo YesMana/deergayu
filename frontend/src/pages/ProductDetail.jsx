@@ -302,13 +302,22 @@ const ProductDetail = () => {
             
             <p style={{ color: 'var(--text-secondary)', marginBottom: '1rem', fontSize: '1.1rem' }}>By {product.vendorName || 'Deergayu Store'}</p>
             
-            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '2rem' }}>
-              <div style={{ display: 'flex', alignItems: 'center', color: '#f1c40f' }}>
-                {[1,2,3,4,5].map(star => (
-                  <Star key={star} size={18} fill={star <= (product.rating || product.averageRating || 4.5) ? "currentColor" : "none"} />
-                ))}
-                <span style={{ color: 'var(--text-secondary)', marginLeft: '0.5rem', fontSize: '0.9rem' }}>({product.reviewCount ?? reviews.length} reviews)</span>
-              </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '2rem', flexWrap: 'wrap' }}>
+              {(() => {
+                const rating = Number(product.rating ?? product.averageRating);
+                const reviewCount = Number(product.reviewCount ?? reviews.length) || 0;
+                if (!(rating > 0) || reviewCount <= 0) return null;
+                return (
+                  <div style={{ display: 'flex', alignItems: 'center', color: '#f1c40f' }}>
+                    {[1, 2, 3, 4, 5].map((star) => (
+                      <Star key={star} size={18} fill={star <= rating ? 'currentColor' : 'none'} />
+                    ))}
+                    <span style={{ color: 'var(--text-secondary)', marginLeft: '0.5rem', fontSize: '0.9rem' }}>
+                      ({reviewCount} reviews)
+                    </span>
+                  </div>
+                );
+              })()}
               <span className="type-badge" style={{ background: 'rgba(76, 175, 80, 0.1)', color: '#4caf50', padding: '0.3rem 0.6rem', borderRadius: '4px', fontSize: '0.8rem' }}>{product.category}</span>
               {product.stock === 0 && <span className="type-badge" style={{ background: 'rgba(255, 107, 107, 0.1)', color: '#ff6b6b', padding: '0.3rem 0.6rem', borderRadius: '4px', fontSize: '0.8rem' }}>Out of Stock</span>}
             </div>

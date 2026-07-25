@@ -63,8 +63,20 @@ export function consultationTypeLabel(type) {
   return map[type] || type;
 }
 
+/**
+ * Platform listing approval only (admin reviewed account for public directory).
+ * Does NOT mean professional credentials were independently verified.
+ * UI must label this as "Deergayu Approved", never "Verified Doctor".
+ *
+ * Public GET /api/providers filters status==approved and returns status when available.
+ * If status is omitted on a public listing payload, treat as approved (listing itself is the signal).
+ */
 export function isApprovedProvider(provider) {
-  return String(provider?.status || '') === 'approved';
+  if (!provider) return false;
+  if (provider.status != null && String(provider.status) !== '') {
+    return String(provider.status) === 'approved';
+  }
+  return ['doctor', 'clinic', 'organization'].includes(String(provider.role || ''));
 }
 
 export function collectSpecialtiesFromProviders(providers = []) {

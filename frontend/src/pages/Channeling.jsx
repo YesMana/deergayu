@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Calendar as CalendarIcon, Star, Video, MapPin, CheckCircle2, X } from 'lucide-react';
+import { Search, Calendar as CalendarIcon, Star, Video, MapPin, X } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
@@ -133,7 +133,7 @@ const Channeling = () => {
   const handleBookClick = (provider, mode = 'in_person') => {
     if (!user) {
       error("Please login to book an appointment.");
-      navigate('/login?returnUrl=/channeling');
+      navigate(`/login?returnUrl=${encodeURIComponent(`/channeling?book=${provider.id}`)}`);
       return;
     }
     setConsultMode(mode);
@@ -289,19 +289,46 @@ const Channeling = () => {
               return (
               <div key={provider.id} className="provider-card glass-panel">
                 <div className="provider-image-wrapper">
-                  <img src={provider.profileDetails?.profileImageUrl || provider.profileDetails?.image || "https://images.unsplash.com/photo-1612349317150-e413f6a5b16d?w=500&q=80"} alt={provider.name} className="provider-image" />
-                  <div className="provider-rating">
-                    <Star size={14} className="star-icon" fill="currentColor" />{' '}
-                    {avg != null ? Number(avg).toFixed(1) : '—'}
-                    {count != null && count > 0 && (
+                  {provider.profileDetails?.profileImageUrl || provider.profileDetails?.image ? (
+                    <img
+                      src={provider.profileDetails?.profileImageUrl || provider.profileDetails?.image}
+                      alt={provider.name}
+                      className="provider-image"
+                    />
+                  ) : (
+                    <div
+                      className="provider-image"
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        background: 'linear-gradient(135deg, rgba(46,125,50,0.2), rgba(201,162,39,0.25))',
+                        fontSize: '2rem',
+                        fontWeight: 700,
+                        color: 'var(--primary-color)',
+                      }}
+                      aria-hidden
+                    >
+                      {(provider.name || 'D')[0].toUpperCase()}
+                    </div>
+                  )}
+                  {avg != null && Number(avg) > 0 && count != null && count > 0 ? (
+                    <div className="provider-rating">
+                      <Star size={14} className="star-icon" fill="currentColor" />{' '}
+                      {Number(avg).toFixed(1)}
                       <span style={{ marginLeft: 4, opacity: 0.85 }}>({count})</span>
-                    )}
-                  </div>
+                    </div>
+                  ) : null}
                 </div>
                 
                 <div className="provider-info">
                   <div className="provider-header-info">
-                    <h3 className="provider-name">{provider.name} <CheckCircle2 size={18} className="verified-icon" /></h3>
+                    <h3 className="provider-name">
+                      {provider.name}{' '}
+                      <span className="doctor-badge verified" style={{ fontSize: '0.7rem', verticalAlign: 'middle' }}>
+                        Deergayu Approved
+                      </span>
+                    </h3>
                     <p className="provider-role">{provider.profileDetails?.doctorType || provider.role}</p>
                   </div>
                   
@@ -351,16 +378,22 @@ const Channeling = () => {
 
       {selectedProvider && (
         <div
+          role="presentation"
           onClick={() => { setSelectedProvider(null); setBookingDate(''); setBookingTime(''); setBookingPhone(''); setBookingNotes(''); setAvailableSlots([]); setBookedSlots([]); }}
           style={{
             position: 'fixed', inset: 0, zIndex: 9999,
             background: 'rgba(0,0,0,0.75)',
             backdropFilter: 'blur(6px)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            padding: '1rem'
+            display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
+            padding: '0.5rem',
+            overflowY: 'auto',
           }}
         >
           <div
+            role="dialog"
+            aria-modal="true"
+            aria-label={`Book appointment with ${selectedProvider.name}`}
+            data-testid="booking-modal"
             onClick={e => e.stopPropagation()}
             style={{
               width: '100%', maxWidth: '560px',
@@ -369,32 +402,36 @@ const Channeling = () => {
               borderRadius: '20px',
               boxShadow: '0 30px 80px rgba(0,0,0,0.6)',
               overflow: 'hidden',
-              maxHeight: '90vh',
-              overflowY: 'auto'
+              maxHeight: 'min(92vh, 920px)',
+              overflowY: 'auto',
+              margin: 'auto 0',
             }}
           >
             {/* Header */}
             <div style={{
               background: 'linear-gradient(135deg, rgba(212,175,55,0.2), rgba(212,175,55,0.05))',
               borderBottom: '1px solid rgba(212,175,55,0.15)',
-              padding: '1.5rem 2rem',
-              display: 'flex', alignItems: 'center', justifyContent: 'space-between'
+              padding: '1rem 1.25rem',
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              position: 'sticky', top: 0, zIndex: 2,
+              backdropFilter: 'blur(8px)',
             }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem', minWidth: 0 }}>
                 <div style={{
                   width: '52px', height: '52px', borderRadius: '50%',
                   background: 'linear-gradient(135deg, rgba(212,175,55,0.4), rgba(212,175,55,0.1))',
                   border: '2px solid rgba(212,175,55,0.5)',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontSize: '1.5rem', overflow: 'hidden', flexShrink: 0
+                  fontSize: '1.35rem', overflow: 'hidden', flexShrink: 0,
+                  fontWeight: 700, color: '#d4af37',
                 }}>
-                  {selectedProvider.photoUrl
-                    ? <img src={selectedProvider.photoUrl} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="" />
-                    : '👨‍⚕️'}
+                  {(selectedProvider.profileDetails?.profileImageUrl || selectedProvider.photoUrl)
+                    ? <img src={selectedProvider.profileDetails?.profileImageUrl || selectedProvider.photoUrl} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="" />
+                    : (selectedProvider.name || 'D')[0].toUpperCase()}
                 </div>
-                <div>
+                <div style={{ minWidth: 0 }}>
                   <div style={{ fontSize: '0.72rem', color: 'rgba(212,175,55,0.7)', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '2px' }}>Book Appointment</div>
-                  <div style={{ fontWeight: 'bold', color: '#fff', fontSize: '1.1rem' }}>{selectedProvider.name}</div>
+                  <div style={{ fontWeight: 'bold', color: '#fff', fontSize: '1.05rem', wordBreak: 'break-word' }}>{selectedProvider.name}</div>
                   <div style={{ fontSize: '0.82rem', color: 'rgba(255,255,255,0.5)' }}>
                     {selectedProvider.profileDetails?.specialty || selectedProvider.profileDetails?.doctorType || selectedProvider.role}
                   </div>
@@ -402,10 +439,11 @@ const Channeling = () => {
               </div>
               <button
                 type="button"
+                aria-label="Close booking"
                 onClick={() => { setSelectedProvider(null); setBookingDate(''); setBookingTime(''); setBookingPhone(''); setBookingNotes(''); setAvailableSlots([]); setBookedSlots([]); }}
                 style={{
                   background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)',
-                  borderRadius: '50%', width: '36px', height: '36px',
+                  borderRadius: '50%', width: '44px', height: '44px',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                   cursor: 'pointer', color: '#fff', flexShrink: 0
                 }}
@@ -426,10 +464,12 @@ const Channeling = () => {
                 }}>
                   <div style={{ fontSize: '0.85rem', color: 'rgba(212,175,55,0.85)', marginBottom: '0.65rem', fontWeight: 600 }}>
                     Patient Reviews
-                    {(selectedProvider.averageRating ?? selectedProvider.rating) != null && (
+                    {(selectedProvider.averageRating ?? selectedProvider.rating) != null &&
+                      Number(selectedProvider.averageRating ?? selectedProvider.rating) > 0 &&
+                      Number(selectedProvider.reviewCount) > 0 && (
                       <span style={{ marginLeft: 8, color: '#f1c40f' }}>
                         ★ {Number(selectedProvider.averageRating ?? selectedProvider.rating).toFixed(1)}
-                        {selectedProvider.reviewCount != null ? ` · ${selectedProvider.reviewCount}` : ''}
+                        {` · ${selectedProvider.reviewCount}`}
                       </span>
                     )}
                   </div>

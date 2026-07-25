@@ -93,7 +93,7 @@ const DoctorProfile = () => {
           '@context': 'https://schema.org',
           '@type': 'Physician',
           name: provider.name,
-          medicalSpecialty: specs,
+          ...(specs.length ? { medicalSpecialty: specs } : {}),
           url: `https://deergayu.com/doctors/${provider.id}`,
         }}
       />
@@ -120,7 +120,7 @@ const DoctorProfile = () => {
                 <div className="doctor-meta">{getProviderTitle(provider)}</div>
                 <div className="doctor-badges" style={{ marginTop: '0.5rem' }}>
                   {isApprovedProvider(provider) && (
-                    <span className="doctor-badge verified">Verified provider</span>
+                    <span className="doctor-badge verified">Deergayu Approved</span>
                   )}
                   {types.map((t) => (
                     <span key={t} className="doctor-badge muted">

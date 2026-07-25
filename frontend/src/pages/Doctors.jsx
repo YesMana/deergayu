@@ -190,7 +190,7 @@ const Doctors = () => {
                       </div>
                       <div className="doctor-badges">
                         {isApprovedProvider(p) && (
-                          <span className="doctor-badge verified">Verified provider</span>
+                          <span className="doctor-badge verified">Deergayu Approved</span>
                         )}
                         {types.map((t) => (
                           <span key={t} className="doctor-badge muted">

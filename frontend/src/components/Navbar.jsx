@@ -15,20 +15,17 @@ const Navbar = () => {
   const [isListening, setIsListening] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
-  const [servicesOpen, setServicesOpen] = useState(false);
-  const [wellnessOpen, setWellnessOpen] = useState(false);
+  const [moreOpen, setMoreOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
   const userMenuRef = useRef(null);
-  const servicesRef = useRef(null);
-  const wellnessRef = useRef(null);
+  const moreRef = useRef(null);
 
   useEffect(() => {
     setIsMobileMenuOpen(false);
     setIsUserMenuOpen(false);
-    setServicesOpen(false);
-    setWellnessOpen(false);
+    setMoreOpen(false);
   }, [location.pathname]);
 
   useEffect(() => {
@@ -42,11 +39,8 @@ const Navbar = () => {
       if (userMenuRef.current && !userMenuRef.current.contains(e.target)) {
         setIsUserMenuOpen(false);
       }
-      if (servicesRef.current && !servicesRef.current.contains(e.target)) {
-        setServicesOpen(false);
-      }
-      if (wellnessRef.current && !wellnessRef.current.contains(e.target)) {
-        setWellnessOpen(false);
+      if (moreRef.current && !moreRef.current.contains(e.target)) {
+        setMoreOpen(false);
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
@@ -104,10 +98,9 @@ const Navbar = () => {
   const profilePic = user?.profileDetails?.profileImageUrl;
   const path = location.pathname;
 
-  const servicesActive =
-    ['/online-consultation', '/specialties', '/channeling', '/videos'].some((p) => path.startsWith(p));
-  const wellnessActive =
-    ['/ayurvedic-guide', '/astrology'].some((p) => path.startsWith(p));
+  const moreActive = ['/specialties', '/channeling', '/videos', '/astrology', '/faq', '/join-as-doctor'].some(
+    (p) => path.startsWith(p)
+  );
 
   return (
     <nav className={`navbar ${scrolled ? 'scrolled' : ''}`} aria-label="Main">
@@ -128,57 +121,22 @@ const Navbar = () => {
             </Link>
           </li>
           <li>
-            <Link to="/ayurveda" className={path.startsWith('/ayurveda') ? 'active' : ''}>
+            <Link to="/ayurveda" className={path === '/ayurveda' || path.startsWith('/ayurveda/') ? 'active' : ''}>
               Ayurveda
             </Link>
           </li>
-          <li className="nav-dropdown" ref={servicesRef}>
-            <button
-              type="button"
-              className={`nav-dropdown-trigger ${servicesActive ? 'active' : ''}`}
-              aria-expanded={servicesOpen}
-              aria-haspopup="true"
-              onClick={() => setServicesOpen((v) => !v)}
+          <li>
+            <Link
+              to="/online-consultation"
+              className={path.startsWith('/online-consultation') ? 'active' : ''}
             >
-              Services <ChevronDown size={14} />
-            </button>
-            {servicesOpen && (
-              <div className="nav-dropdown-menu" role="menu">
-                <Link to="/online-consultation" role="menuitem">
-                  Online consultation
-                </Link>
-                <Link to="/specialties" role="menuitem">
-                  Specialties
-                </Link>
-                <Link to="/channeling" role="menuitem">
-                  Book / Channel
-                </Link>
-                <Link to="/videos" role="menuitem">
-                  Videos
-                </Link>
-              </div>
-            )}
+              Online Consultation
+            </Link>
           </li>
-          <li className="nav-dropdown" ref={wellnessRef}>
-            <button
-              type="button"
-              className={`nav-dropdown-trigger ${wellnessActive ? 'active' : ''}`}
-              aria-expanded={wellnessOpen}
-              aria-haspopup="true"
-              onClick={() => setWellnessOpen((v) => !v)}
-            >
-              Health &amp; Wellness <ChevronDown size={14} />
-            </button>
-            {wellnessOpen && (
-              <div className="nav-dropdown-menu" role="menu">
-                <Link to="/ayurvedic-guide" role="menuitem">
-                  Guide / Articles
-                </Link>
-                <Link to="/astrology" role="menuitem">
-                  Astrology
-                </Link>
-              </div>
-            )}
+          <li>
+            <Link to="/ayurvedic-guide" className={path.startsWith('/ayurvedic-guide') ? 'active' : ''}>
+              Guide
+            </Link>
           </li>
           <li>
             <Link to="/shop" className={path.startsWith('/shop') ? 'active' : ''}>
@@ -194,6 +152,39 @@ const Navbar = () => {
             <Link to="/contact" className={path === '/contact' ? 'active' : ''}>
               Contact
             </Link>
+          </li>
+          <li className="nav-dropdown" ref={moreRef}>
+            <button
+              type="button"
+              className={`nav-dropdown-trigger ${moreActive ? 'active' : ''}`}
+              aria-expanded={moreOpen}
+              aria-haspopup="true"
+              onClick={() => setMoreOpen((v) => !v)}
+            >
+              More <ChevronDown size={14} />
+            </button>
+            {moreOpen && (
+              <div className="nav-dropdown-menu" role="menu">
+                <Link to="/specialties" role="menuitem">
+                  Specialties
+                </Link>
+                <Link to="/channeling" role="menuitem">
+                  Book / Channel
+                </Link>
+                <Link to="/faq" role="menuitem">
+                  FAQ
+                </Link>
+                <Link to="/videos" role="menuitem">
+                  Videos
+                </Link>
+                <Link to="/astrology" role="menuitem">
+                  Astrology
+                </Link>
+                <Link to="/join-as-doctor" role="menuitem">
+                  Join as Doctor
+                </Link>
+              </div>
+            )}
           </li>
         </ul>
 
@@ -318,17 +309,18 @@ const Navbar = () => {
         <ul className="mobile-nav-links">
           <li><Link to="/">Home</Link></li>
           <li><Link to="/doctors">Find a Doctor</Link></li>
-          <li><Link to="/channeling">Book / Channel a Doctor</Link></li>
           <li><Link to="/ayurveda">Ayurveda</Link></li>
-          <li><Link to="/online-consultation">Online consultation</Link></li>
-          <li><Link to="/specialties">Specialties</Link></li>
+          <li><Link to="/online-consultation">Online Consultation</Link></li>
           <li><Link to="/ayurvedic-guide">Guide / Articles</Link></li>
           <li><Link to="/shop">Shop</Link></li>
-          <li><Link to="/videos">Videos</Link></li>
           <li><Link to="/about">About</Link></li>
-          <li><Link to="/faq">FAQ</Link></li>
           <li><Link to="/contact">Contact</Link></li>
+          <li><Link to="/channeling">Book / Channel a Doctor</Link></li>
+          <li><Link to="/specialties">Specialties</Link></li>
+          <li><Link to="/faq">FAQ</Link></li>
           <li><Link to="/join-as-doctor">Join as Doctor</Link></li>
+          <li className="mobile-nav-secondary"><Link to="/videos">Videos</Link></li>
+          <li className="mobile-nav-secondary"><Link to="/astrology">Astrology</Link></li>
           {user && (
             <>
               <li>
