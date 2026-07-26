@@ -98,6 +98,16 @@ body {
   overflow-x: hidden;
 }
 
+html[lang="si"], html[lang="ta"],
+body.lang-si, body.lang-ta {
+  line-height: 1.65;
+}
+
+.btn, .nav-link, .doctor-badge {
+  line-height: 1.4;
+  white-space: normal;
+}
+
 :root[data-theme='light'] body {
   background-image:
     radial-gradient(ellipse 80% 50% at 50% -10%, rgba(46, 125, 50, 0.08), transparent 55%),
@@ -267,7 +277,6 @@ button {
   cursor: pointer;
   border: none;
   font-family: var(--font-body);
-  white-space: nowrap;
   position: relative;
   overflow: hidden;
 }

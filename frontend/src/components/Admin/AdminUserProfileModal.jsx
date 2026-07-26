@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { X, DollarSign, Star, Package, ShoppingBag, Calendar, Mail } from 'lucide-react';
 import { auth } from '../../firebase';
 import { fmtCurrency, fmtDate, StatusPill, userInitials } from './AdminUtils';
 import { API_URL } from '../../config/api';
+import { useLanguage } from '../../context/LanguageContext';
 import {
   computeProfileCompletion,
   normalizeQualifications,
@@ -22,6 +23,7 @@ function FieldRow({ label, children }) {
 }
 
 export default function AdminUserProfileModal({ userId, onClose }) {
+  const { t } = useLanguage();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState('overview');
@@ -65,16 +67,16 @@ export default function AdminUserProfileModal({ userId, onClose }) {
         style={{ maxWidth: '900px', width: '95%', maxHeight: '90vh', overflow: 'auto' }}
       >
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-          <h2 style={{ margin: 0 }}>Provider review — Admin</h2>
+          <h2 style={{ margin: 0 }}>{t('admin_provider_review_title')}</h2>
           <button onClick={onClose} className="btn btn-outline" style={{ padding: '0.4rem' }}>
             <X size={18} />
           </button>
         </div>
 
         {loading ? (
-          <div style={{ padding: '3rem', textAlign: 'center' }}>Loading full profile…</div>
+          <div style={{ padding: '3rem', textAlign: 'center' }}>{t('admin_loading_full_profile')}</div>
         ) : !u ? (
-          <div style={{ padding: '2rem', textAlign: 'center', color: '#ef5350' }}>Failed to load profile</div>
+          <div style={{ padding: '2rem', textAlign: 'center', color: '#ef5350' }}>{t('admin_failed_load_profile')}</div>
         ) : (
           <>
             <div
@@ -114,14 +116,14 @@ export default function AdminUserProfileModal({ userId, onClose }) {
                   borderRadius: 8,
                 }}
               >
-                <strong>Profile completion: {completion.percent}%</strong>
+                <strong>{t('admin_profile_completion')}: {completion.percent}%</strong>
                 <p style={{ margin: '0.5rem 0 0', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
                   {data?.approvalNote ||
-                    'Deergayu Approved is directory review only — not medical/legal credential verification.'}
+                    t('admin_approval_note_default')}
                 </p>
                 {completion.missingRequired?.length > 0 && (
                   <p style={{ margin: '0.5rem 0 0', fontSize: '0.85rem' }}>
-                    Missing required: {completion.missingRequired.map((m) => m.action).join('; ')}
+                    {t('admin_missing_required')}: {completion.missingRequired.map((m) => m.action).join('; ')}
                   </p>
                 )}
               </div>

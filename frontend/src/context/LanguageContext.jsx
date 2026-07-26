@@ -1,4 +1,4 @@
-import React, { createContext, useState, useContext, useCallback } from 'react';
+import { createContext, useState, useContext, useCallback, useEffect } from 'react';
 import { translations } from '../i18n/translations';
 
 const LanguageContext = createContext();
@@ -22,6 +22,12 @@ export function translate(lang, key) {
 export const LanguageProvider = ({ children }) => {
   const [lang, setLangState] = useState(localStorage.getItem('appLang') || 'en');
   const [hasChosen, setHasChosen] = useState(!!localStorage.getItem('appLang'));
+
+  useEffect(() => {
+    document.documentElement.lang = lang;
+    document.body.classList.remove('lang-en', 'lang-si', 'lang-ta');
+    document.body.classList.add(`lang-${lang}`);
+  }, [lang]);
 
   const setLanguage = useCallback((selectedLang) => {
     const next = ['en', 'si', 'ta'].includes(selectedLang) ? selectedLang : 'en';

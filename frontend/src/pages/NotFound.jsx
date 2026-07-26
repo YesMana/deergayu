@@ -1,9 +1,15 @@
-import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Home, ArrowLeft } from 'lucide-react';
+import { useLanguage } from '../context/LanguageContext';
 
 const NotFound = () => {
   const navigate = useNavigate();
+  const { t } = useLanguage();
+  const quickLinks = [
+    { to: '/shop', label: `🛍️ ${t('footer_shop')}` },
+    { to: '/channeling', label: `📅 ${t('nav_book_appointment')}` },
+    { to: '/ayurvedic-guide', label: `🌿 ${t('nav_guide')}` },
+  ];
 
   return (
     <div style={{
@@ -40,11 +46,10 @@ const NotFound = () => {
       }}>
         <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>🌿</div>
         <h1 style={{ fontSize: '1.6rem', fontWeight: 700, marginBottom: '0.75rem', color: 'var(--text-primary)' }}>
-          Page Not Found
+          {t('nf_title')}
         </h1>
         <p style={{ color: 'var(--text-secondary)', marginBottom: '2rem', lineHeight: 1.6 }}>
-          The page you're looking for doesn't exist or has been moved.
-          Let's get you back on track.
+          {t('nf_body')}
         </p>
 
         <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center', flexWrap: 'wrap' }}>
@@ -53,25 +58,21 @@ const NotFound = () => {
             className="btn btn-outline"
             style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
           >
-            <ArrowLeft size={18} /> Go Back
+            <ArrowLeft size={18} /> {t('common_back')}
           </button>
           <Link
             to="/"
             className="btn btn-primary"
             style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
           >
-            <Home size={18} /> Go Home
+            <Home size={18} /> {t('nf_go_home')}
           </Link>
         </div>
       </div>
 
       {/* Quick Links */}
       <div style={{ marginTop: '2rem', display: 'flex', gap: '1.5rem', flexWrap: 'wrap', justifyContent: 'center' }}>
-        {[
-          { to: '/shop', label: '🛍️ Shop' },
-          { to: '/channeling', label: '📅 Book Appointment' },
-          { to: '/ayurvedic-guide', label: '🌿 Ayurvedic Guide' },
-        ].map(link => (
+        {quickLinks.map(link => (
           <Link key={link.to} to={link.to} style={{
             color: 'var(--primary-color)',
             textDecoration: 'none',

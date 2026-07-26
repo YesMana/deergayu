@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Search, Calendar as CalendarIcon, Star, Video, MapPin, X } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext';
@@ -165,7 +165,7 @@ const Channeling = () => {
       return;
     }
     setConsultMode(mode);
-    setBookingNotes(mode === 'video' ? 'Video consultation requested. Doctor will share Google Meet / Zoom link after confirmation.' : '');
+    setBookingNotes(mode === 'video' ? t('ch_video_request_note') : '');
     setSelectedProvider(provider);
     setProviderReviews([]);
     setLoadingReviews(true);
@@ -303,7 +303,7 @@ const Channeling = () => {
       <div className="container channeling-content">
         <div className="providers-list">
           {loading ? (
-            <div style={{ textAlign: 'center', padding: '4rem', color: 'var(--text-secondary)' }}>Loading experts...</div>
+            <div style={{ textAlign: 'center', padding: '4rem', color: 'var(--text-secondary)' }}>{t('ch_loading_experts')}</div>
           ) : filteredProviders.length > 0 ? (
             filteredProviders.map(provider => {
               const avg = provider.averageRating ?? provider.rating;
@@ -348,7 +348,7 @@ const Channeling = () => {
                     <h3 className="provider-name">
                       {provider.name}{' '}
                       <span className="doctor-badge verified" style={{ fontSize: '0.7rem', verticalAlign: 'middle' }}>
-                        Deergayu Approved
+                        {t('badge_deergayu_approved')}
                       </span>
                     </h3>
                     <p className="provider-role">{provider.profileDetails?.doctorType || provider.role}</p>
