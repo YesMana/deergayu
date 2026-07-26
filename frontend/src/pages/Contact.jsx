@@ -1,13 +1,13 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { MessageCircle, Phone, Mail, MapPin } from 'lucide-react';
 import SEO from '../components/SEO';
 import { useToast } from '../context/ToastContext';
 import './LegalPages.css';
 import { API_URL } from '../config/api';
 
-
-/** Public customer contact channels */
-const CONTACTS = {
+/** Public customer channels already published on deergayu.com (not private admin inboxes). */
+const PUBLIC_CHANNELS = {
   whatsapp: {
     label: '071 990 9299',
     display: '0719909299',
@@ -17,10 +17,6 @@ const CONTACTS = {
     label: '076 220 9299',
     display: '0762209299',
   },
-  emails: [
-    { label: 'info@deergayu.com', href: 'mailto:info@deergayu.com' },
-    { label: 'support@deergayu.com', href: 'mailto:support@deergayu.com' },
-  ],
 };
 
 const WA_PRESET = 'Hi Deergayu — I have an inquiry from the Contact page.';
@@ -44,6 +40,18 @@ const Contact = () => {
     message: '',
   });
   const [submitting, setSubmitting] = useState(false);
+  const [contactEmail, setContactEmail] = useState('');
+  const [settingsLoaded, setSettingsLoaded] = useState(false);
+
+  useEffect(() => {
+    fetch(`${API_URL}/api/storefront-settings`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (data?.contactEmail) setContactEmail(String(data.contactEmail).trim());
+      })
+      .catch(() => {})
+      .finally(() => setSettingsLoaded(true));
+  }, []);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -74,13 +82,13 @@ const Contact = () => {
     }
   };
 
-  const waHref = `https://wa.me/${CONTACTS.whatsapp.e164}?text=${encodeURIComponent(WA_PRESET)}`;
+  const waHref = `https://wa.me/${PUBLIC_CHANNELS.whatsapp.e164}?text=${encodeURIComponent(WA_PRESET)}`;
 
   return (
     <div className="legal-page animate-fade-in">
       <SEO
         title="Contact Us | Deergayu"
-        description="Contact Deergayu — WhatsApp, phone, email, or send an inquiry. We help with shop, channeling, and partnerships."
+        description="Contact Deergayu — WhatsApp, phone, email from storefront settings, or send an inquiry about bookings and shop support."
         url="https://deergayu.com/contact"
         canonical="https://deergayu.com/contact"
       />
@@ -94,47 +102,59 @@ const Contact = () => {
           <aside className="contact-info glass-panel">
             <h2>Get in touch</h2>
             <p>
-              Chat on WhatsApp for the fastest reply, call us, or email. You can also send a written inquiry —
-              our team reviews every message in the admin desk.
+              Chat on WhatsApp for a quick reply, call us, or use the email published in storefront
+              settings. You can also send a written inquiry.
             </p>
 
             <a className="contact-wa-btn" href={waHref} target="_blank" rel="noopener noreferrer">
-              <MessageCircle size={18} />
-              WhatsApp {CONTACTS.whatsapp.label}
+              <MessageCircle size={18} aria-hidden="true" />
+              WhatsApp {PUBLIC_CHANNELS.whatsapp.label}
             </a>
 
             <div className="contact-detail">
               <span>
-                <Phone size={13} style={{ display: 'inline', verticalAlign: -2, marginRight: 4 }} />
+                <Phone size={13} style={{ display: 'inline', verticalAlign: -2, marginRight: 4 }} aria-hidden="true" />
                 Phone
               </span>
-              <a href={`tel:${CONTACTS.phone.display}`}>{CONTACTS.phone.label}</a>
+              <a href={`tel:${PUBLIC_CHANNELS.phone.display}`}>{PUBLIC_CHANNELS.phone.label}</a>
             </div>
 
             <div className="contact-detail">
               <span>
-                <Mail size={13} style={{ display: 'inline', verticalAlign: -2, marginRight: 4 }} />
+                <Mail size={13} style={{ display: 'inline', verticalAlign: -2, marginRight: 4 }} aria-hidden="true" />
                 Email
               </span>
-              {CONTACTS.emails.map((e) => (
-                <a key={e.href} href={e.href} className="contact-email-line">
-                  {e.label}
+              {settingsLoaded && contactEmail ? (
+                <a href={`mailto:${contactEmail}`} className="contact-email-line">
+                  {contactEmail}
                 </a>
-              ))}
+              ) : settingsLoaded ? (
+                <strong>Use the inquiry form — public email not configured in storefront settings.</strong>
+              ) : (
+                <span>Loading…</span>
+              )}
             </div>
 
             <div className="contact-detail">
               <span>
-                <MapPin size={13} style={{ display: 'inline', verticalAlign: -2, marginRight: 4 }} />
+                <MapPin size={13} style={{ display: 'inline', verticalAlign: -2, marginRight: 4 }} aria-hidden="true" />
                 Location
               </span>
               <strong>Sri Lanka</strong>
             </div>
+
+            <p style={{ marginTop: '1rem', fontSize: '0.9rem' }}>
+              <Link to="/faq">FAQ</Link>
+              {' · '}
+              <Link to="/privacy">Privacy</Link>
+              {' · '}
+              <Link to="/refund-policy">Refunds</Link>
+            </p>
           </aside>
 
           <form className="contact-form glass-panel" onSubmit={handleSubmit}>
             <h2 className="contact-form-title">Send an inquiry</h2>
-            <p className="contact-form-sub">Subject + message go straight to the Deergayu team.</p>
+            <p className="contact-form-sub">Subject + message go to the Deergayu contact desk.</p>
 
             <div className="form-group">
               <label htmlFor="contact-name">Name *</label>

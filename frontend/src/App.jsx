@@ -19,6 +19,15 @@ const Home = lazy(() => import('./pages/Home'));
 const Shop = lazy(() => import('./pages/Shop'));
 const ProductDetail = lazy(() => import('./pages/ProductDetail'));
 const Channeling = lazy(() => import('./pages/Channeling'));
+const Doctors = lazy(() => import('./pages/Doctors'));
+const DoctorProfile = lazy(() => import('./pages/DoctorProfile'));
+const Specialties = lazy(() => import('./pages/Specialties'));
+const Ayurveda = lazy(() => import('./pages/Ayurveda'));
+const OnlineConsultation = lazy(() => import('./pages/OnlineConsultation'));
+const About = lazy(() => import('./pages/About'));
+const FAQ = lazy(() => import('./pages/FAQ'));
+const JoinAsDoctor = lazy(() => import('./pages/JoinAsDoctor'));
+const JoinAsClinic = lazy(() => import('./pages/JoinAsClinic'));
 const AyurvedicGuide = lazy(() => import('./pages/AyurvedicGuide'));
 const AdminDashboard = lazy(() => import('./pages/AdminDashboard'));
 const VendorDashboard = lazy(() => import('./pages/VendorDashboard'));
@@ -51,7 +60,17 @@ function AppShell() {
             <Route path="/" element={<Home />} />
             <Route path="/shop" element={<Shop />} />
             <Route path="/product/:id" element={<ProductDetail />} />
+            <Route path="/doctors" element={<Doctors />} />
+            <Route path="/doctors/:id" element={<DoctorProfile />} />
+            <Route path="/specialties" element={<Specialties />} />
+            <Route path="/specialties/:slug" element={<Specialties />} />
             <Route path="/channeling" element={<Channeling />} />
+            <Route path="/ayurveda" element={<Ayurveda />} />
+            <Route path="/online-consultation" element={<OnlineConsultation />} />
+            <Route path="/about" element={<About />} />
+            <Route path="/faq" element={<FAQ />} />
+            <Route path="/join-as-doctor" element={<JoinAsDoctor />} />
+            <Route path="/join-as-clinic" element={<JoinAsClinic />} />
             <Route path="/ayurvedic-guide" element={<AyurvedicGuide />} />
             <Route path="/videos" element={<Videos />} />
             <Route path="/astrology" element={<Astrology />} />

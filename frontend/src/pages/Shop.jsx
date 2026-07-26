@@ -132,7 +132,9 @@ const Shop = () => {
                     </p>
                   )}
                   <div className="product-meta">
-                    <span className="product-rating">★ {product.rating || '4.5'}</span>
+                    {product.rating != null && Number(product.rating) > 0 && (
+                      <span className="product-rating">★ {Number(product.rating).toFixed(1)}</span>
+                    )}
                     <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginLeft: 'auto' }}>By {product.vendorName || 'Deergayu'}</span>
                   </div>
                   <div className="product-bottom">
