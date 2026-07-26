@@ -82,9 +82,10 @@ const DoctorProfile = () => {
   const qualifications = cleanDisplayText(pd.qualifications);
   const registration = cleanDisplayText(pd.registrationNumber);
   const languages = formatLanguages(pd.languages);
+  // Structured professional location only — never free-text address (may be personal)
   const locationLine =
     cleanDisplayText(provider.locationSummary) ||
-    [cleanDisplayText(pd.address), cleanDisplayText(pd.city), cleanDisplayText(pd.district), cleanDisplayText(pd.province)]
+    [cleanDisplayText(pd.city), cleanDisplayText(pd.district), cleanDisplayText(pd.province), cleanDisplayText(pd.country)]
       .filter(Boolean)
       .join(', ');
   const availText = formatAvailabilitySummary(provider.availabilitySummary);
@@ -102,9 +103,9 @@ const DoctorProfile = () => {
         canonical={canonicalUrl}
         jsonLd={{
           '@context': 'https://schema.org',
-          '@type': 'Physician',
+          '@type': provider.role === 'doctor' ? 'Physician' : 'MedicalBusiness',
           name,
-          ...(specs.length ? { medicalSpecialty: specs } : {}),
+          ...(provider.role === 'doctor' && specs.length ? { medicalSpecialty: specs } : {}),
           url: canonicalUrl,
         }}
       />

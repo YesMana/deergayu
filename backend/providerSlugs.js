@@ -1,6 +1,17 @@
 /**
  * P1-B provider public slugs — server-generated, unique, URL-safe.
- * Stored on users/{uid}.publicSlug; uniqueness via providerSlugs/{slug} index docs.
+ *
+ * Lifecycle (writes only on privileged/admin paths — never on public GET):
+ *   A. Admin approval (POST /users/:uid/status → approved)
+ *   B. Approved provider completes/updates profile (PUT /me/profile) when slug missing
+ *   C. Explicit operational backfill: `node backend/scripts/backfill-provider-slugs.js`
+ *
+ * Immutability: once `users.publicSlug` is set, it is never changed by ensureProviderSlug.
+ * Future provider name changes do NOT republish a new slug (SEO stability).
+ * Manual slug changes require an explicit admin/ops procedure (not implemented as self-serve).
+ *
+ * Index: providerSlugs/{slug} → { providerId }. Client SDK cannot write (Firestore rules).
+ * Deleting/deactivating a provider does not reassign their slug to another provider.
  */
 
 const SLUG_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
@@ -32,59 +43,75 @@ function isValidSlug(slug) {
 }
 
 /**
- * Reserve a unique slug for providerId. Collision → suffix -2, -3, …
+ * Reserve a unique slug for providerId using a Firestore transaction (concurrency-safe).
  * If provider already has publicSlug, returns it unchanged (immutable after publish).
+ * Does not modify unrelated provider fields.
  */
 async function ensureProviderSlug(db, { providerId, name, role, existingSlug }) {
   if (existingSlug && isValidSlug(existingSlug)) {
     return existingSlug;
   }
+  // Re-read user in case another writer already set the slug
+  const userRef = db.collection('users').doc(providerId);
+  const fresh = await userRef.get();
+  const freshSlug = fresh.exists ? fresh.data()?.publicSlug : null;
+  if (freshSlug && isValidSlug(freshSlug)) {
+    return freshSlug;
+  }
+
   const base = slugifyProviderName(name, role);
-  let candidate = base;
   let n = 1;
-  // Cap attempts
   while (n < 200) {
-    const ref = db.collection('providerSlugs').doc(candidate);
-    const snap = await ref.get();
-    if (!snap.exists || snap.data()?.providerId === providerId) {
-      await ref.set(
-        {
-          providerId,
-          slug: candidate,
-          updatedAt: new Date().toISOString(),
-        },
-        { merge: true }
-      );
-      await db.collection('users').doc(providerId).set(
-        {
-          publicSlug: candidate,
-          updatedAt: new Date().toISOString(),
-        },
-        { merge: true }
-      );
-      return candidate;
+    const candidate = n === 1 ? base : `${base}-${n}`;
+    try {
+      const reserved = await db.runTransaction(async (tx) => {
+        const userSnap = await tx.get(userRef);
+        const current = userSnap.exists ? userSnap.data()?.publicSlug : null;
+        if (current && isValidSlug(current)) {
+          return current;
+        }
+        const slugRef = db.collection('providerSlugs').doc(candidate);
+        const slugSnap = await tx.get(slugRef);
+        if (slugSnap.exists && slugSnap.data()?.providerId !== providerId) {
+          return null; // collision — try next
+        }
+        const now = new Date().toISOString();
+        tx.set(
+          slugRef,
+          { providerId, slug: candidate, updatedAt: now },
+          { merge: true }
+        );
+        tx.set(userRef, { publicSlug: candidate, updatedAt: now }, { merge: true });
+        return candidate;
+      });
+      if (reserved) return reserved;
+    } catch (e) {
+      // Contention — retry same candidate once more via loop increment
     }
     n += 1;
-    candidate = `${base}-${n}`;
   }
-  // Fallback: append short id fragment
-  candidate = `${base}-${String(providerId).slice(0, 6).toLowerCase()}`;
-  await db.collection('providerSlugs').doc(candidate).set({
-    providerId,
-    slug: candidate,
-    updatedAt: new Date().toISOString(),
+  // Fallback: append short id fragment (still transactional)
+  const fallback = `${base}-${String(providerId).slice(0, 6).toLowerCase()}`;
+  return db.runTransaction(async (tx) => {
+    const userSnap = await tx.get(userRef);
+    const current = userSnap.exists ? userSnap.data()?.publicSlug : null;
+    if (current && isValidSlug(current)) return current;
+    const slugRef = db.collection('providerSlugs').doc(fallback);
+    const slugSnap = await tx.get(slugRef);
+    if (slugSnap.exists && slugSnap.data()?.providerId !== providerId) {
+      throw new Error('Unable to reserve unique provider slug');
+    }
+    const now = new Date().toISOString();
+    tx.set(slugRef, { providerId, slug: fallback, updatedAt: now }, { merge: true });
+    tx.set(userRef, { publicSlug: fallback, updatedAt: now }, { merge: true });
+    return fallback;
   });
-  await db.collection('users').doc(providerId).set(
-    { publicSlug: candidate, updatedAt: new Date().toISOString() },
-    { merge: true }
-  );
-  return candidate;
 }
 
 async function resolveProviderIdBySlugOrId(db, idOrSlug) {
   const key = String(idOrSlug || '').trim();
   if (!key) return null;
-  // Prefer UID doc
+  // Prefer UID doc — legacy routes work even before slug backfill
   const byId = await db.collection('users').doc(key).get();
   if (byId.exists) {
     const data = byId.data() || {};
@@ -92,8 +119,12 @@ async function resolveProviderIdBySlugOrId(db, idOrSlug) {
       return { id: byId.id, data, via: 'id' };
     }
   }
-  // Slug index
+  // Slug index (exact doc id = lowercase slug)
   const slugKey = key.toLowerCase();
+  if (!isValidSlug(slugKey)) {
+    // Malformed slug-like keys that are not UIDs → not found (UID path already tried)
+    return null;
+  }
   const slugDoc = await db.collection('providerSlugs').doc(slugKey).get();
   if (slugDoc.exists) {
     const providerId = slugDoc.data()?.providerId;

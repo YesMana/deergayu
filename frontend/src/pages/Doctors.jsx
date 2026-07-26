@@ -23,9 +23,12 @@ const Doctors = () => {
   const [specialty, setSpecialty] = useState(searchParams.get('specialty') || 'all');
   const [consultType, setConsultType] = useState(searchParams.get('type') || 'all');
   const [dateFilter, setDateFilter] = useState(searchParams.get('date') || '');
+  const [district, setDistrict] = useState(searchParams.get('district') || 'all');
+  const [city, setCity] = useState(searchParams.get('city') || 'all');
+  const [facilityId, setFacilityId] = useState(searchParams.get('facility') || 'all');
   const [prices, setPrices] = useState({});
 
-  const queryKey = ['public_doctors', nameQ, specialty, consultType, dateFilter];
+  const queryKey = ['public_doctors', nameQ, specialty, consultType, dateFilter, district, city, facilityId];
 
   const { data: providers = [], isLoading, isError, refetch } = useQuery({
     queryKey,
@@ -35,14 +38,28 @@ const Doctors = () => {
         specialty: specialty !== 'all' ? specialty : undefined,
         type: consultType !== 'all' ? consultType : undefined,
         date: dateFilter || undefined,
+        district: district !== 'all' ? district : undefined,
+        city: city !== 'all' ? city : undefined,
+        facility: facilityId !== 'all' ? facilityId : undefined,
       }),
     staleTime: 60 * 1000,
   });
 
-  // Specialty options: when date-filtered list is small, still show known specialties from unfiltered fetch
+  // Specialty / location options from unfiltered directory (structured fields only)
   const { data: allForSpecs = [] } = useQuery({
     queryKey: ['public_doctors_specs'],
     queryFn: () => fetchPublicProviders(API_URL, { includeNext: '0' }),
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const { data: activeFacilities = [] } = useQuery({
+    queryKey: ['public_facilities_active'],
+    queryFn: async () => {
+      const res = await fetch(`${API_URL}/api/facilities`);
+      if (!res.ok) return [];
+      const list = await res.json();
+      return Array.isArray(list) ? list : [];
+    },
     staleTime: 5 * 60 * 1000,
   });
 
@@ -51,14 +68,51 @@ const Doctors = () => {
     [allForSpecs, providers]
   );
 
+  const districtOptions = useMemo(() => {
+    const set = new Set();
+    for (const p of allForSpecs) {
+      const d = String(p?.profileDetails?.district || '').trim();
+      if (d) set.add(d);
+    }
+    return [...set].sort((a, b) => a.localeCompare(b));
+  }, [allForSpecs]);
+
+  const cityOptions = useMemo(() => {
+    const set = new Set();
+    for (const p of allForSpecs) {
+      const c = String(p?.profileDetails?.city || '').trim();
+      if (c) set.add(c);
+    }
+    return [...set].sort((a, b) => a.localeCompare(b));
+  }, [allForSpecs]);
+
+  const showDistrictFilter = districtOptions.length > 0;
+  const showCityFilter = cityOptions.length > 0;
+  const showFacilityFilter = activeFacilities.length > 0;
+
   useEffect(() => {
     const next = new URLSearchParams();
     if (nameQ.trim()) next.set('q', nameQ.trim());
     if (specialty !== 'all') next.set('specialty', specialty);
     if (consultType !== 'all') next.set('type', consultType);
     if (dateFilter) next.set('date', dateFilter);
+    if (showDistrictFilter && district !== 'all') next.set('district', district);
+    if (showCityFilter && city !== 'all') next.set('city', city);
+    if (showFacilityFilter && facilityId !== 'all') next.set('facility', facilityId);
     setSearchParams(next, { replace: true });
-  }, [nameQ, specialty, consultType, dateFilter, setSearchParams]);
+  }, [
+    nameQ,
+    specialty,
+    consultType,
+    dateFilter,
+    district,
+    city,
+    facilityId,
+    showDistrictFilter,
+    showCityFilter,
+    showFacilityFilter,
+    setSearchParams,
+  ]);
 
   useEffect(() => {
     let cancelled = false;
@@ -160,6 +214,51 @@ const Doctors = () => {
               onChange={(e) => setDateFilter(e.target.value)}
               title="Show providers with real open slots on this date (Asia/Colombo)"
             />
+            {showDistrictFilter && (
+              <select
+                id="doc-district"
+                value={district}
+                onChange={(e) => setDistrict(e.target.value)}
+                aria-label="District"
+              >
+                <option value="all">All districts</option>
+                {districtOptions.map((d) => (
+                  <option key={d} value={d}>
+                    {d}
+                  </option>
+                ))}
+              </select>
+            )}
+            {showCityFilter && (
+              <select
+                id="doc-city"
+                value={city}
+                onChange={(e) => setCity(e.target.value)}
+                aria-label="City"
+              >
+                <option value="all">All cities</option>
+                {cityOptions.map((c) => (
+                  <option key={c} value={c}>
+                    {c}
+                  </option>
+                ))}
+              </select>
+            )}
+            {showFacilityFilter && (
+              <select
+                id="doc-facility"
+                value={facilityId}
+                onChange={(e) => setFacilityId(e.target.value)}
+                aria-label="Facility"
+              >
+                <option value="all">All facilities</option>
+                {activeFacilities.map((f) => (
+                  <option key={f.id} value={f.id}>
+                    {f.name}
+                  </option>
+                ))}
+              </select>
+            )}
           </div>
           {dateFilter && (
             <p className="pub-note" style={{ marginTop: '-0.5rem', marginBottom: '1rem' }}>

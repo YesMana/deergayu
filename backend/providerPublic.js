@@ -1,5 +1,12 @@
 /**
  * Public-safe provider DTO for directory/profile — never payout/telephone/admin notes.
+ *
+ * Location privacy:
+ *   - Free-text `profileDetails.address` may be a personal/home address entered at signup.
+ *   - It is NOT treated as a public clinic address.
+ *   - Public list/profile expose only structured professional location fields when present:
+ *     city, district, province, country (plus locationSummary built from those).
+ *   - Clinic/facility addresses come from the facilities collection when affiliated.
  */
 
 const {
@@ -9,8 +16,8 @@ const {
   specialtiesFromProfile,
 } = require('./availability');
 
+/** Intentionally public professional profile fields (excludes free-text personal address). */
 const PUBLIC_PROFILE_KEYS = [
-  'address',
   'province',
   'district',
   'city',
@@ -30,7 +37,8 @@ const PUBLIC_PROFILE_KEYS = [
   'offersAudio',
   'videoConsultation',
   'consultationModes',
-  // schedule omitted from list DTO by default — availabilitySummary used instead
+  // schedule omitted from list DTO — availabilitySummary used instead
+  // address intentionally omitted (may be personal)
 ];
 
 function pickPublicProfileDetails(pd = {}, { includeSchedule = false } = {}) {
@@ -40,7 +48,6 @@ function pickPublicProfileDetails(pd = {}, { includeSchedule = false } = {}) {
     if (src[key] !== undefined) out[key] = src[key];
   }
   if (includeSchedule && src.schedule) {
-    // Compact schedule presence only for profile detail if needed — prefer summary
     out.hasSchedule = hasRealSchedule(src.schedule);
   } else {
     out.hasSchedule = hasRealSchedule(src.schedule);
@@ -48,11 +55,13 @@ function pickPublicProfileDetails(pd = {}, { includeSchedule = false } = {}) {
   return out;
 }
 
+/**
+ * Public location line from structured fields only — never free-text address.
+ */
 function locationSummary(pd = {}) {
-  const parts = [pd.address, pd.city, pd.district, pd.province, pd.country]
+  const parts = [pd.city, pd.district, pd.province, pd.country]
     .map((x) => (x == null ? '' : String(x).trim()))
     .filter(Boolean);
-  // Dedupe consecutive duplicates
   const deduped = [];
   for (const p of parts) {
     if (!deduped.length || deduped[deduped.length - 1].toLowerCase() !== p.toLowerCase()) {

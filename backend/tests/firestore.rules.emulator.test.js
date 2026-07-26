@@ -381,7 +381,101 @@ async function main() {
     );
   }
 
-  // ─── 6. P0-B2 FINANCE COLLECTIONS ─────────────────────────────────
+  // ─── 6. P1-B FACILITIES / AFFILIATIONS / PROVIDER SLUGS ───────────
+  console.log('\n=== P1-B FACILITY & SLUG RULES ===\n');
+  await testEnv.withSecurityRulesDisabled(async (ctx) => {
+    const db = ctx.firestore();
+    await db.doc('facilities/activeClinic1').set({
+      name: 'Active Clinic',
+      type: 'clinic',
+      status: 'active',
+      slug: 'active-clinic',
+    });
+    await db.doc('facilities/draftClinic1').set({
+      name: 'Draft Clinic',
+      type: 'clinic',
+      status: 'draft',
+      slug: 'draft-clinic',
+    });
+    await db.doc('facilityAffiliations/aff1').set({
+      facilityId: 'activeClinic1',
+      providerId: 'approved1',
+      status: 'active',
+      consultationTypes: ['in_person'],
+    });
+    await db.doc('providerSlugs/dr-approved').set({
+      providerId: 'approved1',
+      slug: 'dr-approved',
+    });
+  });
+
+  {
+    const db = testEnv.unauthenticatedContext().firestore();
+    await expectAllowed('unauth: can read active facility', db.doc('facilities/activeClinic1').get());
+    await expectDenied('unauth: cannot read draft facility', db.doc('facilities/draftClinic1').get());
+    await expectDenied('unauth: cannot create facility', db.doc('facilities/hack').set({
+      name: 'Hack', type: 'clinic', status: 'active',
+    }));
+    await expectDenied('unauth: cannot update facility', db.doc('facilities/activeClinic1').update({ name: 'X' }));
+    await expectDenied('unauth: cannot delete facility', db.doc('facilities/activeClinic1').delete());
+    await expectAllowed('unauth: can read active affiliation', db.doc('facilityAffiliations/aff1').get());
+    await expectDenied('unauth: cannot create affiliation', db.doc('facilityAffiliations/hack').set({
+      facilityId: 'activeClinic1', providerId: 'patient1', status: 'active',
+    }));
+    await expectDenied('unauth: cannot update affiliation', db.doc('facilityAffiliations/aff1').update({ status: 'inactive' }));
+    await expectDenied('unauth: cannot delete affiliation', db.doc('facilityAffiliations/aff1').delete());
+    await expectAllowed('unauth: can read providerSlugs', db.doc('providerSlugs/dr-approved').get());
+    await expectDenied('unauth: cannot write providerSlugs', db.doc('providerSlugs/hack').set({
+      providerId: 'patient1', slug: 'hack',
+    }));
+  }
+  {
+    const db = testEnv.authenticatedContext('patient1', { email: 'patient@test.com' }).firestore();
+    await expectAllowed('patient: can read active facility', db.doc('facilities/activeClinic1').get());
+    await expectDenied('patient: cannot read draft facility', db.doc('facilities/draftClinic1').get());
+    await expectDenied('patient: cannot create facility', db.doc('facilities/p-hack').set({
+      name: 'P', type: 'hospital', status: 'active',
+    }));
+    await expectDenied('patient: cannot update facility', db.doc('facilities/activeClinic1').update({ status: 'inactive' }));
+    await expectDenied('patient: cannot create affiliation', db.doc('facilityAffiliations/p-aff').set({
+      facilityId: 'activeClinic1', providerId: 'patient1', status: 'active',
+    }));
+    await expectDenied('patient: cannot write providerSlugs', db.doc('providerSlugs/dr-patient').set({
+      providerId: 'patient1', slug: 'dr-patient',
+    }));
+    await expectDenied('patient: cannot set publicSlug on self', db.doc('users/patient1').update({ publicSlug: 'hacked' }));
+  }
+  {
+    const db = testEnv.authenticatedContext('approved1', { email: 'vendor@test.com' }).firestore();
+    await expectDenied('provider: cannot create facility', db.doc('facilities/prov-clinic').set({
+      name: 'Mine', type: 'clinic', status: 'active',
+    }));
+    await expectDenied('provider: cannot mutate facility', db.doc('facilities/activeClinic1').update({ name: 'Taken' }));
+    await expectDenied('provider: cannot self-affiliate via Firestore', db.doc('facilityAffiliations/self').set({
+      facilityId: 'activeClinic1', providerId: 'approved1', status: 'active',
+    }));
+    await expectDenied('provider: cannot change own publicSlug', db.doc('users/approved1').update({ publicSlug: 'new-slug' }));
+    await expectDenied('provider: cannot write providerSlugs', db.doc('providerSlugs/dr-new').set({
+      providerId: 'approved1', slug: 'dr-new',
+    }));
+    await expectAllowed('provider: can read own affiliation', db.doc('facilityAffiliations/aff1').get());
+  }
+  {
+    const db = testEnv.authenticatedContext('admin1', { email: 'admin@test.com' }).firestore();
+    await expectAllowed('admin: can read draft facility', db.doc('facilities/draftClinic1').get());
+    await expectAllowed('admin: can read active facility', db.doc('facilities/activeClinic1').get());
+    // Privileged writes remain Admin SDK / Express — client SDK denied
+    await expectDenied('admin client: cannot create facility (API/Admin SDK)', db.doc('facilities/admin-new').set({
+      name: 'Admin New', type: 'clinic', status: 'draft',
+    }));
+    await expectDenied('admin client: cannot update facility (API/Admin SDK)', db.doc('facilities/activeClinic1').update({ status: 'inactive' }));
+    await expectDenied('admin client: cannot write affiliations (API/Admin SDK)', db.doc('facilityAffiliations/aff1').update({ status: 'inactive' }));
+    await expectDenied('admin client: cannot write providerSlugs (API/Admin SDK)', db.doc('providerSlugs/dr-admin').set({
+      providerId: 'approved1', slug: 'dr-admin',
+    }));
+  }
+
+  // ─── 7. P0-B2 FINANCE COLLECTIONS ─────────────────────────────────
   console.log('\n=== P0-B2 FINANCE RULES ===\n');
   {
     const unauth = testEnv.unauthenticatedContext().firestore();

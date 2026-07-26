@@ -31,13 +31,19 @@ const Navbar = () => {
     setMoreOpen(false);
   }, [location.pathname]);
 
-  // P1-B: hide empty facility directories from primary navigation
+  // P1-B: hide empty facility directories; refresh on navigation so activate/deactivate is not stale
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
         const res = await fetch(`${API_URL}/api/facilities`);
-        if (!res.ok) return;
+        if (!res.ok) {
+          if (!cancelled) {
+            setShowClinicsNav(false);
+            setShowHospitalsNav(false);
+          }
+          return;
+        }
         const list = await res.json();
         if (cancelled || !Array.isArray(list)) return;
         setShowClinicsNav(
@@ -45,13 +51,16 @@ const Navbar = () => {
         );
         setShowHospitalsNav(list.some((f) => f.type === 'hospital'));
       } catch {
-        /* ignore */
+        if (!cancelled) {
+          setShowClinicsNav(false);
+          setShowHospitalsNav(false);
+        }
       }
     })();
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [location.pathname]);
 
   useEffect(() => {
     const handleScroll = () => setScrolled(window.scrollY > 20);

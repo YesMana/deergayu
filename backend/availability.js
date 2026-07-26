@@ -18,15 +18,26 @@ function colomboWeekdayName(dateStr) {
 }
 
 function todayColomboDateString(now = new Date()) {
-  // Format now as YYYY-MM-DD in Asia/Colombo
   const fmt = new Intl.DateTimeFormat('en-CA', {
     timeZone: 'Asia/Colombo',
     year: 'numeric',
     month: '2-digit',
     day: '2-digit',
   });
-  // en-CA → YYYY-MM-DD
   return fmt.format(now);
+}
+
+/** Current HH:mm in Asia/Colombo. */
+function nowColomboTimeString(now = new Date()) {
+  const parts = new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Asia/Colombo',
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23',
+  }).formatToParts(now);
+  const hour = parts.find((p) => p.type === 'hour')?.value || '00';
+  const minute = parts.find((p) => p.type === 'minute')?.value || '00';
+  return `${hour.padStart(2, '0')}:${minute.padStart(2, '0')}`;
 }
 
 function addDaysColombo(dateStr, days) {
@@ -49,6 +60,20 @@ function hasRealSchedule(schedule) {
     if (wd.active === false) return false;
     return Boolean(wd.start && wd.end);
   });
+}
+
+/**
+ * Drop slots that are already in the past for "today" (Asia/Colombo).
+ * Past calendar dates → empty. Future dates unchanged.
+ */
+function filterBookableSlots(dateStr, slots, now = new Date()) {
+  const parsed = parseCanonicalDate(dateStr);
+  if (!parsed.ok) return [];
+  const today = todayColomboDateString(now);
+  if (parsed.date < today) return [];
+  if (parsed.date > today) return (slots || []).slice();
+  const nowHm = nowColomboTimeString(now);
+  return (slots || []).filter((s) => String(s) > nowHm);
 }
 
 /**
@@ -99,13 +124,14 @@ function freeSlots(allSlots, bookedSlots = []) {
 /**
  * Next open slot within horizonDays from fromDate (inclusive), using real schedule.
  * bookedByDate: { 'YYYY-MM-DD': ['09:00', ...] }
+ * For "today", past times are excluded.
  */
-function findNextAvailability(schedule, bookedByDate = {}, fromDate, horizonDays = 21) {
+function findNextAvailability(schedule, bookedByDate = {}, fromDate, horizonDays = 21, now = new Date()) {
   if (!hasRealSchedule(schedule)) return null;
-  let cursor = fromDate || todayColomboDateString();
+  let cursor = fromDate || todayColomboDateString(now);
   for (let i = 0; i < horizonDays; i += 1) {
     const gen = generateDaySlots(schedule, cursor);
-    const free = freeSlots(gen.allSlots, bookedByDate[cursor] || []);
+    const free = filterBookableSlots(cursor, freeSlots(gen.allSlots, bookedByDate[cursor] || []), now);
     if (free.length) {
       return {
         nextDate: cursor,
@@ -120,9 +146,10 @@ function findNextAvailability(schedule, bookedByDate = {}, fromDate, horizonDays
   return null;
 }
 
-function providerHasAvailabilityOnDate(schedule, dateStr, bookedSlots = []) {
+function providerHasAvailabilityOnDate(schedule, dateStr, bookedSlots = [], now = new Date()) {
   const gen = generateDaySlots(schedule, dateStr);
-  return freeSlots(gen.allSlots, bookedSlots).length > 0;
+  const free = filterBookableSlots(dateStr, freeSlots(gen.allSlots, bookedSlots), now);
+  return free.length > 0;
 }
 
 /** Consultation types from profile flags — same semantics as frontend. */
@@ -159,16 +186,35 @@ function specialtiesFromProfile(profileDetails = {}) {
     });
 }
 
+/** Run async mapper with bounded concurrency. */
+async function mapPool(items, concurrency, mapper) {
+  const results = new Array(items.length);
+  let i = 0;
+  async function worker() {
+    while (i < items.length) {
+      const idx = i;
+      i += 1;
+      results[idx] = await mapper(items[idx], idx);
+    }
+  }
+  const n = Math.max(1, Math.min(concurrency, items.length || 1));
+  await Promise.all(Array.from({ length: n }, () => worker()));
+  return results;
+}
+
 module.exports = {
   WEEKDAYS,
   colomboWeekdayName,
   todayColomboDateString,
+  nowColomboTimeString,
   addDaysColombo,
   hasRealSchedule,
   generateDaySlots,
   freeSlots,
+  filterBookableSlots,
   findNextAvailability,
   providerHasAvailabilityOnDate,
   consultationTypesFromProfile,
   specialtiesFromProfile,
+  mapPool,
 };
