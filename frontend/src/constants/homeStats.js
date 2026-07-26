@@ -1,6 +1,8 @@
 /**
- * Display real API counts only — no artificial floors on public UI (P1-A).
- * Backend may still keep floor config for ops; frontend must not inflate numbers.
+ * Legacy helper — homepage no longer displays floored `/api/home-stats` numbers.
+ * Backend `homeStatsFloor` (50 / 120 / 1000) still inflates that endpoint for
+ * other clients; public Home must use non-numeric trust messaging or verified
+ * live counts only.
  */
 export function displayHomeStats(stats = {}) {
   return {

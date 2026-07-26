@@ -12,11 +12,14 @@ import {
   Users,
   MapPin,
   Stethoscope,
+  Sparkles,
+  Star,
+  Heart,
+  MoonStar,
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import SEO from '../components/SEO';
 import SocialLinks from '../components/SocialLinks';
-import { displayHomeStats } from '../constants/homeStats';
 import {
   collectSpecialtiesFromProviders,
   getProviderSpecialties,
@@ -28,12 +31,6 @@ import { API_URL } from '../config/api';
 
 const Home = () => {
   const navigate = useNavigate();
-  const [stats, setStats] = useState({
-    expertCount: 0,
-    productCount: 0,
-    orderCount: 0,
-    appointmentCount: 0,
-  });
   const [providers, setProviders] = useState([]);
   const [featuredProducts, setFeaturedProducts] = useState([]);
   const [loadingProviders, setLoadingProviders] = useState(true);
@@ -43,13 +40,6 @@ const Home = () => {
   const [consultType, setConsultType] = useState('all');
 
   useEffect(() => {
-    fetch(`${API_URL}/api/home-stats`)
-      .then((r) => (r.ok ? r.json() : null))
-      .then((data) => {
-        if (data) setStats(data);
-      })
-      .catch(() => {});
-
     fetch(`${API_URL}/api/providers`)
       .then((r) => (r.ok ? r.json() : []))
       .then((data) => setProviders(Array.isArray(data) ? data : []))
@@ -76,10 +66,6 @@ const Home = () => {
     // public search can use real schedule APIs per doctor (P1-B).
     navigate(`/doctors?${params.toString()}`);
   };
-
-  const shown = displayHomeStats(stats);
-  const hasRealStats =
-    shown.expertCount > 0 || shown.productCount > 0 || shown.appointmentCount > 0;
 
   const fadeUpVariant = {
     hidden: { opacity: 0, y: 28 },
@@ -203,42 +189,32 @@ const Home = () => {
         </div>
       </section>
 
-      {/* Real stats only — no artificial floors */}
-      {hasRealStats && (
-        <motion.section
-          className="stats-section"
-          initial="hidden"
-          whileInView="visible"
-          viewport={{ once: true, margin: '-50px' }}
-          variants={fadeUpVariant}
-        >
-          <div className="container">
-            <div className="stats-grid stats-grid-real">
-              {shown.expertCount > 0 && (
-                <div className="stat-card glass-panel">
-                  <Users size={22} aria-hidden="true" />
-                  <div className="stat-value">{shown.expertCount}</div>
-                  <div className="stat-label">Listed providers</div>
-                </div>
-              )}
-              {shown.appointmentCount > 0 && (
-                <div className="stat-card glass-panel">
-                  <Calendar size={22} aria-hidden="true" />
-                  <div className="stat-value">{shown.appointmentCount}</div>
-                  <div className="stat-label">Consultations recorded</div>
-                </div>
-              )}
-              {shown.productCount > 0 && (
-                <div className="stat-card glass-panel">
-                  <Package size={22} aria-hidden="true" />
-                  <div className="stat-value">{shown.productCount}</div>
-                  <div className="stat-label">Shop products</div>
-                </div>
-              )}
-            </div>
-          </div>
-        </motion.section>
-      )}
+      {/* Honest trust signals — no floored / inflated platform-scale numbers */}
+      <motion.section
+        className="stats-section home-trust-section"
+        aria-label="Platform trust signals"
+        initial="hidden"
+        whileInView="visible"
+        viewport={{ once: true, margin: '-50px' }}
+        variants={fadeUpVariant}
+      >
+        <div className="container">
+          <ul className="stats-grid stats-grid-real home-trust-grid">
+            <li className="stat-card glass-panel home-trust-card">
+              <Users size={22} aria-hidden="true" />
+              <div className="stat-label home-trust-label">Approved providers</div>
+            </li>
+            <li className="stat-card glass-panel home-trust-card">
+              <Shield size={22} aria-hidden="true" />
+              <div className="stat-label home-trust-label">Secure appointment booking</div>
+            </li>
+            <li className="stat-card glass-panel home-trust-card">
+              <Package size={22} aria-hidden="true" />
+              <div className="stat-label home-trust-label">Ayurvedic products &amp; wellness</div>
+            </li>
+          </ul>
+        </div>
+      </motion.section>
 
       {/* 2. Popular / available doctors */}
       <motion.section
@@ -407,7 +383,63 @@ const Home = () => {
         </div>
       </motion.section>
 
-      {/* 5. How it works */}
+      {/* 5. Astrology discovery — secondary to Find a Doctor / healthcare */}
+      <motion.section
+        className="home-astrology-section section"
+        aria-labelledby="home-astrology-heading"
+        initial="hidden"
+        whileInView="visible"
+        viewport={{ once: true, margin: '-80px' }}
+        variants={fadeUpVariant}
+      >
+        <div className="home-astrology-motif" aria-hidden="true" />
+        <div className="container home-astrology-inner">
+          <div className="section-header">
+            <div className="section-label home-astrology-eyebrow">Astrology</div>
+            <h2 id="home-astrology-heading" className="section-title">
+              Discover Guidance Through the Stars
+            </h2>
+            <p className="section-subtitle">
+              Explore traditional astrology services, birth-chart insights, compatibility
+              guidance and auspicious times through Deergayu.
+            </p>
+          </div>
+
+          <ul className="home-astrology-cards">
+            <li className="home-astrology-card glass-panel">
+              <div className="home-astrology-card-icon" aria-hidden="true">
+                <Star size={22} />
+              </div>
+              <h3>Birth Chart</h3>
+              <p>Personalised traditional birth-chart insights.</p>
+            </li>
+            <li className="home-astrology-card glass-panel">
+              <div className="home-astrology-card-icon" aria-hidden="true">
+                <Heart size={22} />
+              </div>
+              <h3>Compatibility</h3>
+              <p>Explore traditional compatibility guidance.</p>
+            </li>
+            <li className="home-astrology-card glass-panel">
+              <div className="home-astrology-card-icon" aria-hidden="true">
+                <MoonStar size={22} />
+              </div>
+              <h3>Auspicious Times</h3>
+              <p>Discover traditional guidance for important dates and occasions.</p>
+            </li>
+          </ul>
+
+          <div className="home-astrology-cta">
+            <Link to="/astrology" className="btn btn-outline home-astrology-cta-btn">
+              <Sparkles size={16} aria-hidden="true" />
+              Explore Astrology
+              <ChevronRight size={16} aria-hidden="true" />
+            </Link>
+          </div>
+        </div>
+      </motion.section>
+
+      {/* 6. How it works */}
       <motion.section
         className="section"
         initial="hidden"
@@ -446,7 +478,7 @@ const Home = () => {
         </div>
       </motion.section>
 
-      {/* 6. Why choose */}
+      {/* 7. Why choose */}
       <motion.section
         className="section"
         style={{ background: 'var(--surface-color)' }}
@@ -485,7 +517,7 @@ const Home = () => {
         </div>
       </motion.section>
 
-      {/* 7. Online consultation */}
+      {/* 8. Online consultation */}
       <motion.section
         className="section"
         initial="hidden"
