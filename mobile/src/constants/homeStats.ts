@@ -1,4 +1,8 @@
-/** Real API counts only — no artificial floors on public UI (P1-A). */
+/**
+ * Legacy helper — mobile home no longer displays numeric /api/home-stats counters.
+ * Prefer non-numeric trust labels. If callers need counts, use API values as-is
+ * with no local floors or fabricated fallbacks.
+ */
 export function displayHomeStats(
   stats?: {
     expertCount?: number;
@@ -14,3 +18,6 @@ export function displayHomeStats(
     orderCount: Math.max(Number(stats?.orderCount) || 0, 0),
   };
 }
+
+/** Explicit: no fabricated local fallbacks. */
+export const HOME_STATS_FALLBACK = null;

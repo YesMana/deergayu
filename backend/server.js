@@ -21,6 +21,7 @@ const {
   updateReviewAggregates,
   DEFAULT_SETTINGS,
 } = require('./platformUtils');
+const { fetchHomeStats } = require('./homeStats');
 const {
   PROVIDER_ROLES,
   isProviderRole,
@@ -876,26 +877,11 @@ apiRouter.post('/admin/contact-messages/:id/status', verifyAdmin, async (req, re
 // PUBLIC SMART APIs (Home Page, Symptom Checker, etc.)
 // ============================================================
 
-// Get platform stats for Home page (web + mobile share this — keep display floors in sync)
+// Get platform stats for Home page (web + mobile) — REAL counts only, never floored
 apiRouter.get('/home-stats', async (req, res) => {
   try {
-    const settings = await getSettings(db);
-    const floor = {
-      ...DEFAULT_SETTINGS.homeStatsFloor,
-      ...(settings.homeStatsFloor || {}),
-    };
-    const [providersSnap, productsSnap, ordersSnap, appointmentsSnap] = await Promise.all([
-      db.collection('users').where('role', 'in', ['doctor', 'clinic', 'organization']).where('status', '==', 'approved').get(),
-      db.collection('products').where('status', '==', 'approved').get(),
-      db.collection('orders').get(),
-      db.collection('appointments').get()
-    ]);
-    res.json({
-      expertCount: Math.max(providersSnap.size, Number(floor.expertCount) || 0),
-      productCount: Math.max(productsSnap.size, Number(floor.productCount) || 0),
-      orderCount: ordersSnap.size,
-      appointmentCount: Math.max(appointmentsSnap.size, Number(floor.appointmentCount) || 0),
-    });
+    const stats = await fetchHomeStats(db);
+    res.json(stats);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
