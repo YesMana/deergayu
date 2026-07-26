@@ -144,7 +144,9 @@ export function productImage(p: Product): string | null {
   return mediaUrl(p.imageUrl || p.image || p.images?.[0]);
 }
 
+/** Real counts only (no floors). Prefer non-numeric trust UI on home. */
 export const fetchHomeStats = () => request<HomeStats>('/api/home-stats');
+
 export const fetchFeaturedProducts = () => request<Product[]>('/api/featured-products');
 export const fetchFeaturedProviders = () => request<Provider[]>('/api/featured-providers');
 export const fetchProducts = (limit = 50) => request<Product[]>(`/api/products?limit=${limit}`);

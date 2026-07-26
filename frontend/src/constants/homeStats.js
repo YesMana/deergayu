@@ -1,8 +1,7 @@
 /**
- * Legacy helper — homepage no longer displays floored `/api/home-stats` numbers.
- * Backend `homeStatsFloor` (50 / 120 / 1000) still inflates that endpoint for
- * other clients; public Home must use non-numeric trust messaging or verified
- * live counts only.
+ * Legacy helper — web homepage uses non-numeric trust messaging only.
+ * Do not display floored /api/home-stats counters (50 / 120 / 1000).
+ * Backend now returns real counts; still do not reintroduce numeric homepage counters.
  */
 export function displayHomeStats(stats = {}) {
   return {

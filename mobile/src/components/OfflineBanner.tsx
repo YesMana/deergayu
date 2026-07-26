@@ -13,7 +13,7 @@ export default function OfflineBanner() {
     try {
       const ctrl = new AbortController();
       const timer = setTimeout(() => ctrl.abort(), 6000);
-      await fetch(`${API_URL}/api/home-stats`, {
+      await fetch(`${API_URL}/api/health`, {
         method: 'GET',
         signal: ctrl.signal,
       });

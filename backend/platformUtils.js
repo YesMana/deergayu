@@ -36,11 +36,12 @@ const DEFAULT_SETTINGS = {
     youtube: '',
     whatsapp: '',
   },
-  /** Public home stats floors — show at least these until real counts grow past them */
+  /** @deprecated Unused for public display. Kept only so legacy Firestore settings
+   *  docs do not break admin reads. GET /api/home-stats MUST NOT apply these floors. */
   homeStatsFloor: {
-    expertCount: 50,
-    productCount: 120,
-    appointmentCount: 1000,
+    expertCount: 0,
+    productCount: 0,
+    appointmentCount: 0,
   },
   // P0-B2 payment foundation — appointment payments OFF until Dialog Pay approval
   appointmentPaymentsEnabled: false,

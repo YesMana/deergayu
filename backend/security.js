@@ -76,6 +76,7 @@ const PRIVATE_SETTINGS_KEYS = [
   'categories',
   'autoApproveExperts',
   'autoApproveProducts',
+  /** @deprecated Inflated public home counters — unused by /api/home-stats */
   'homeStatsFloor',
   'providerPayoutHoldHours',
   'settlementCadence',

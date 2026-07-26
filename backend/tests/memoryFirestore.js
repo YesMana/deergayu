@@ -69,8 +69,8 @@ function createMemoryFirestore() {
   function makeQuery(colParts, filters = [], lim = null) {
     return {
       where(field, op, value) {
-        if (op !== '==') throw new Error(`memoryFirestore only supports ==, got ${op}`);
-        return makeQuery(colParts, [...filters, { field, value }], lim);
+        if (op !== '==' && op !== 'in') throw new Error(`memoryFirestore only supports == or in, got ${op}`);
+        return makeQuery(colParts, [...filters, { field, op, value }], lim);
       },
       limit(n) {
         return makeQuery(colParts, filters, n);
@@ -85,7 +85,12 @@ function createMemoryFirestore() {
           if (!k.startsWith(prefix)) continue;
           let ok = true;
           for (const f of filters) {
-            if (v?.[f.field] !== f.value) ok = false;
+            const op = f.op || '==';
+            if (op === '==') {
+              if (v?.[f.field] !== f.value) ok = false;
+            } else if (op === 'in') {
+              if (!Array.isArray(f.value) || !f.value.includes(v?.[f.field])) ok = false;
+            }
           }
           if (ok) {
             docs.push({

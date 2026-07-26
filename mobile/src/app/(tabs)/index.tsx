@@ -20,16 +20,13 @@ import { LinearGradient } from 'expo-linear-gradient';
 import {
   fetchFeaturedProducts,
   fetchFeaturedProviders,
-  fetchHomeStats,
   productImage,
-  type HomeStats,
   type Product,
   type Provider,
 } from '../../lib/api';
 import { mediaUrl } from '../../constants/api';
 import { useCart } from '../../context/CartContext';
 import { useAuth } from '../../context/AuthContext';
-import { displayHomeStats } from '../../constants/homeStats';
 
 const { width: SCREEN_W } = Dimensions.get('window');
 
@@ -79,7 +76,6 @@ export default function HomeScreen() {
   const { addToCart } = useCart();
   const { isAdmin } = useAuth();
 
-  const [stats, setStats] = useState<HomeStats | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
   const [providers, setProviders] = useState<Provider[]>([]);
   const [loading, setLoading] = useState(true);
@@ -92,12 +88,10 @@ export default function HomeScreen() {
   const load = useCallback(async () => {
     setError(null);
     try {
-      const [s, p, pr] = await Promise.all([
-        fetchHomeStats().catch(() => null),
+      const [p, pr] = await Promise.all([
         fetchFeaturedProducts().catch(() => []),
         fetchFeaturedProviders().catch(() => []),
       ]);
-      if (s) setStats(s);
       setProducts(Array.isArray(p) ? p.slice(0, 6) : []);
       setProviders(Array.isArray(pr) ? pr.slice(0, 4) : []);
     } catch (e: any) {
@@ -246,22 +240,20 @@ export default function HomeScreen() {
         </TouchableOpacity>
       ) : null}
 
-      {/* ── STATS ── */}
+      {/* ── TRUST (non-numeric — no floored platform-scale counters) ── */}
       <View style={styles.statsGrid}>
-        {(() => {
-          const shown = displayHomeStats(stats);
-          return [
-            { icon: 'groups' as const, value: shown.expertCount, label: 'Experts' },
-            { icon: 'inventory-2' as const, value: shown.productCount, label: 'Products' },
-            { icon: 'event-available' as const, value: shown.appointmentCount, label: 'Bookings' },
-          ].filter((s) => Number(s.value) > 0);
-        })().map((s) => (
+        {(
+          [
+            { icon: 'groups' as const, label: 'Approved providers' },
+            { icon: 'verified-user' as const, label: 'Secure booking' },
+            { icon: 'spa' as const, label: 'Ayurvedic products & wellness' },
+          ] as const
+        ).map((s) => (
           <View key={s.label} style={styles.statCard}>
             <View style={styles.statIconWrap}>
               <MaterialIcons name={s.icon} size={18} color="#7cb342" />
             </View>
-            <Text style={styles.statValue}>{s.value}</Text>
-            <Text style={styles.statLabel}>{s.label}</Text>
+            <Text style={styles.trustLabel}>{s.label}</Text>
           </View>
         ))}
       </View>
@@ -619,6 +611,15 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   statValue: { color: '#7cb342', fontSize: 15, fontWeight: '800', textAlign: 'center' },
+  trustLabel: {
+    color: '#e8f0ea',
+    fontSize: 11,
+    marginTop: 2,
+    fontWeight: '700',
+    textAlign: 'center',
+    lineHeight: 14,
+    paddingHorizontal: 2,
+  },
   statLabel: {
     color: '#9aaa9a',
     fontSize: 10,
