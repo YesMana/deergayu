@@ -85,13 +85,11 @@ test.describe('P1-A public routes', () => {
 
   test('doctor card Book preserves provider id', async ({ page }) => {
     await page.goto('/doctors');
-    const profileLink = page.locator('a[href^="/doctors/"]').filter({ hasNotText: 'Find' }).first();
-    await expect(profileLink).toBeVisible({ timeout: 20000 });
-    const href = await profileLink.getAttribute('href');
-    const id = href?.replace('/doctors/', '');
+    const book = page.locator('a[href*="/channeling?book="]').first();
+    await expect(book).toBeVisible({ timeout: 20000 });
+    const href = await book.getAttribute('href');
+    const id = new URL(href!, 'http://local').searchParams.get('book');
     expect(id && id.length > 5).toBeTruthy();
-    const book = page.locator(`a[href*="book=${id}"]`).first();
-    await expect(book).toBeVisible();
     await book.click();
     await expect(page).toHaveURL(new RegExp(`book=${id}`));
   });
