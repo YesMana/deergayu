@@ -82,14 +82,40 @@ export default function ManageCommercialTerms() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [providerId]);
 
+  const requiredMoneyComplete = useMemo(() => {
+    // Empty string must NOT coerce to 0 for validation messaging / save gating
+    const required = [form.consultationPrice, form.providerPayout, form.platformGross];
+    if (required.some((v) => v === '' || v == null)) return false;
+    if (form.facilityFee === '' || form.facilityFee == null) return false;
+    return required.every((v) => !Number.isNaN(num(v))) && !Number.isNaN(num(form.facilityFee));
+  }, [form]);
+
   const equationOk = useMemo(() => {
+    if (!requiredMoneyComplete) return false;
     const fee = num(form.consultationPrice);
     const pay = num(form.providerPayout);
     const gross = num(form.platformGross);
     const fac = num(form.facilityFee);
-    if ([fee, pay, gross, fac].some((x) => Number.isNaN(x))) return false;
     return Math.abs(fee - (pay + gross + fac)) < 0.001;
-  }, [form]);
+  }, [form, requiredMoneyComplete]);
+
+  const canSave = Boolean(providerId) && requiredMoneyComplete && equationOk;
+
+  const validationMessage = useMemo(() => {
+    if (!requiredMoneyComplete) {
+      return {
+        text: 'Enter all required values to validate the commercial terms.',
+        color: 'var(--text-secondary)',
+      };
+    }
+    if (equationOk) {
+      return { text: '✓ Equation balanced', color: 'var(--primary-color)' };
+    }
+    return {
+      text: '✗ Invalid split: consultationFee must equal providerPayout + platformGross + facilityFee',
+      color: '#c62828',
+    };
+  }, [requiredMoneyComplete, equationOk]);
 
   const fillSuggested = () => {
     const t = defaults?.suggestedAdminFormTemplate;
@@ -308,30 +334,63 @@ export default function ManageCommercialTerms() {
           </div>
         </div>
 
-        <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: '1rem' }}>
+        <label
+          htmlFor="ct-active"
+          className="ct-active-control"
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '0.65rem',
+            marginTop: '1.1rem',
+            padding: '0.65rem 0.85rem',
+            borderRadius: 10,
+            border: '1px solid var(--glass-border, rgba(0,0,0,0.1))',
+            background: 'rgba(0,0,0,0.02)',
+            maxWidth: '100%',
+            cursor: 'pointer',
+            boxSizing: 'border-box',
+          }}
+        >
           <input
+            id="ct-active"
             type="checkbox"
             checked={!!form.active}
             onChange={(e) => setForm((p) => ({ ...p, active: e.target.checked }))}
+            style={{
+              width: 18,
+              height: 18,
+              margin: 0,
+              flexShrink: 0,
+              accentColor: 'var(--primary-color, #2e7d32)',
+              cursor: 'pointer',
+            }}
           />
-          Active for this consultation type
+          <span
+            style={{
+              margin: 0,
+              fontWeight: 600,
+              fontSize: '0.95rem',
+              lineHeight: 1.3,
+              userSelect: 'none',
+            }}
+          >
+            Active for this consultation type
+          </span>
         </label>
 
         <p
           className="admin-hint"
           style={{
             marginTop: '0.85rem',
-            color: equationOk ? 'var(--primary-color)' : '#c62828',
+            color: validationMessage.color,
             fontWeight: 600,
           }}
         >
-          {equationOk
-            ? '✓ Equation balanced'
-            : '✗ Fill all money fields so fee = payout + gross + facility'}
+          {validationMessage.text}
         </p>
 
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.65rem', marginTop: '1rem' }}>
-          <button type="submit" className="btn btn-primary" disabled={saving || !providerId}>
+          <button type="submit" className="btn btn-primary" disabled={saving || !canSave}>
             {saving ? 'Saving…' : 'Save terms'}
           </button>
           <button type="button" className="btn btn-outline" onClick={fillSuggested}>
