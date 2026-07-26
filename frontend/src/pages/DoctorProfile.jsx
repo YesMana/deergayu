@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import SEO from '../components/SEO';
@@ -12,7 +12,6 @@ import {
   getProviderTitle,
   isApprovedProvider,
   isDisplayableText,
-  looksLikeTestPlaceholder,
 } from '../utils/doctorUtils';
 import './PublicPages.css';
 
@@ -59,18 +58,6 @@ const DoctorProfile = () => {
       .catch(() => setSlotsPreview(null));
   }, [provider?.id]);
 
-  const suspiciousFields = useMemo(() => {
-    if (!provider) return [];
-    const pd = provider.profileDetails || {};
-    const hits = [];
-    getProviderSpecialties(provider).forEach((s) => {
-      if (looksLikeTestPlaceholder(s)) hits.push({ field: 'specialty', value: s });
-    });
-    if (looksLikeTestPlaceholder(pd.address)) hits.push({ field: 'address', value: pd.address });
-    if (looksLikeTestPlaceholder(pd.bio)) hits.push({ field: 'bio', value: pd.bio });
-    return hits;
-  }, [provider]);
-
   if (isLoading) {
     return (
       <div className="pub-page doctor-profile-page">
@@ -110,15 +97,6 @@ const DoctorProfile = () => {
     .join(', ');
   const pageTitle = `${name} | Deergayu`;
   const desc = `${name} — ${professionalTitle}${specs[0] ? `, ${specs[0]}` : ''}. Book on Deergayu.`;
-
-  if (suspiciousFields.length && typeof console !== 'undefined') {
-    // Dev/ops breadcrumb only — not shown to patients
-    console.info('[Deergayu] Suspicious/test-looking provider fields (admin cleanup):', {
-      providerId: provider.id,
-      name,
-      fields: suspiciousFields,
-    });
-  }
 
   return (
     <div className="pub-page doctor-profile-page animate-fade-in">
