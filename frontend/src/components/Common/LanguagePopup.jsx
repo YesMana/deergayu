@@ -4,7 +4,7 @@ import { Globe } from 'lucide-react';
 import './LanguagePopup.css';
 
 const LanguagePopup = () => {
-  const { hasChosen, setLanguage } = useLanguage();
+  const { hasChosen, setLanguage, t } = useLanguage();
 
   if (hasChosen) return null;
 
@@ -14,8 +14,8 @@ const LanguagePopup = () => {
         <div className="language-modal-icon">
           <Globe size={48} color="var(--primary-color)" />
         </div>
-        <h2>Select Your Language</h2>
-        <p>කරුණාකර ඔබගේ භාෂාව තෝරන්න / தயவுசெய்து உங்கள் மொழியைத் தேர்ந்தெடுக்கவும்</p>
+        <h2>{t('lang_select_title')}</h2>
+        <p>{t('lang_english')} / {t('lang_sinhala')} / {t('lang_tamil')}</p>
         
         <div className="language-options">
           <button 
@@ -23,7 +23,7 @@ const LanguagePopup = () => {
             onClick={() => setLanguage('si')}
           >
             <span className="lang-code">SI</span>
-            <span className="lang-name">සිංහල</span>
+            <span className="lang-name">{t('lang_sinhala')}</span>
           </button>
           
           <button 
@@ -31,7 +31,7 @@ const LanguagePopup = () => {
             onClick={() => setLanguage('ta')}
           >
             <span className="lang-code">TA</span>
-            <span className="lang-name">தமிழ்</span>
+            <span className="lang-name">{t('lang_tamil')}</span>
           </button>
           
           <button 
@@ -39,7 +39,7 @@ const LanguagePopup = () => {
             onClick={() => setLanguage('en')}
           >
             <span className="lang-code">EN</span>
-            <span className="lang-name">English</span>
+            <span className="lang-name">{t('lang_english')}</span>
           </button>
         </div>
       </div>
