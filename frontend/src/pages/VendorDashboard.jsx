@@ -7,6 +7,15 @@ import { collection, query, where, orderBy, onSnapshot } from 'firebase/firestor
 import PartnerSupportCard from '../components/PartnerSupportCard';
 import './AdminDashboard.css';
 import { API_URL } from '../config/api';
+import {
+  computeProfileCompletion,
+  DEFAULT_SPECIALTY_CATALOG,
+  DEFAULT_LANGUAGES,
+  normalizeQualifications,
+  normalizeLanguages,
+  parseSpecialtyList,
+  looksLikeSuspiciousSpecialty,
+} from '../utils/providerProfileCompletion';
 
 
 
@@ -142,6 +151,7 @@ const VendorDashboard = () => {
     unavailableDates: []
   });
   const [savingSchedule, setSavingSchedule] = useState(false);
+  const [unavailableDateInput, setUnavailableDateInput] = useState('');
   
   const [profileData, setProfileData] = useState({
     category: 'Ayurvedic Doctor',
@@ -151,15 +161,30 @@ const VendorDashboard = () => {
   });
   const [submittingProfile, setSubmittingProfile] = useState(false);
 
+  const [specialtyCatalog, setSpecialtyCatalog] = useState(DEFAULT_SPECIALTY_CATALOG);
+  const [languageCatalog, setLanguageCatalog] = useState(DEFAULT_LANGUAGES);
   const [settingsData, setSettingsData] = useState({
     name: '',
     profileImageUrl: '',
     telephone: '',
     address: '',
-    specialty: '',
+    specialtySelected: [],
+    specialtyOther: '',
     experience: '',
+    yearsOfExperience: '',
     doctorType: '',
+    title: '',
     bio: '',
+    country: 'Sri Lanka',
+    province: '',
+    district: '',
+    city: '',
+    registrationNumber: '',
+    languages: [],
+    offersInPerson: false,
+    offersVideo: false,
+    offersAudio: false,
+    qualifications: [],
   });
   const [savingSettings, setSavingSettings] = useState(false);
   
@@ -230,23 +255,62 @@ const VendorDashboard = () => {
         })
         .catch(() => {});
       if (user.profileDetails?.schedule) {
-        setSchedule(user.profileDetails.schedule);
+        const sch = user.profileDetails.schedule;
+        setSchedule({
+          slotDuration: sch.slotDuration || 30,
+          workingDays: sch.workingDays || {
+            Monday: { start: '09:00', end: '17:00', active: true },
+            Tuesday: { start: '09:00', end: '17:00', active: true },
+            Wednesday: { start: '09:00', end: '17:00', active: true },
+            Thursday: { start: '09:00', end: '17:00', active: true },
+            Friday: { start: '09:00', end: '17:00', active: true },
+            Saturday: { start: '09:00', end: '13:00', active: false },
+            Sunday: { start: '09:00', end: '13:00', active: false },
+          },
+          unavailableDates: Array.isArray(sch.unavailableDates) ? sch.unavailableDates : [],
+        });
       }
       const pd = user.profileDetails || {};
-      const specialtyStr = Array.isArray(pd.specialty)
-        ? pd.specialty.join(', ')
-        : (pd.specialty || '');
+      const specs = parseSpecialtyList(pd.specialty);
+      const catalogLower = new Set(DEFAULT_SPECIALTY_CATALOG.map((s) => s.toLowerCase()));
+      const selected = specs.filter((s) => catalogLower.has(s.toLowerCase()) && !looksLikeSuspiciousSpecialty(s));
+      const other = specs.filter((s) => !catalogLower.has(s.toLowerCase()) && !looksLikeSuspiciousSpecialty(s));
+      const hasExplicit =
+        typeof pd.offersInPerson === 'boolean' ||
+        pd.offersVideo === true ||
+        pd.offersAudio === true ||
+        pd.videoConsultation === true;
       setSettingsData((prev) => ({
         ...prev,
         name: user.displayName || user.name || '',
         profileImageUrl: pd.profileImageUrl || '',
         telephone: pd.telephone || '',
         address: pd.address || '',
-        specialty: specialtyStr,
+        specialtySelected: selected,
+        specialtyOther: other.join(', '),
         experience: pd.experience || '',
+        yearsOfExperience: pd.yearsOfExperience != null ? String(pd.yearsOfExperience) : '',
         doctorType: pd.doctorType || '',
+        title: pd.title || '',
         bio: pd.bio || '',
+        country: pd.country || 'Sri Lanka',
+        province: pd.province || '',
+        district: pd.district || '',
+        city: pd.city || '',
+        registrationNumber: pd.registrationNumber || '',
+        languages: normalizeLanguages(pd.languages),
+        offersInPerson: hasExplicit ? pd.offersInPerson === true : false,
+        offersVideo: pd.offersVideo === true || pd.videoConsultation === true,
+        offersAudio: pd.offersAudio === true,
+        qualifications: normalizeQualifications(pd.qualifications),
       }));
+      fetch(`${API_URL}/api/specialty-catalog`)
+        .then((r) => (r.ok ? r.json() : null))
+        .then((data) => {
+          if (data?.specialties?.length) setSpecialtyCatalog(data.specialties);
+          if (data?.languages?.length) setLanguageCatalog(data.languages);
+        })
+        .catch(() => {});
     }
   }, [user]);
 
@@ -634,9 +698,14 @@ const VendorDashboard = () => {
     setSavingSettings(true);
     try {
       const existingDetails = user.profileDetails || {};
-      const specialtyVal = settingsData.specialty.includes(',')
-        ? settingsData.specialty.split(',').map((s) => s.trim()).filter(Boolean)
-        : settingsData.specialty.trim();
+      const specialtyList = [
+        ...settingsData.specialtySelected,
+        ...parseSpecialtyList(settingsData.specialtyOther),
+      ].filter((s) => !looksLikeSuspiciousSpecialty(s));
+      const specialtyVal =
+        specialtyList.length > 1 ? specialtyList : specialtyList.length === 1 ? specialtyList[0] : '';
+      const yearsRaw = String(settingsData.yearsOfExperience || '').trim();
+      const yearsNum = yearsRaw ? Number(yearsRaw) : null;
       const nextDetails = {
         ...existingDetails,
         profileImageUrl: settingsData.profileImageUrl || '',
@@ -644,9 +713,39 @@ const VendorDashboard = () => {
         address: settingsData.address || '',
         specialty: specialtyVal || existingDetails.specialty || '',
         experience: settingsData.experience || '',
+        yearsOfExperience:
+          yearsNum != null && Number.isFinite(yearsNum) ? yearsNum : existingDetails.yearsOfExperience || null,
         doctorType: settingsData.doctorType || '',
+        title: settingsData.title || '',
         bio: settingsData.bio || '',
+        country: settingsData.country || 'Sri Lanka',
+        province: settingsData.province || '',
+        district: settingsData.district || '',
+        city: settingsData.city || '',
+        registrationNumber: settingsData.registrationNumber || '',
+        languages: normalizeLanguages(settingsData.languages),
+        offersInPerson: Boolean(settingsData.offersInPerson),
+        offersVideo: Boolean(settingsData.offersVideo),
+        offersAudio: Boolean(settingsData.offersAudio),
+        videoConsultation: Boolean(settingsData.offersVideo),
+        consultationModes: [
+          settingsData.offersInPerson && 'in_person',
+          settingsData.offersVideo && 'video',
+          settingsData.offersAudio && 'audio',
+        ].filter(Boolean),
+        qualifications: normalizeQualifications(settingsData.qualifications),
       };
+      // If provider cleared specialties intentionally (selected empty + other empty), allow clear
+      if (!specialtyList.length && !settingsData.specialtyOther.trim()) {
+        // Keep legacy junk readable during transition — do not auto-wipe suspicious values
+        const legacy = parseSpecialtyList(existingDetails.specialty);
+        const onlySuspicious = legacy.length > 0 && legacy.every(looksLikeSuspiciousSpecialty);
+        if (onlySuspicious) {
+          nextDetails.specialty = existingDetails.specialty;
+        } else if (!legacy.length) {
+          nextDetails.specialty = '';
+        }
+      }
       const token = await auth.currentUser.getIdToken();
       const res = await fetch(`${API_URL}/api/me/profile`, {
         method: 'PUT',
@@ -820,6 +919,32 @@ const VendorDashboard = () => {
   };
 
   const isDoctor = ['doctor', 'clinic', 'organization'].includes(user?.role);
+  const profileCompletion = isDoctor
+    ? computeProfileCompletion({
+        name: settingsData.name || user?.name || user?.displayName,
+        displayName: settingsData.name || user?.displayName,
+        profileDetails: {
+          ...(user?.profileDetails || {}),
+          title: settingsData.title,
+          doctorType: settingsData.doctorType,
+          specialty: [
+            ...settingsData.specialtySelected,
+            ...parseSpecialtyList(settingsData.specialtyOther),
+          ],
+          bio: settingsData.bio,
+          profileImageUrl: settingsData.profileImageUrl,
+          qualifications: settingsData.qualifications,
+          registrationNumber: settingsData.registrationNumber,
+          languages: settingsData.languages,
+          offersInPerson: settingsData.offersInPerson,
+          offersVideo: settingsData.offersVideo,
+          offersAudio: settingsData.offersAudio,
+          city: settingsData.city,
+          district: settingsData.district,
+          schedule: schedule,
+        },
+      })
+    : null;
 
   useEffect(() => {
     if (!user || activeTab !== 'commercial') return;
@@ -969,6 +1094,78 @@ const VendorDashboard = () => {
                 ))
               )}
             </div>
+
+            {isDoctor && profileCompletion && profileCompletion.percent < 100 && (
+              <div
+                className="dash-section provider-profile-completion"
+                style={{
+                  marginBottom: '1.5rem',
+                  border: '1px solid rgba(212,175,55,0.35)',
+                  borderRadius: 12,
+                  padding: '1.25rem',
+                  maxWidth: '100%',
+                  overflow: 'hidden',
+                }}
+              >
+                <div className="dash-section-header" style={{ flexWrap: 'wrap', gap: '0.75rem' }}>
+                  <h3 style={{ margin: 0 }}>Complete your professional profile</h3>
+                  <strong style={{ color: 'var(--secondary-color)' }}>
+                    Profile completion: {profileCompletion.percent}%
+                  </strong>
+                </div>
+                <div
+                  style={{
+                    height: 8,
+                    borderRadius: 4,
+                    background: 'rgba(255,255,255,0.08)',
+                    margin: '0.75rem 0 1rem',
+                    overflow: 'hidden',
+                  }}
+                >
+                  <div
+                    style={{
+                      width: `${profileCompletion.percent}%`,
+                      height: '100%',
+                      background: 'linear-gradient(90deg, #3d8b55, #d4af37)',
+                      transition: 'width 0.3s ease',
+                    }}
+                  />
+                </div>
+                <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginTop: 0 }}>
+                  Patients see structured specialties, bio, consultation types, and location. Fill the items below.
+                </p>
+                {(profileCompletion.suspiciousSpecialties?.length > 0 ||
+                  profileCompletion.suspiciousAddress?.length > 0) && (
+                  <p style={{ color: '#ef9a9a', fontSize: '0.85rem' }}>
+                    Needs cleanup (not shown publicly as specialty):{' '}
+                    {[...(profileCompletion.suspiciousSpecialties || []), ...(profileCompletion.suspiciousAddress || [])]
+                      .map((s) => `"${s}"`)
+                      .join(', ')}
+                    . Replace with real values in Settings — we will not auto-delete without your approval.
+                  </p>
+                )}
+                <ul style={{ margin: '0 0 1rem', paddingLeft: '1.2rem', color: 'var(--text-primary)' }}>
+                  {[...profileCompletion.missingRequired, ...profileCompletion.missingRecommended.slice(0, 4)].map(
+                    (item) => (
+                      <li key={item.key} style={{ marginBottom: '0.35rem' }}>
+                        {item.action}
+                        {!item.required ? ' (recommended)' : ''}
+                      </li>
+                    )
+                  )}
+                </ul>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+                  <button type="button" className="btn btn-primary" onClick={() => setActiveTab('settings')}>
+                    Edit profile
+                  </button>
+                  {profileCompletion.presence && !profileCompletion.presence.schedule && (
+                    <button type="button" className="btn btn-outline" onClick={() => setActiveTab('schedule')}>
+                      Set schedule
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
 
             {!isDoctor && (
               <div className="dash-section" style={{ marginBottom: '1.5rem' }}>
@@ -1224,6 +1421,84 @@ const VendorDashboard = () => {
                       </div>
                     ))}
                   </div>
+                </div>
+
+                <div style={{ marginBottom: '2rem' }}>
+                  <h3 style={{ marginBottom: '0.5rem', color: 'var(--text-primary)' }}>Unavailable dates</h3>
+                  <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginBottom: '0.75rem' }}>
+                    Block specific calendar days (Asia/Colombo). Booking uses your existing schedule engine.
+                  </p>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', alignItems: 'center', marginBottom: '0.75rem' }}>
+                    <input
+                      type="date"
+                      value={unavailableDateInput}
+                      onChange={(e) => setUnavailableDateInput(e.target.value)}
+                      style={{
+                        padding: '0.5rem',
+                        borderRadius: 4,
+                        background: 'rgba(0,0,0,0.2)',
+                        color: 'var(--text-primary)',
+                        border: '1px solid rgba(255,255,255,0.1)',
+                        maxWidth: '100%',
+                      }}
+                    />
+                    <button
+                      type="button"
+                      className="btn btn-outline"
+                      onClick={() => {
+                        const d = unavailableDateInput;
+                        if (!d) return;
+                        const list = Array.isArray(schedule.unavailableDates) ? schedule.unavailableDates : [];
+                        if (list.includes(d)) return;
+                        setSchedule({ ...schedule, unavailableDates: [...list, d].sort() });
+                        setUnavailableDateInput('');
+                      }}
+                    >
+                      Add date
+                    </button>
+                  </div>
+                  {(schedule.unavailableDates || []).length === 0 ? (
+                    <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', margin: 0 }}>No blocked dates.</p>
+                  ) : (
+                    <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+                      {(schedule.unavailableDates || []).map((d) => (
+                        <li
+                          key={d}
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '0.35rem',
+                            padding: '0.35rem 0.65rem',
+                            background: 'rgba(239,83,80,0.12)',
+                            borderRadius: 8,
+                            fontSize: '0.85rem',
+                          }}
+                        >
+                          {d}
+                          <button
+                            type="button"
+                            aria-label={`Remove ${d}`}
+                            onClick={() =>
+                              setSchedule({
+                                ...schedule,
+                                unavailableDates: (schedule.unavailableDates || []).filter((x) => x !== d),
+                              })
+                            }
+                            style={{
+                              border: 'none',
+                              background: 'transparent',
+                              color: '#ef5350',
+                              cursor: 'pointer',
+                              padding: 0,
+                              lineHeight: 1,
+                            }}
+                          >
+                            ×
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
                 </div>
 
                 <div style={{ marginTop: '2rem', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '2rem' }}>
@@ -1772,13 +2047,21 @@ const VendorDashboard = () => {
           )}
 
           {activeTab === 'settings' && (
-            <div className="glass-panel table-container" style={{maxWidth: '640px'}}>
-              <h2 style={{color: 'var(--text-primary)', marginBottom: '0.25rem'}}>
-                {isDoctor ? 'My Profile' : 'Profile Settings'}
+            <div className="glass-panel table-container" style={{ maxWidth: '720px', width: '100%', overflow: 'hidden' }}>
+              <h2 style={{ color: 'var(--text-primary)', marginBottom: '0.25rem' }}>
+                {isDoctor ? 'My professional profile' : 'Profile Settings'}
               </h2>
-              <p style={{color: 'var(--text-secondary)', fontSize: '0.875rem', marginBottom: '1.75rem'}}>
-                Update your photo and profile details. Changes show on Channeling / public pages after save.
+              <p style={{ color: 'var(--text-secondary)', fontSize: '0.875rem', marginBottom: '1.75rem' }}>
+                {isDoctor
+                  ? 'Structured fields power your public doctor page. Private address stays off the public profile.'
+                  : 'Update your photo and profile details.'}
               </p>
+
+              {isDoctor && profileCompletion && (
+                <p style={{ marginBottom: '1rem', fontWeight: 600, color: 'var(--secondary-color)' }}>
+                  Profile completion: {profileCompletion.percent}%
+                </p>
+              )}
               
               {/* Profile Picture Section - Prominent */}
               <div style={{
@@ -1874,45 +2157,284 @@ const VendorDashboard = () => {
 
               <div className="form-group" style={{marginBottom: '1rem'}}>
                 <label style={{color: 'var(--text-secondary)'}}>Display Name</label>
-                <input type="text" value={settingsData.name} onChange={e => setSettingsData({...settingsData, name: e.target.value})} className="form-control" style={{width: '100%', padding: '0.75rem', borderRadius: 'var(--radius-sm)', border: '1px solid rgba(212, 175, 55, 0.3)', background: 'rgba(255, 255, 255, 0.05)', color: 'var(--text-primary)'}} />
+                <input type="text" value={settingsData.name} onChange={e => setSettingsData({...settingsData, name: e.target.value})} className="form-control" style={{width: '100%', maxWidth: '100%', padding: '0.75rem', borderRadius: 'var(--radius-sm)', border: '1px solid rgba(212, 175, 55, 0.3)', background: 'rgba(255, 255, 255, 0.05)', color: 'var(--text-primary)'}} />
               </div>
 
               {isDoctor && (
                 <>
-                  <div className="form-group" style={{marginBottom: '1rem'}}>
-                    <label style={{color: 'var(--text-secondary)'}}>Doctor / expert type</label>
-                    <input type="text" value={settingsData.doctorType} onChange={e => setSettingsData({...settingsData, doctorType: e.target.value})} placeholder="e.g. Ayurvedic Physician" className="form-control" style={{width: '100%', padding: '0.75rem', borderRadius: 'var(--radius-sm)', border: '1px solid rgba(212, 175, 55, 0.3)', background: 'rgba(255, 255, 255, 0.05)', color: 'var(--text-primary)'}} />
-                  </div>
-                  <div className="form-group" style={{marginBottom: '1rem'}}>
-                    <label style={{color: 'var(--text-secondary)'}}>Specialty</label>
-                    <input type="text" value={settingsData.specialty} onChange={e => setSettingsData({...settingsData, specialty: e.target.value})} placeholder="Comma-separated if multiple" className="form-control" style={{width: '100%', padding: '0.75rem', borderRadius: 'var(--radius-sm)', border: '1px solid rgba(212, 175, 55, 0.3)', background: 'rgba(255, 255, 255, 0.05)', color: 'var(--text-primary)'}} />
-                  </div>
-                  <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem'}}>
-                    <div className="form-group" style={{marginBottom: '1rem'}}>
-                      <label style={{color: 'var(--text-secondary)'}}>Phone</label>
-                      <input type="tel" value={settingsData.telephone} onChange={e => setSettingsData({...settingsData, telephone: e.target.value})} className="form-control" style={{width: '100%', padding: '0.75rem', borderRadius: 'var(--radius-sm)', border: '1px solid rgba(212, 175, 55, 0.3)', background: 'rgba(255, 255, 255, 0.05)', color: 'var(--text-primary)'}} />
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '0.75rem' }}>
+                    <div className="form-group" style={{ marginBottom: '1rem' }}>
+                      <label style={{ color: 'var(--text-secondary)' }}>Professional title</label>
+                      <input
+                        type="text"
+                        value={settingsData.title}
+                        onChange={(e) => setSettingsData({ ...settingsData, title: e.target.value })}
+                        placeholder="e.g. Ayurvedic Physician"
+                        className="form-control"
+                        style={{ width: '100%', padding: '0.75rem', borderRadius: 'var(--radius-sm)', border: '1px solid rgba(212, 175, 55, 0.3)', background: 'rgba(255, 255, 255, 0.05)', color: 'var(--text-primary)' }}
+                      />
                     </div>
-                    <div className="form-group" style={{marginBottom: '1rem'}}>
-                      <label style={{color: 'var(--text-secondary)'}}>Experience</label>
-                      <input type="text" value={settingsData.experience} onChange={e => setSettingsData({...settingsData, experience: e.target.value})} placeholder="e.g. 10 years" className="form-control" style={{width: '100%', padding: '0.75rem', borderRadius: 'var(--radius-sm)', border: '1px solid rgba(212, 175, 55, 0.3)', background: 'rgba(255, 255, 255, 0.05)', color: 'var(--text-primary)'}} />
+                    <div className="form-group" style={{ marginBottom: '1rem' }}>
+                      <label style={{ color: 'var(--text-secondary)' }}>Provider type</label>
+                      <input
+                        type="text"
+                        value={settingsData.doctorType}
+                        onChange={(e) => setSettingsData({ ...settingsData, doctorType: e.target.value })}
+                        placeholder="e.g. traditional / Ayurvedic Physician"
+                        className="form-control"
+                        style={{ width: '100%', padding: '0.75rem', borderRadius: 'var(--radius-sm)', border: '1px solid rgba(212, 175, 55, 0.3)', background: 'rgba(255, 255, 255, 0.05)', color: 'var(--text-primary)' }}
+                      />
                     </div>
                   </div>
-                  <div className="form-group" style={{marginBottom: '1rem'}}>
-                    <label style={{color: 'var(--text-secondary)'}}>Address</label>
-                    <input type="text" value={settingsData.address} onChange={e => setSettingsData({...settingsData, address: e.target.value})} className="form-control" style={{width: '100%', padding: '0.75rem', borderRadius: 'var(--radius-sm)', border: '1px solid rgba(212, 175, 55, 0.3)', background: 'rgba(255, 255, 255, 0.05)', color: 'var(--text-primary)'}} />
+
+                  <div className="form-group" style={{ marginBottom: '1rem' }}>
+                    <label style={{ color: 'var(--text-secondary)', display: 'block', marginBottom: '0.5rem' }}>
+                      Specialties (select one or more)
+                    </label>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem 1rem' }}>
+                      {specialtyCatalog.map((s) => {
+                        const checked = settingsData.specialtySelected.some(
+                          (x) => x.toLowerCase() === s.toLowerCase()
+                        );
+                        return (
+                          <label key={s} style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.9rem', cursor: 'pointer' }}>
+                            <input
+                              type="checkbox"
+                              checked={checked}
+                              onChange={(e) => {
+                                setSettingsData((prev) => {
+                                  const next = e.target.checked
+                                    ? [...prev.specialtySelected.filter((x) => x.toLowerCase() !== s.toLowerCase()), s]
+                                    : prev.specialtySelected.filter((x) => x.toLowerCase() !== s.toLowerCase());
+                                  return { ...prev, specialtySelected: next };
+                                });
+                              }}
+                            />
+                            {s}
+                          </label>
+                        );
+                      })}
+                    </div>
+                    <input
+                      type="text"
+                      value={settingsData.specialtyOther}
+                      onChange={(e) => setSettingsData({ ...settingsData, specialtyOther: e.target.value })}
+                      placeholder="Additional specialty (optional free text)"
+                      className="form-control"
+                      style={{ width: '100%', marginTop: '0.65rem', padding: '0.75rem', borderRadius: 'var(--radius-sm)', border: '1px solid rgba(212, 175, 55, 0.3)', background: 'rgba(255, 255, 255, 0.05)', color: 'var(--text-primary)' }}
+                    />
+                    {parseSpecialtyList(user?.profileDetails?.specialty).some(looksLikeSuspiciousSpecialty) && (
+                      <p style={{ color: '#ef9a9a', fontSize: '0.8rem', marginTop: '0.5rem' }}>
+                        Legacy specialty needs cleanup:{' '}
+                        {parseSpecialtyList(user.profileDetails.specialty)
+                          .filter(looksLikeSuspiciousSpecialty)
+                          .join(', ')}
+                        . It is hidden from the public profile until replaced.
+                      </p>
+                    )}
                   </div>
-                  <div className="form-group" style={{marginBottom: '1.5rem'}}>
-                    <label style={{color: 'var(--text-secondary)'}}>Bio / about</label>
-                    <textarea value={settingsData.bio} onChange={e => setSettingsData({...settingsData, bio: e.target.value})} rows={3} className="form-control" style={{width: '100%', padding: '0.75rem', borderRadius: 'var(--radius-sm)', border: '1px solid rgba(212, 175, 55, 0.3)', background: 'rgba(255, 255, 255, 0.05)', color: 'var(--text-primary)', resize: 'vertical'}} />
+
+                  <div className="form-group" style={{ marginBottom: '1rem' }}>
+                    <label style={{ color: 'var(--text-secondary)', display: 'block', marginBottom: '0.5rem' }}>
+                      Consultation types
+                    </label>
+                    <p style={{ color: 'var(--text-secondary)', fontSize: '0.8rem', marginTop: 0 }}>
+                      Only checked types appear publicly. Video is never assumed.
+                    </p>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1rem' }}>
+                      {[
+                        { key: 'offersInPerson', label: 'In-person' },
+                        { key: 'offersVideo', label: 'Video consultation' },
+                        { key: 'offersAudio', label: 'Audio consultation' },
+                      ].map(({ key, label }) => (
+                        <label key={key} style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', cursor: 'pointer' }}>
+                          <input
+                            type="checkbox"
+                            checked={Boolean(settingsData[key])}
+                            onChange={(e) => setSettingsData({ ...settingsData, [key]: e.target.checked })}
+                          />
+                          {label}
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '0.75rem' }}>
+                    <div className="form-group" style={{ marginBottom: '1rem' }}>
+                      <label style={{ color: 'var(--text-secondary)' }}>Province</label>
+                      <input type="text" value={settingsData.province} onChange={(e) => setSettingsData({ ...settingsData, province: e.target.value })} className="form-control" style={{ width: '100%', padding: '0.75rem', borderRadius: 'var(--radius-sm)', border: '1px solid rgba(212, 175, 55, 0.3)', background: 'rgba(255, 255, 255, 0.05)', color: 'var(--text-primary)' }} />
+                    </div>
+                    <div className="form-group" style={{ marginBottom: '1rem' }}>
+                      <label style={{ color: 'var(--text-secondary)' }}>District</label>
+                      <input type="text" value={settingsData.district} onChange={(e) => setSettingsData({ ...settingsData, district: e.target.value })} className="form-control" style={{ width: '100%', padding: '0.75rem', borderRadius: 'var(--radius-sm)', border: '1px solid rgba(212, 175, 55, 0.3)', background: 'rgba(255, 255, 255, 0.05)', color: 'var(--text-primary)' }} />
+                    </div>
+                    <div className="form-group" style={{ marginBottom: '1rem' }}>
+                      <label style={{ color: 'var(--text-secondary)' }}>City</label>
+                      <input type="text" value={settingsData.city} onChange={(e) => setSettingsData({ ...settingsData, city: e.target.value })} className="form-control" style={{ width: '100%', padding: '0.75rem', borderRadius: 'var(--radius-sm)', border: '1px solid rgba(212, 175, 55, 0.3)', background: 'rgba(255, 255, 255, 0.05)', color: 'var(--text-primary)' }} />
+                    </div>
+                    <div className="form-group" style={{ marginBottom: '1rem' }}>
+                      <label style={{ color: 'var(--text-secondary)' }}>Country</label>
+                      <input type="text" value={settingsData.country} onChange={(e) => setSettingsData({ ...settingsData, country: e.target.value })} className="form-control" style={{ width: '100%', padding: '0.75rem', borderRadius: 'var(--radius-sm)', border: '1px solid rgba(212, 175, 55, 0.3)', background: 'rgba(255, 255, 255, 0.05)', color: 'var(--text-primary)' }} />
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '0.75rem' }}>
+                    <div className="form-group" style={{ marginBottom: '1rem' }}>
+                      <label style={{ color: 'var(--text-secondary)' }}>Phone (private)</label>
+                      <input type="tel" value={settingsData.telephone} onChange={(e) => setSettingsData({ ...settingsData, telephone: e.target.value })} className="form-control" style={{ width: '100%', padding: '0.75rem', borderRadius: 'var(--radius-sm)', border: '1px solid rgba(212, 175, 55, 0.3)', background: 'rgba(255, 255, 255, 0.05)', color: 'var(--text-primary)' }} />
+                    </div>
+                    <div className="form-group" style={{ marginBottom: '1rem' }}>
+                      <label style={{ color: 'var(--text-secondary)' }}>Years of experience</label>
+                      <input type="number" min="0" max="80" value={settingsData.yearsOfExperience} onChange={(e) => setSettingsData({ ...settingsData, yearsOfExperience: e.target.value })} placeholder="e.g. 10" className="form-control" style={{ width: '100%', padding: '0.75rem', borderRadius: 'var(--radius-sm)', border: '1px solid rgba(212, 175, 55, 0.3)', background: 'rgba(255, 255, 255, 0.05)', color: 'var(--text-primary)' }} />
+                    </div>
+                    <div className="form-group" style={{ marginBottom: '1rem' }}>
+                      <label style={{ color: 'var(--text-secondary)' }}>Registration number</label>
+                      <input type="text" value={settingsData.registrationNumber} onChange={(e) => setSettingsData({ ...settingsData, registrationNumber: e.target.value })} placeholder="Does not auto-verify credentials" className="form-control" style={{ width: '100%', padding: '0.75rem', borderRadius: 'var(--radius-sm)', border: '1px solid rgba(212, 175, 55, 0.3)', background: 'rgba(255, 255, 255, 0.05)', color: 'var(--text-primary)' }} />
+                    </div>
+                  </div>
+
+                  <div className="form-group" style={{ marginBottom: '1rem' }}>
+                    <label style={{ color: 'var(--text-secondary)' }}>Private address (not shown publicly)</label>
+                    <input type="text" value={settingsData.address} onChange={(e) => setSettingsData({ ...settingsData, address: e.target.value })} className="form-control" style={{ width: '100%', padding: '0.75rem', borderRadius: 'var(--radius-sm)', border: '1px solid rgba(212, 175, 55, 0.3)', background: 'rgba(255, 255, 255, 0.05)', color: 'var(--text-primary)' }} />
+                    <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', margin: '0.35rem 0 0' }}>
+                      Public location uses city / district / province above. Facility affiliations use facility address when set.
+                    </p>
+                  </div>
+
+                  <div className="form-group" style={{ marginBottom: '1rem' }}>
+                    <label style={{ color: 'var(--text-secondary)', display: 'block', marginBottom: '0.5rem' }}>Languages</label>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem' }}>
+                      {languageCatalog.map((lang) => {
+                        const checked = settingsData.languages.some((l) => l.toLowerCase() === lang.toLowerCase());
+                        return (
+                          <label key={lang} style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', cursor: 'pointer' }}>
+                            <input
+                              type="checkbox"
+                              checked={checked}
+                              onChange={(e) => {
+                                setSettingsData((prev) => ({
+                                  ...prev,
+                                  languages: e.target.checked
+                                    ? [...prev.languages.filter((l) => l.toLowerCase() !== lang.toLowerCase()), lang]
+                                    : prev.languages.filter((l) => l.toLowerCase() !== lang.toLowerCase()),
+                                }));
+                              }}
+                            />
+                            {lang}
+                          </label>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  <div className="form-group" style={{ marginBottom: '1rem' }}>
+                    <label style={{ color: 'var(--text-secondary)', display: 'block', marginBottom: '0.5rem' }}>
+                      Qualifications
+                    </label>
+                    {(settingsData.qualifications || []).map((q, idx) => (
+                      <div
+                        key={idx}
+                        style={{
+                          display: 'grid',
+                          gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
+                          gap: '0.5rem',
+                          marginBottom: '0.65rem',
+                          padding: '0.75rem',
+                          background: 'rgba(255,255,255,0.03)',
+                          borderRadius: 8,
+                        }}
+                      >
+                        <input
+                          placeholder="Qualification name"
+                          value={q.qualificationName || ''}
+                          onChange={(e) => {
+                            const next = [...settingsData.qualifications];
+                            next[idx] = { ...next[idx], qualificationName: e.target.value };
+                            setSettingsData({ ...settingsData, qualifications: next });
+                          }}
+                          className="form-control"
+                          style={{ padding: '0.5rem', borderRadius: 4, border: '1px solid rgba(212,175,55,0.3)', background: 'rgba(0,0,0,0.2)', color: 'var(--text-primary)' }}
+                        />
+                        <input
+                          placeholder="Institution"
+                          value={q.institution || ''}
+                          onChange={(e) => {
+                            const next = [...settingsData.qualifications];
+                            next[idx] = { ...next[idx], institution: e.target.value };
+                            setSettingsData({ ...settingsData, qualifications: next });
+                          }}
+                          className="form-control"
+                          style={{ padding: '0.5rem', borderRadius: 4, border: '1px solid rgba(212,175,55,0.3)', background: 'rgba(0,0,0,0.2)', color: 'var(--text-primary)' }}
+                        />
+                        <input
+                          placeholder="Country"
+                          value={q.country || ''}
+                          onChange={(e) => {
+                            const next = [...settingsData.qualifications];
+                            next[idx] = { ...next[idx], country: e.target.value };
+                            setSettingsData({ ...settingsData, qualifications: next });
+                          }}
+                          className="form-control"
+                          style={{ padding: '0.5rem', borderRadius: 4, border: '1px solid rgba(212,175,55,0.3)', background: 'rgba(0,0,0,0.2)', color: 'var(--text-primary)' }}
+                        />
+                        <input
+                          placeholder="Year (optional)"
+                          value={q.year != null ? q.year : ''}
+                          onChange={(e) => {
+                            const next = [...settingsData.qualifications];
+                            next[idx] = { ...next[idx], year: e.target.value };
+                            setSettingsData({ ...settingsData, qualifications: next });
+                          }}
+                          className="form-control"
+                          style={{ padding: '0.5rem', borderRadius: 4, border: '1px solid rgba(212,175,55,0.3)', background: 'rgba(0,0,0,0.2)', color: 'var(--text-primary)' }}
+                        />
+                        <button
+                          type="button"
+                          className="btn btn-outline"
+                          style={{ color: '#ef5350', borderColor: 'rgba(239,83,80,0.4)' }}
+                          onClick={() =>
+                            setSettingsData({
+                              ...settingsData,
+                              qualifications: settingsData.qualifications.filter((_, i) => i !== idx),
+                            })
+                          }
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    ))}
+                    <button
+                      type="button"
+                      className="btn btn-outline"
+                      onClick={() =>
+                        setSettingsData({
+                          ...settingsData,
+                          qualifications: [...(settingsData.qualifications || []), { qualificationName: '' }],
+                        })
+                      }
+                    >
+                      Add qualification
+                    </button>
+                  </div>
+
+                  <div className="form-group" style={{ marginBottom: '1.5rem' }}>
+                    <label style={{ color: 'var(--text-secondary)' }}>Professional bio</label>
+                    <textarea
+                      value={settingsData.bio}
+                      onChange={(e) => setSettingsData({ ...settingsData, bio: e.target.value })}
+                      rows={4}
+                      className="form-control"
+                      style={{ width: '100%', padding: '0.75rem', borderRadius: 'var(--radius-sm)', border: '1px solid rgba(212, 175, 55, 0.3)', background: 'rgba(255, 255, 255, 0.05)', color: 'var(--text-primary)', resize: 'vertical' }}
+                    />
                   </div>
                 </>
               )}
 
-              <div style={{display: 'flex', gap: '1rem', marginTop: '0.5rem'}}>
+              <div style={{ display: 'flex', gap: '1rem', marginTop: '0.5rem', flexWrap: 'wrap' }}>
                 <button className="btn btn-primary" onClick={handleSettingsSubmit} disabled={savingSettings || settingsUploadingImage}>
                   {savingSettings ? <><div className="spinner spinner-sm" style={{width:'14px',height:'14px',border:'2px solid rgba(255,255,255,0.4)',borderTopColor:'white',display:'inline-block',marginRight:'0.4rem'}}/> Saving...</> : '✓ Save Changes'}
                 </button>
-                <button className="btn btn-outline" style={{borderColor: 'var(--error-color)', color: 'var(--error-color)', marginLeft: 'auto'}} onClick={() => { localStorage.clear(); window.location.href = '/'; }}>Logout</button>
+                <button className="btn btn-outline" style={{ borderColor: 'var(--error-color)', color: 'var(--error-color)', marginLeft: 'auto' }} onClick={() => { localStorage.clear(); window.location.href = '/'; }}>Logout</button>
               </div>
             </div>
           )}

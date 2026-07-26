@@ -360,19 +360,30 @@ const Channeling = () => {
                           {t(service)}
                         </span>
                       ))
-                    ) : Array.isArray(provider.profileDetails?.specialty) ? (
-                      provider.profileDetails.specialty.map(service => (
+                    ) : (
+                      getProviderSpecialties(provider).map((service) => (
                         <span key={service} className="detail-tag" style={{background: 'rgba(76,175,80,0.15)', border: '1px solid rgba(76,175,80,0.3)', color: '#4caf50'}}>
                           {t(service)}
                         </span>
                       ))
-                    ) : (
-                      <span className="detail-tag">{t(provider.profileDetails?.specialty || 'General')}</span>
                     )}
                     {provider.profileDetails?.experience && (
                       <span className="detail-tag">{provider.profileDetails.experience} Experience</span>
                     )}
-                    <span className="detail-tag flex-center"><MapPin size={14}/> {t(provider.profileDetails?.address || 'Sri Lanka')}</span>
+                    {(provider.locationSummary ||
+                      [provider.profileDetails?.city, provider.profileDetails?.district, provider.profileDetails?.province]
+                        .filter(Boolean)
+                        .join(', ')) && (
+                      <span className="detail-tag flex-center">
+                        <MapPin size={14}/>{' '}
+                        {t(
+                          provider.locationSummary ||
+                            [provider.profileDetails?.city, provider.profileDetails?.district, provider.profileDetails?.province]
+                              .filter(Boolean)
+                              .join(', ')
+                        )}
+                      </span>
+                    )}
                   </div>
                 </div>
                 

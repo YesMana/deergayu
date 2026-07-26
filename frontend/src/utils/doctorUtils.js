@@ -33,7 +33,7 @@ export function looksLikeTestPlaceholder(value) {
   const s = cleanDisplayText(value).toLowerCase();
   if (!s) return false;
   if (s.length <= 3) return true;
-  if (/^(test|xxx|asdf|qwer|hgfh|fghf|asdfg|lorem|dummy|placeholder)$/i.test(s)) return true;
+  if (/^(test|xxx|asdf|qwer|hgfh|fghf|asdfg|lorem|dummy|placeholder|n\/a|na|null|undefined)$/i.test(s)) return true;
   if (/^(.)\1{3,}$/.test(s)) return true;
   // Short keyboard-mash: few/no vowels, letters only
   if (s.length <= 5 && /^[a-z]+$/.test(s) && (s.match(/[aeiou]/g) || []).length === 0) {
@@ -42,18 +42,25 @@ export function looksLikeTestPlaceholder(value) {
   return false;
 }
 
+/**
+ * Public-facing specialties — omits suspicious/junk labels (e.g. "hgfh").
+ * Prefer provider.specialties DTO when present (already filtered by API).
+ */
 export function getProviderSpecialties(provider) {
+  if (Array.isArray(provider?.specialties) && provider.specialties.length) {
+    return provider.specialties.map(cleanDisplayText).filter(Boolean).filter((s) => !looksLikeTestPlaceholder(s));
+  }
   const raw = provider?.profileDetails?.specialty;
   let list = [];
   if (Array.isArray(raw)) list = raw.map(String);
   else if (typeof raw === 'string' && raw.trim()) {
     list = raw.split(/[,|/]/).map((x) => x.trim());
   }
-  // Trim / drop empties; keep real stored values (even if low-quality) for honesty
   const seen = new Set();
   return list
     .map(cleanDisplayText)
     .filter(Boolean)
+    .filter((s) => !looksLikeTestPlaceholder(s))
     .filter((s) => {
       const key = s.toLowerCase();
       if (seen.has(key)) return false;
@@ -100,18 +107,24 @@ export function roleLabel(role) {
 
 export function getConsultationTypes(provider) {
   const pd = provider?.profileDetails || {};
+  const modes = Array.isArray(pd.consultationModes) ? pd.consultationModes : [];
+  const explicit =
+    typeof pd.offersInPerson === 'boolean' ||
+    pd.offersVideo === true ||
+    pd.offersAudio === true ||
+    pd.videoConsultation === true ||
+    modes.length > 0;
   const types = [];
-  // Schedule presence implies in-person availability; video if explicitly enabled or default offer
-  if (pd.offersInPerson !== false) types.push('in_person');
-  if (pd.offersVideo === true || pd.videoConsultation === true || pd.consultationModes?.includes?.('video')) {
-    types.push('video');
+  if (explicit) {
+    if (pd.offersInPerson === true || modes.includes('in_person')) types.push('in_person');
+    if (pd.offersVideo === true || pd.videoConsultation === true || modes.includes('video')) {
+      types.push('video');
+    }
+    if (pd.offersAudio === true || modes.includes('audio')) types.push('audio');
+    return types;
   }
-  if (pd.offersAudio === true || pd.consultationModes?.includes?.('audio')) {
-    types.push('audio');
-  }
-  // If nothing flagged, still show in_person as the platform default booking mode
-  if (!types.length) types.push('in_person');
-  return types;
+  // Legacy profiles without explicit flags: in_person only — never invent video
+  return ['in_person'];
 }
 
 export function consultationTypeLabel(type) {

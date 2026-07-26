@@ -23,6 +23,15 @@ const {
 } = require('./platformUtils');
 const { fetchHomeStats } = require('./homeStats');
 const {
+  resolveSpecialtyCatalog,
+  computeProfileCompletion,
+  DEFAULT_LANGUAGES,
+  looksLikeSuspiciousSpecialty,
+  parseSpecialtyList,
+  normalizeQualifications,
+  normalizeLanguages,
+} = require('./providerProfile');
+const {
   PROVIDER_ROLES,
   isProviderRole,
   isApprovedProviderStatus,
@@ -887,6 +896,41 @@ apiRouter.get('/home-stats', async (req, res) => {
   }
 });
 
+// P1-C: controlled specialty catalog + language suggestions
+apiRouter.get('/specialty-catalog', async (req, res) => {
+  try {
+    const settings = await getSettings(db);
+    res.json({
+      specialties: resolveSpecialtyCatalog(settings),
+      languages: DEFAULT_LANGUAGES,
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// P1-C: provider profile completion (self only)
+apiRouter.get('/me/profile-completion', verifyUser, async (req, res) => {
+  try {
+    const snap = await db.collection('users').doc(req.user.uid).get();
+    if (!snap.exists) return res.status(404).json({ error: 'User profile not found' });
+    const data = { id: snap.id, ...snap.data() };
+    if (!isProviderRole(data.role)) {
+      return res.status(403).json({ error: 'Provider profile only' });
+    }
+    const completion = computeProfileCompletion(data);
+    res.json({
+      ...completion,
+      // Badge reminder: platform approval ≠ credential verification
+      approvalBadge: 'Deergayu Approved',
+      approvalNote:
+        'Deergayu Approved means the account was reviewed for the public directory. It does not certify medical/legal credentials.',
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Get featured/approved providers for Home page
 apiRouter.get('/featured-providers', async (req, res) => {
   try {
@@ -1158,7 +1202,17 @@ apiRouter.post('/users/:uid/profile', verifyAdmin, async (req, res) => {
     if (profileDetails !== undefined && typeof profileDetails === 'object') {
       const existing = await db.collection('users').doc(uid).get();
       const prev = existing.exists ? (existing.data().profileDetails || {}) : {};
-      updates.profileDetails = { ...prev, ...profileDetails };
+      const merged = { ...prev, ...profileDetails };
+      if (Object.prototype.hasOwnProperty.call(profileDetails, 'qualifications')) {
+        merged.qualifications = normalizeQualifications(profileDetails.qualifications);
+      }
+      if (Object.prototype.hasOwnProperty.call(profileDetails, 'languages')) {
+        merged.languages = normalizeLanguages(profileDetails.languages);
+      }
+      if (Object.prototype.hasOwnProperty.call(profileDetails, 'registrationNumber')) {
+        merged.registrationNumber = String(profileDetails.registrationNumber || '').trim();
+      }
+      updates.profileDetails = merged;
     }
     await db.collection('users').doc(uid).set(updates, { merge: true });
 
@@ -1516,8 +1570,13 @@ apiRouter.get('/admin/users/:uid/profile', verifyAdmin, async (req, res) => {
     const vendorEarnings = delivered.reduce((s, o) => s + Number(o.vendorEarnings ?? o.totalPrice * 0.9), 0);
     const platformFees = delivered.reduce((s, o) => s + Number(o.platformFee ?? o.totalPrice * 0.1), 0);
 
+    const completion = isProviderRole(userData.role) ? computeProfileCompletion(userData) : null;
     res.json({
       user: userData,
+      profileCompletion: completion,
+      approvalBadge: 'Deergayu Approved',
+      approvalNote:
+        'Deergayu Approved means the account was reviewed for the public directory. It does not certify medical/legal credentials.',
       products: productsSnap.docs.map((d) => ({ id: d.id, ...d.data() })),
       vendorOrders,
       customerOrders: customerOrdersSnap.docs.map((d) => ({ id: d.id, ...d.data() })),
