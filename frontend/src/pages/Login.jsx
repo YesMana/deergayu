@@ -7,6 +7,17 @@ import { doc, getDoc } from 'firebase/firestore';
 import './Login.css';
 import { API_URL } from '../config/api';
 
+/** Firebase auth/unauthorized-domain helper — report the real browser hostname. */
+function unauthorizedDomainMessage() {
+  const host =
+    typeof window !== 'undefined' && window.location?.hostname
+      ? window.location.hostname
+      : '(unknown host)';
+  return (
+    `Error: This domain (${host}) is not authorized in Firebase. ` +
+    'Please add it in Firebase Console → Authentication → Settings → Authorized domains.'
+  );
+}
 
 const Login = () => {
   const location = useLocation();
@@ -111,7 +122,11 @@ const Login = () => {
         setMessage('Password reset email sent! Check your inbox.');
       }
     } catch (err) {
-      setError(err.message || 'Authentication failed. Please try again.');
+      if (err.code === 'auth/unauthorized-domain') {
+        setError(unauthorizedDomainMessage());
+      } else {
+        setError(err.message || 'Authentication failed. Please try again.');
+      }
     }
   };
 
@@ -150,7 +165,7 @@ const Login = () => {
     } catch (err) {
       console.error("Google Auth Error:", err);
       if (err.code === 'auth/unauthorized-domain') {
-        setError('Error: This domain (deergayu.com) is not authorized in Firebase. Please add it in Firebase Console -> Authentication -> Settings -> Authorized domains.');
+        setError(unauthorizedDomainMessage());
       } else if (err.code === 'auth/popup-closed-by-user') {
         setError(''); // User just closed the popup
       } else {
