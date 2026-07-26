@@ -20,7 +20,6 @@ import {
 import { motion } from 'framer-motion';
 import SEO from '../components/SEO';
 import SocialLinks from '../components/SocialLinks';
-import { displayHomeStats } from '../constants/homeStats';
 import {
   collectSpecialtiesFromProviders,
   getProviderSpecialties,
@@ -32,12 +31,6 @@ import { API_URL } from '../config/api';
 
 const Home = () => {
   const navigate = useNavigate();
-  const [stats, setStats] = useState({
-    expertCount: 0,
-    productCount: 0,
-    orderCount: 0,
-    appointmentCount: 0,
-  });
   const [providers, setProviders] = useState([]);
   const [featuredProducts, setFeaturedProducts] = useState([]);
   const [loadingProviders, setLoadingProviders] = useState(true);
@@ -47,13 +40,6 @@ const Home = () => {
   const [consultType, setConsultType] = useState('all');
 
   useEffect(() => {
-    fetch(`${API_URL}/api/home-stats`)
-      .then((r) => (r.ok ? r.json() : null))
-      .then((data) => {
-        if (data) setStats(data);
-      })
-      .catch(() => {});
-
     fetch(`${API_URL}/api/providers`)
       .then((r) => (r.ok ? r.json() : []))
       .then((data) => setProviders(Array.isArray(data) ? data : []))
@@ -80,10 +66,6 @@ const Home = () => {
     // public search can use real schedule APIs per doctor (P1-B).
     navigate(`/doctors?${params.toString()}`);
   };
-
-  const shown = displayHomeStats(stats);
-  const hasRealStats =
-    shown.expertCount > 0 || shown.productCount > 0 || shown.appointmentCount > 0;
 
   const fadeUpVariant = {
     hidden: { opacity: 0, y: 28 },
@@ -207,42 +189,32 @@ const Home = () => {
         </div>
       </section>
 
-      {/* Real stats only — no artificial floors */}
-      {hasRealStats && (
-        <motion.section
-          className="stats-section"
-          initial="hidden"
-          whileInView="visible"
-          viewport={{ once: true, margin: '-50px' }}
-          variants={fadeUpVariant}
-        >
-          <div className="container">
-            <div className="stats-grid stats-grid-real">
-              {shown.expertCount > 0 && (
-                <div className="stat-card glass-panel">
-                  <Users size={22} aria-hidden="true" />
-                  <div className="stat-value">{shown.expertCount}</div>
-                  <div className="stat-label">Listed providers</div>
-                </div>
-              )}
-              {shown.appointmentCount > 0 && (
-                <div className="stat-card glass-panel">
-                  <Calendar size={22} aria-hidden="true" />
-                  <div className="stat-value">{shown.appointmentCount}</div>
-                  <div className="stat-label">Consultations recorded</div>
-                </div>
-              )}
-              {shown.productCount > 0 && (
-                <div className="stat-card glass-panel">
-                  <Package size={22} aria-hidden="true" />
-                  <div className="stat-value">{shown.productCount}</div>
-                  <div className="stat-label">Shop products</div>
-                </div>
-              )}
-            </div>
-          </div>
-        </motion.section>
-      )}
+      {/* Honest trust signals — no floored / inflated platform-scale numbers */}
+      <motion.section
+        className="stats-section home-trust-section"
+        aria-label="Platform trust signals"
+        initial="hidden"
+        whileInView="visible"
+        viewport={{ once: true, margin: '-50px' }}
+        variants={fadeUpVariant}
+      >
+        <div className="container">
+          <ul className="stats-grid stats-grid-real home-trust-grid">
+            <li className="stat-card glass-panel home-trust-card">
+              <Users size={22} aria-hidden="true" />
+              <div className="stat-label home-trust-label">Approved providers</div>
+            </li>
+            <li className="stat-card glass-panel home-trust-card">
+              <Shield size={22} aria-hidden="true" />
+              <div className="stat-label home-trust-label">Secure appointment booking</div>
+            </li>
+            <li className="stat-card glass-panel home-trust-card">
+              <Package size={22} aria-hidden="true" />
+              <div className="stat-label home-trust-label">Ayurvedic products &amp; wellness</div>
+            </li>
+          </ul>
+        </div>
+      </motion.section>
 
       {/* 2. Popular / available doctors */}
       <motion.section

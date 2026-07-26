@@ -222,6 +222,32 @@
 
 .stat-card:hover { transform: translateY(-4px); }
 
+/* Non-numeric trust strip (replaces floored platform-scale counters) */
+.home-trust-section {
+  padding: 2.25rem 0;
+}
+
+.home-trust-grid {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.home-trust-card {
+  min-height: 0;
+  gap: 0.65rem;
+  padding: 1.25rem 1rem;
+  color: var(--primary-color);
+}
+
+.home-trust-label {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  line-height: 1.35;
+}
+
 .stat-icon-wrap {
   width: 52px;
   height: 52px;
@@ -752,17 +778,29 @@
 .home-astrology-section {
   position: relative;
   overflow: hidden;
+  padding-block: 3.25rem;
   background:
-    radial-gradient(ellipse 70% 55% at 88% 12%, rgba(196, 163, 90, 0.1), transparent 55%),
-    radial-gradient(ellipse 55% 45% at 8% 88%, rgba(61, 139, 85, 0.12), transparent 50%),
+    radial-gradient(ellipse 70% 55% at 88% 12%, rgba(196, 163, 90, 0.08), transparent 55%),
+    radial-gradient(ellipse 55% 45% at 8% 88%, rgba(61, 139, 85, 0.1), transparent 50%),
     var(--surface-alt);
+}
+
+.home-astrology-section .section-title {
+  font-size: clamp(1.55rem, 2.4vw, 2rem);
+  max-width: 28ch;
+  margin-inline: auto;
+}
+
+.home-astrology-section .section-subtitle {
+  max-width: 46ch;
+  margin-inline: auto;
 }
 
 .home-astrology-motif {
   position: absolute;
   inset: 0;
   pointer-events: none;
-  opacity: 0.45;
+  opacity: 0.35;
   background-image:
     radial-gradient(1.5px 1.5px at 12% 22%, var(--secondary-light), transparent),
     radial-gradient(1.5px 1.5px at 28% 68%, var(--secondary-color), transparent),
