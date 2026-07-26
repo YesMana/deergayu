@@ -1,10 +1,25 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { ShoppingBag, Globe, Mic, Sun, Moon, Menu, X, ChevronDown, User, Package, Calendar, LayoutDashboard, Shield, LogOut } from 'lucide-react';
+import {
+  ShoppingBag,
+  Globe,
+  Mic,
+  Sun,
+  Moon,
+  Menu,
+  X,
+  ChevronDown,
+  User,
+  Package,
+  Calendar,
+  LayoutDashboard,
+  Shield,
+  LogOut,
+} from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useId } from 'react';
 import { API_URL } from '../config/api';
 import './Navbar.css';
 
@@ -24,6 +39,7 @@ const Navbar = () => {
   const navigate = useNavigate();
   const userMenuRef = useRef(null);
   const moreRef = useRef(null);
+  const moreMenuId = useId();
 
   useEffect(() => {
     setIsMobileMenuOpen(false);
@@ -31,7 +47,7 @@ const Navbar = () => {
     setMoreOpen(false);
   }, [location.pathname]);
 
-  // P1-B: hide empty facility directories; refresh on navigation so activate/deactivate is not stale
+  // P1-B: hide empty facility directories; refresh on navigation
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -77,8 +93,19 @@ const Navbar = () => {
         setMoreOpen(false);
       }
     };
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        setMoreOpen(false);
+        setIsUserMenuOpen(false);
+        setIsMobileMenuOpen(false);
+      }
+    };
     document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
   }, []);
 
   const handleVoiceSearch = () => {
@@ -92,6 +119,7 @@ const Navbar = () => {
     recognition.interimResults = false;
     recognition.maxAlternatives = 1;
     setIsListening(true);
+    setMoreOpen(false);
     recognition.start();
     recognition.onresult = (event) => {
       const transcript = event.results[0][0].transcript.toLowerCase();
@@ -133,15 +161,18 @@ const Navbar = () => {
   const path = location.pathname;
 
   const moreActive = [
+    '/about',
+    '/contact',
     '/specialties',
-    '/channeling',
     '/videos',
     '/astrology',
     '/faq',
     '/join-as-doctor',
     '/clinics',
     '/hospitals',
-  ].some((p) => path.startsWith(p));
+  ].some((p) => path === p || path.startsWith(`${p}/`));
+
+  const linkClass = (match) => (match ? 'active' : undefined);
 
   return (
     <nav className={`navbar ${scrolled ? 'scrolled' : ''}`} aria-label="Main">
@@ -152,46 +183,34 @@ const Navbar = () => {
 
         <ul className="nav-links desktop-only">
           <li>
-            <Link to="/" className={path === '/' ? 'active' : ''}>
-              {t('nav_home')}
-            </Link>
-          </li>
-          <li>
-            <Link to="/doctors" className={path.startsWith('/doctors') ? 'active' : ''}>
+            <Link to="/doctors" className={linkClass(path.startsWith('/doctors'))}>
               Find a Doctor
             </Link>
           </li>
           <li>
-            <Link to="/ayurveda" className={path === '/ayurveda' || path.startsWith('/ayurveda/') ? 'active' : ''}>
+            <Link
+              to="/ayurveda"
+              className={linkClass(path === '/ayurveda' || path.startsWith('/ayurveda/'))}
+            >
               Ayurveda
             </Link>
           </li>
           <li>
             <Link
               to="/online-consultation"
-              className={path.startsWith('/online-consultation') ? 'active' : ''}
+              className={linkClass(path.startsWith('/online-consultation'))}
             >
               Online Consultation
             </Link>
           </li>
           <li>
-            <Link to="/ayurvedic-guide" className={path.startsWith('/ayurvedic-guide') ? 'active' : ''}>
+            <Link to="/ayurvedic-guide" className={linkClass(path.startsWith('/ayurvedic-guide'))}>
               Guide
             </Link>
           </li>
           <li>
-            <Link to="/shop" className={path.startsWith('/shop') ? 'active' : ''}>
+            <Link to="/shop" className={linkClass(path.startsWith('/shop'))}>
               {t('nav_shop')}
-            </Link>
-          </li>
-          <li>
-            <Link to="/about" className={path === '/about' ? 'active' : ''}>
-              About
-            </Link>
-          </li>
-          <li>
-            <Link to="/contact" className={path === '/contact' ? 'active' : ''}>
-              Contact
             </Link>
           </li>
           <li className="nav-dropdown" ref={moreRef}>
@@ -199,15 +218,34 @@ const Navbar = () => {
               type="button"
               className={`nav-dropdown-trigger ${moreActive ? 'active' : ''}`}
               aria-expanded={moreOpen}
-              aria-haspopup="true"
+              aria-haspopup="menu"
+              aria-controls={moreMenuId}
+              id={`${moreMenuId}-trigger`}
               onClick={() => setMoreOpen((v) => !v)}
             >
-              More <ChevronDown size={14} />
+              More <ChevronDown size={14} aria-hidden="true" />
             </button>
             {moreOpen && (
-              <div className="nav-dropdown-menu" role="menu">
+              <div
+                id={moreMenuId}
+                className="nav-dropdown-menu"
+                role="menu"
+                aria-labelledby={`${moreMenuId}-trigger`}
+              >
+                <Link to="/about" role="menuitem">
+                  About
+                </Link>
+                <Link to="/contact" role="menuitem">
+                  Contact
+                </Link>
                 <Link to="/specialties" role="menuitem">
                   Specialties
+                </Link>
+                <Link to="/videos" role="menuitem">
+                  Videos
+                </Link>
+                <Link to="/astrology" role="menuitem">
+                  Astrology
                 </Link>
                 {showClinicsNav && (
                   <Link to="/clinics" role="menuitem">
@@ -219,54 +257,53 @@ const Navbar = () => {
                     Hospitals
                   </Link>
                 )}
-                <Link to="/channeling" role="menuitem">
-                  Book / Channel
-                </Link>
                 <Link to="/faq" role="menuitem">
                   FAQ
-                </Link>
-                <Link to="/videos" role="menuitem">
-                  Videos
-                </Link>
-                <Link to="/astrology" role="menuitem">
-                  Astrology
                 </Link>
                 <Link to="/join-as-doctor" role="menuitem">
                   Join as Doctor
                 </Link>
+                <button
+                  type="button"
+                  role="menuitem"
+                  className={`nav-dropdown-action ${isListening ? 'listening' : ''}`}
+                  onClick={handleVoiceSearch}
+                >
+                  <Mic size={16} aria-hidden="true" />
+                  Voice search
+                </button>
               </div>
             )}
           </li>
         </ul>
 
         <div className="nav-actions">
-          <Link to="/doctors" className="btn btn-primary btn-sm nav-cta desktop-only">
-            Find a Doctor
-          </Link>
-          <Link to="/channeling" className="btn btn-outline btn-sm nav-cta-secondary desktop-only">
-            Book
+          <Link to="/channeling" className="btn btn-primary btn-sm nav-cta desktop-only">
+            Book Appointment
           </Link>
 
           <button
             type="button"
-            className={`icon-btn ${isListening ? 'listening' : ''}`}
-            onClick={handleVoiceSearch}
-            title="Voice Search"
-            aria-label="Voice search"
+            className="icon-btn"
+            onClick={toggleTheme}
+            title="Toggle Theme"
+            aria-label="Toggle theme"
           >
-            <Mic size={19} />
+            {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
           </button>
 
-          <button type="button" className="icon-btn" onClick={toggleTheme} title="Toggle Theme" aria-label="Toggle theme">
-            {theme === 'dark' ? <Sun size={19} /> : <Moon size={19} />}
-          </button>
-
-          <button type="button" className="icon-btn lang-btn" onClick={toggleLanguage} title="Switch Language" aria-label="Switch language">
-            <Globe size={18} /> <span>{lang.toUpperCase()}</span>
+          <button
+            type="button"
+            className="icon-btn lang-btn"
+            onClick={toggleLanguage}
+            title="Switch Language"
+            aria-label="Switch language"
+          >
+            <Globe size={17} /> <span>{lang.toUpperCase()}</span>
           </button>
 
           <Link to="/shop/cart" className="icon-btn cart-btn" title="Cart" aria-label="Cart">
-            <ShoppingBag size={19} />
+            <ShoppingBag size={18} />
             {cartCount > 0 && <span className="cart-badge">{cartCount}</span>}
           </Link>
 
@@ -276,19 +313,20 @@ const Navbar = () => {
                 type="button"
                 className="user-avatar-btn"
                 onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
-                aria-label="User menu"
+                aria-label="Account menu"
                 aria-expanded={isUserMenuOpen}
+                aria-haspopup="menu"
               >
                 {profilePic ? (
                   <img src={profilePic} alt="" className="avatar-img" />
                 ) : (
                   <div className="avatar-placeholder">{profileInitial}</div>
                 )}
-                <ChevronDown size={14} className={`chevron ${isUserMenuOpen ? 'open' : ''}`} />
+                <ChevronDown size={14} className={`chevron ${isUserMenuOpen ? 'open' : ''}`} aria-hidden="true" />
               </button>
 
               {isUserMenuOpen && (
-                <div className="user-dropdown animate-fade-in-scale">
+                <div className="user-dropdown animate-fade-in-scale" role="menu">
                   <div className="dropdown-header">
                     <div className="dropdown-avatar">
                       {profilePic ? (
@@ -300,7 +338,10 @@ const Navbar = () => {
                     <div>
                       <div className="dropdown-name">{user.displayName || user.email?.split('@')[0]}</div>
                       <div className="dropdown-email">{user.email}</div>
-                      <span className="dropdown-role-badge" style={{ background: `${roleBadge.color}22`, color: roleBadge.color }}>
+                      <span
+                        className="dropdown-role-badge"
+                        style={{ background: `${roleBadge.color}22`, color: roleBadge.color }}
+                      >
                         {roleBadge.label}
                       </span>
                     </div>
@@ -308,8 +349,9 @@ const Navbar = () => {
 
                   <div className="dropdown-divider" />
 
-                  {(user.role === 'admin' || ['vendor', 'doctor', 'clinic', 'organization'].includes(user.role)) && (
-                    <Link to={getDashboardLink()} className="dropdown-item">
+                  {(user.role === 'admin' ||
+                    ['vendor', 'doctor', 'clinic', 'organization'].includes(user.role)) && (
+                    <Link to={getDashboardLink()} className="dropdown-item" role="menuitem">
                       {user.role === 'admin' ? <Shield size={16} /> : <LayoutDashboard size={16} />}
                       {user.role === 'admin' ? 'Admin Panel' : 'My Dashboard'}
                     </Link>
@@ -317,13 +359,13 @@ const Navbar = () => {
 
                   {user.role === 'user' && (
                     <>
-                      <Link to="/my-account" className="dropdown-item">
+                      <Link to="/my-account" className="dropdown-item" role="menuitem">
                         <User size={16} /> My Account
                       </Link>
-                      <Link to="/my-orders" className="dropdown-item">
+                      <Link to="/my-orders" className="dropdown-item" role="menuitem">
                         <Package size={16} /> My Orders
                       </Link>
-                      <Link to="/my-appointments" className="dropdown-item">
+                      <Link to="/my-appointments" className="dropdown-item" role="menuitem">
                         <Calendar size={16} /> My Appointments
                       </Link>
                     </>
@@ -331,15 +373,15 @@ const Navbar = () => {
 
                   <div className="dropdown-divider" />
 
-                  <button type="button" onClick={logout} className="dropdown-item danger">
+                  <button type="button" onClick={logout} className="dropdown-item danger" role="menuitem">
                     <LogOut size={16} /> Sign Out
                   </button>
                 </div>
               )}
             </div>
           ) : (
-            <Link to="/login" className="btn btn-primary btn-sm">
-              <User size={16} />
+            <Link to="/login" className="btn btn-outline btn-sm nav-login desktop-only">
+              <User size={15} aria-hidden="true" />
               {t('nav_login')}
             </Link>
           )}
@@ -356,24 +398,67 @@ const Navbar = () => {
         </div>
       </div>
 
-      <div className={`mobile-menu ${isMobileMenuOpen ? 'open' : ''}`}>
+      <div className={`mobile-menu ${isMobileMenuOpen ? 'open' : ''}`} id="mobile-nav-panel">
         <ul className="mobile-nav-links">
-          <li><Link to="/">Home</Link></li>
-          <li><Link to="/doctors">Find a Doctor</Link></li>
-          <li><Link to="/ayurveda">Ayurveda</Link></li>
-          <li><Link to="/online-consultation">Online Consultation</Link></li>
-          <li><Link to="/ayurvedic-guide">Guide / Articles</Link></li>
-          <li><Link to="/shop">Shop</Link></li>
-          <li><Link to="/about">About</Link></li>
-          <li><Link to="/contact">Contact</Link></li>
-          <li><Link to="/channeling">Book / Channel a Doctor</Link></li>
-          <li><Link to="/specialties">Specialties</Link></li>
-          {showClinicsNav && <li><Link to="/clinics">Clinics</Link></li>}
-          {showHospitalsNav && <li><Link to="/hospitals">Hospitals</Link></li>}
-          <li><Link to="/faq">FAQ</Link></li>
-          <li><Link to="/join-as-doctor">Join as Doctor</Link></li>
-          <li className="mobile-nav-secondary"><Link to="/videos">Videos</Link></li>
-          <li className="mobile-nav-secondary"><Link to="/astrology">Astrology</Link></li>
+          <li>
+            <Link to="/">Home</Link>
+          </li>
+          <li>
+            <Link to="/doctors">Find a Doctor</Link>
+          </li>
+          <li>
+            <Link to="/channeling" className="mobile-book-link">
+              Book Appointment
+            </Link>
+          </li>
+          <li>
+            <Link to="/ayurveda">Ayurveda</Link>
+          </li>
+          <li>
+            <Link to="/online-consultation">Online Consultation</Link>
+          </li>
+          <li>
+            <Link to="/ayurvedic-guide">Guide</Link>
+          </li>
+          <li>
+            <Link to="/shop">Shop</Link>
+          </li>
+          <li>
+            <Link to="/specialties">Specialties</Link>
+          </li>
+          <li>
+            <Link to="/about">About</Link>
+          </li>
+          <li>
+            <Link to="/contact">Contact</Link>
+          </li>
+          {showClinicsNav && (
+            <li>
+              <Link to="/clinics">Clinics</Link>
+            </li>
+          )}
+          {showHospitalsNav && (
+            <li>
+              <Link to="/hospitals">Hospitals</Link>
+            </li>
+          )}
+          <li className="mobile-nav-secondary">
+            <Link to="/videos">Videos</Link>
+          </li>
+          <li className="mobile-nav-secondary">
+            <Link to="/astrology">Astrology</Link>
+          </li>
+          <li className="mobile-nav-secondary">
+            <Link to="/faq">FAQ</Link>
+          </li>
+          <li className="mobile-nav-secondary">
+            <Link to="/join-as-doctor">Join as Doctor</Link>
+          </li>
+          <li className="mobile-nav-secondary">
+            <button type="button" className="mobile-voice-btn" onClick={handleVoiceSearch}>
+              <Mic size={16} aria-hidden="true" /> Voice search
+            </button>
+          </li>
           {user && (
             <>
               <li>
@@ -387,8 +472,12 @@ const Navbar = () => {
               </li>
               {user.role === 'user' && (
                 <>
-                  <li><Link to="/my-orders">My Orders</Link></li>
-                  <li><Link to="/my-appointments">My Appointments</Link></li>
+                  <li>
+                    <Link to="/my-orders">My Orders</Link>
+                  </li>
+                  <li>
+                    <Link to="/my-appointments">My Appointments</Link>
+                  </li>
                 </>
               )}
               <li>
