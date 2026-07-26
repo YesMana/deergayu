@@ -4,6 +4,7 @@ import { useInfiniteProductsQuery } from '../hooks/queries/useProducts';
 import { useCart } from '../context/CartContext';
 import { useToast } from '../context/ToastContext';
 import { useNavigate } from 'react-router-dom';
+import { useLanguage } from '../context/LanguageContext';
 import SEO from '../components/SEO';
 import './Shop.css';
 
@@ -14,6 +15,7 @@ const Shop = () => {
   const { addToCart } = useCart();
   const { success, error } = useToast();
   const navigate = useNavigate();
+  const { t } = useLanguage();
 
   const {
     data,
@@ -32,14 +34,14 @@ const Shop = () => {
     try {
       const isAdded = await addToCart(product);
       if (isAdded) {
-        success(`${product.name} added to cart!`);
+        success(t('shop_added_cart').replace('{name}', product.name));
       }
     } catch (err) {
       if (err.message.includes('log in')) {
-        error('Please log in to add items to your cart.');
+        error(t('shop_login_cart'));
         navigate('/login?returnUrl=/shop');
       } else {
-        error('Failed to add item to cart.');
+        error(t('shop_add_failed'));
       }
     }
   };
@@ -54,18 +56,18 @@ const Shop = () => {
 
   return (
     <div className="shop-page animate-fade-in" style={{ position: 'relative' }}>
-      <SEO title="Deergayu Shop | Authentic Herbal Remedies" />
+      <SEO title={t('shop_seo_title')} />
       <div className="shop-header">
         <div className="container">
-          <h1 className="shop-title">Ayurvedic Pharmacy</h1>
-          <p className="shop-subtitle">Authentic, pure, and trusted herbal remedies for your holistic wellbeing.</p>
+          <h1 className="shop-title">{t('shop_title')}</h1>
+          <p className="shop-subtitle">{t('shop_subtitle')}</p>
 
           <div className="shop-controls" style={{ display: 'flex', flexWrap: 'wrap', gap: '1rem', alignItems: 'center' }}>
             <div className="search-bar glass-panel" style={{ flex: '1', minWidth: '250px' }}>
               <Search size={20} className="search-icon" />
               <input
                 type="text"
-                placeholder="Search for medicines, herbs..."
+                placeholder={t('shop_search_ph')}
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
@@ -79,7 +81,7 @@ const Shop = () => {
                 style={{ border: 'none', background: 'transparent', padding: '0.8rem', color: 'var(--text-primary)', outline: 'none', cursor: 'pointer' }}
               >
                 {categories.map((cat) => (
-                  <option key={cat} value={cat}>{cat}</option>
+                  <option key={cat} value={cat}>{cat === 'All' ? t('common_all') : cat}</option>
                 ))}
               </select>
             </div>
@@ -90,18 +92,18 @@ const Shop = () => {
       <div className="container shop-content">
         <div className="product-grid">
           {status === 'pending' ? (
-            <div style={{ padding: '2rem', textAlign: 'center', width: '100%', color: 'var(--text-secondary)' }}>Loading products...</div>
+            <div style={{ padding: '2rem', textAlign: 'center', width: '100%', color: 'var(--text-secondary)' }}>{t('shop_loading_products')}</div>
           ) : status === 'error' ? (
             <div style={{ padding: '2rem', textAlign: 'center', width: '100%' }}>
               <p style={{ color: '#ff6b6b', marginBottom: '1rem' }}>
-                Could not load products{queryError?.message ? `: ${queryError.message}` : '.'}
+                {t('shop_load_error')}{queryError?.message ? `: ${queryError.message}` : '.'}
               </p>
               <button className="btn btn-primary" onClick={() => refetch()} disabled={isRefetching}>
-                {isRefetching ? 'Retrying…' : 'Retry'}
+                {isRefetching ? t('shop_retrying') : t('common_retry')}
               </button>
             </div>
           ) : filteredProducts.length === 0 ? (
-            <div style={{ padding: '2rem', textAlign: 'center', width: '100%', color: 'var(--text-secondary)' }}>No products match your search.</div>
+            <div style={{ padding: '2rem', textAlign: 'center', width: '100%', color: 'var(--text-secondary)' }}>{t('shop_no_results')}</div>
           ) : (
             filteredProducts.map((product) => (
               <div
@@ -116,12 +118,12 @@ const Shop = () => {
                     alt={product.name}
                     className="product-image"
                   />
-                  <button className="wishlist-btn" onClick={(e) => { e.stopPropagation(); success('Added to wishlist! (Coming soon)'); }}>
+                  <button className="wishlist-btn" onClick={(e) => { e.stopPropagation(); success(t('shop_wishlist_soon')); }}>
                     <Heart size={20} />
                   </button>
                   <div className="product-category">{product.category}</div>
                   {product.stock === 0 && (
-                    <div style={{ position: 'absolute', bottom: 8, left: 8, background: 'rgba(0,0,0,0.7)', color: '#ff6b6b', borderRadius: 6, padding: '0.2rem 0.5rem', fontSize: '0.72rem', fontWeight: 600 }}>Out of Stock</div>
+                    <div style={{ position: 'absolute', bottom: 8, left: 8, background: 'rgba(0,0,0,0.7)', color: '#ff6b6b', borderRadius: 6, padding: '0.2rem 0.5rem', fontSize: '0.72rem', fontWeight: 600 }}>{t('shop_out_of_stock')}</div>
                   )}
                 </div>
                 <div className="product-info">
@@ -135,7 +137,7 @@ const Shop = () => {
                     {product.rating != null && Number(product.rating) > 0 && (
                       <span className="product-rating">★ {Number(product.rating).toFixed(1)}</span>
                     )}
-                    <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginLeft: 'auto' }}>By {product.vendorName || 'Deergayu'}</span>
+                    <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginLeft: 'auto' }}>{t('shop_vendor_by')} {product.vendorName || 'Deergayu'}</span>
                   </div>
                   <div className="product-bottom">
                     <span className="product-price">Rs. {product.price}</span>
@@ -145,7 +147,7 @@ const Shop = () => {
                       onClick={(e) => { e.stopPropagation(); handleAddToCart(product); }}
                       style={product.stock === 0 ? { opacity: 0.5, cursor: 'not-allowed' } : {}}
                     >
-                      <ShoppingCart size={18} /> {product.stock === 0 ? 'Out of Stock' : 'Add'}
+                      <ShoppingCart size={18} /> {product.stock === 0 ? t('shop_out_of_stock') : t('shop_add')}
                     </button>
                   </div>
                 </div>
@@ -162,7 +164,7 @@ const Shop = () => {
               disabled={isFetchingNextPage}
               style={{ minWidth: '200px' }}
             >
-              {isFetchingNextPage ? 'Loading more...' : 'Load More Products'}
+              {isFetchingNextPage ? t('shop_loading_more') : t('shop_load_more')}
             </button>
           </div>
         )}
