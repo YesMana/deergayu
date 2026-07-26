@@ -14,18 +14,78 @@ export function slugToSpecialtyLookup(slug, specialties = []) {
   return specialties.find((name) => specialtyToSlug(name) === s) || null;
 }
 
+/** Trim and drop empty / whitespace-only public display strings. */
+export function cleanDisplayText(value) {
+  if (value == null) return '';
+  const s = String(value).trim().replace(/\s+/g, ' ');
+  return s;
+}
+
+export function isDisplayableText(value) {
+  return Boolean(cleanDisplayText(value));
+}
+
+/**
+ * Heuristic for admin cleanup reports only — never auto-delete DB data.
+ * Flags very short gibberish / keyboard-mash looking specialty labels.
+ */
+export function looksLikeTestPlaceholder(value) {
+  const s = cleanDisplayText(value).toLowerCase();
+  if (!s) return false;
+  if (s.length <= 3) return true;
+  if (/^(test|xxx|asdf|qwer|hgfh|fghf|asdfg|lorem|dummy|placeholder)$/i.test(s)) return true;
+  if (/^(.)\1{3,}$/.test(s)) return true;
+  // Short keyboard-mash: few/no vowels, letters only
+  if (s.length <= 5 && /^[a-z]+$/.test(s) && (s.match(/[aeiou]/g) || []).length === 0) {
+    return true;
+  }
+  return false;
+}
+
 export function getProviderSpecialties(provider) {
   const raw = provider?.profileDetails?.specialty;
-  if (Array.isArray(raw)) return raw.map(String).filter(Boolean);
-  if (typeof raw === 'string' && raw.trim()) {
-    return raw.split(/[,|/]/).map((x) => x.trim()).filter(Boolean);
+  let list = [];
+  if (Array.isArray(raw)) list = raw.map(String);
+  else if (typeof raw === 'string' && raw.trim()) {
+    list = raw.split(/[,|/]/).map((x) => x.trim());
   }
-  return [];
+  // Trim / drop empties; keep real stored values (even if low-quality) for honesty
+  const seen = new Set();
+  return list
+    .map(cleanDisplayText)
+    .filter(Boolean)
+    .filter((s) => {
+      const key = s.toLowerCase();
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+}
+
+export function formatDoctorTypeLabel(doctorType) {
+  const raw = cleanDisplayText(doctorType);
+  if (!raw) return '';
+  const map = {
+    traditional: 'Traditional practitioner',
+    'ayurvedic physician': 'Ayurvedic physician',
+    'vedic astrologer': 'Vedic astrologer',
+  };
+  const key = raw.toLowerCase();
+  if (map[key]) return map[key];
+  // Title-case single tokens like "traditional"
+  if (!/\s/.test(raw) && raw === raw.toLowerCase()) {
+    return raw.charAt(0).toUpperCase() + raw.slice(1);
+  }
+  return raw;
 }
 
 export function getProviderTitle(provider) {
   const pd = provider?.profileDetails || {};
-  return pd.title || pd.doctorType || roleLabel(provider?.role) || 'Healthcare Provider';
+  const custom = cleanDisplayText(pd.title);
+  if (custom) return custom;
+  const typed = formatDoctorTypeLabel(pd.doctorType);
+  if (typed) return typed;
+  return roleLabel(provider?.role) || 'Healthcare Provider';
 }
 
 export function roleLabel(role) {

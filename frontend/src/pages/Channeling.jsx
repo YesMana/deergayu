@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Search, Calendar as CalendarIcon, Star, Video, MapPin, X } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext';
@@ -9,6 +9,12 @@ import { useQuery } from '@tanstack/react-query';
 import SEO from '../components/SEO';
 import './Channeling.css';
 import { API_URL } from '../config/api';
+import {
+  cleanDisplayText,
+  formatDoctorTypeLabel,
+  getProviderSpecialties,
+  getProviderTitle,
+} from '../utils/doctorUtils';
 
 
 const sriLankaData = {
@@ -75,6 +81,27 @@ const Channeling = () => {
       fetchAvailableSlots(bookingDate);
     }
   }, [bookingDate, selectedProvider]);
+
+  const closeBookingModal = useCallback(() => {
+    setSelectedProvider(null);
+    setBookingDate('');
+    setBookingTime('');
+    setBookingPhone('');
+    setBookingNotes('');
+    setAvailableSlots([]);
+    setBookedSlots([]);
+    setProviderReviews([]);
+  }, []);
+
+  // Lock page scroll while booking modal is open
+  useEffect(() => {
+    if (selectedProvider) {
+      document.body.classList.add('booking-modal-open');
+    } else {
+      document.body.classList.remove('booking-modal-open');
+    }
+    return () => document.body.classList.remove('booking-modal-open');
+  }, [selectedProvider]);
 
   // Deep-link: /channeling?book=:providerId opens booking for that provider
   useEffect(() => {
@@ -178,13 +205,7 @@ const Channeling = () => {
 
       if (res.ok) {
         success("Appointment booked successfully! ✓");
-        setSelectedProvider(null);
-        setBookingDate('');
-        setBookingTime('');
-        setBookingPhone('');
-        setBookingNotes('');
-        setAvailableSlots([]);
-        setBookedSlots([]);
+        closeBookingModal();
         navigate('/my-appointments');
       } else {
         const errData = await res.json().catch(() => ({}));
@@ -376,285 +397,220 @@ const Channeling = () => {
         </div>
       </div>
 
-      {selectedProvider && (
-        <div
-          role="presentation"
-          onClick={() => { setSelectedProvider(null); setBookingDate(''); setBookingTime(''); setBookingPhone(''); setBookingNotes(''); setAvailableSlots([]); setBookedSlots([]); }}
-          style={{
-            position: 'fixed', inset: 0, zIndex: 9999,
-            background: 'rgba(0,0,0,0.75)',
-            backdropFilter: 'blur(6px)',
-            display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
-            padding: '0.5rem',
-            overflowY: 'auto',
-          }}
-        >
-          <div
-            role="dialog"
-            aria-modal="true"
-            aria-label={`Book appointment with ${selectedProvider.name}`}
-            data-testid="booking-modal"
-            onClick={e => e.stopPropagation()}
-            style={{
-              width: '100%', maxWidth: '560px',
-              background: 'linear-gradient(145deg, #1a1208, #251a0a)',
-              border: '1px solid rgba(212,175,55,0.25)',
-              borderRadius: '20px',
-              boxShadow: '0 30px 80px rgba(0,0,0,0.6)',
-              overflow: 'hidden',
-              maxHeight: 'min(92vh, 920px)',
-              overflowY: 'auto',
-              margin: 'auto 0',
-            }}
-          >
-            {/* Header */}
-            <div style={{
-              background: 'linear-gradient(135deg, rgba(212,175,55,0.2), rgba(212,175,55,0.05))',
-              borderBottom: '1px solid rgba(212,175,55,0.15)',
-              padding: '1rem 1.25rem',
-              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-              position: 'sticky', top: 0, zIndex: 2,
-              backdropFilter: 'blur(8px)',
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem', minWidth: 0 }}>
-                <div style={{
-                  width: '52px', height: '52px', borderRadius: '50%',
-                  background: 'linear-gradient(135deg, rgba(212,175,55,0.4), rgba(212,175,55,0.1))',
-                  border: '2px solid rgba(212,175,55,0.5)',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontSize: '1.35rem', overflow: 'hidden', flexShrink: 0,
-                  fontWeight: 700, color: '#d4af37',
-                }}>
-                  {(selectedProvider.profileDetails?.profileImageUrl || selectedProvider.photoUrl)
-                    ? <img src={selectedProvider.profileDetails?.profileImageUrl || selectedProvider.photoUrl} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="" />
-                    : (selectedProvider.name || 'D')[0].toUpperCase()}
-                </div>
-                <div style={{ minWidth: 0 }}>
-                  <div style={{ fontSize: '0.72rem', color: 'rgba(212,175,55,0.7)', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '2px' }}>Book Appointment</div>
-                  <div style={{ fontWeight: 'bold', color: '#fff', fontSize: '1.05rem', wordBreak: 'break-word' }}>{selectedProvider.name}</div>
-                  <div style={{ fontSize: '0.82rem', color: 'rgba(255,255,255,0.5)' }}>
-                    {selectedProvider.profileDetails?.specialty || selectedProvider.profileDetails?.doctorType || selectedProvider.role}
-                  </div>
-                </div>
-              </div>
-              <button
-                type="button"
-                aria-label="Close booking"
-                onClick={() => { setSelectedProvider(null); setBookingDate(''); setBookingTime(''); setBookingPhone(''); setBookingNotes(''); setAvailableSlots([]); setBookedSlots([]); }}
-                style={{
-                  background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)',
-                  borderRadius: '50%', width: '44px', height: '44px',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  cursor: 'pointer', color: '#fff', flexShrink: 0
-                }}
-              >
-                <X size={18} />
-              </button>
-            </div>
+      {selectedProvider && (() => {
+        const modalName = cleanDisplayText(selectedProvider.name) || 'Provider';
+        const modalPic = cleanDisplayText(
+          selectedProvider.profileDetails?.profileImageUrl || selectedProvider.photoUrl
+        );
+        const modalSpecs = getProviderSpecialties(selectedProvider);
+        const modalMeta =
+          modalSpecs[0] ||
+          getProviderTitle(selectedProvider) ||
+          formatDoctorTypeLabel(selectedProvider.profileDetails?.doctorType) ||
+          '';
+        const consultLabel = consultMode === 'video' ? 'Video consultation' : 'In-person consultation';
+        const confirmLabel = isBooking
+          ? 'Booking…'
+          : !bookingDate
+            ? 'Select a date first'
+            : !bookingTime
+              ? 'Select a time slot'
+              : !bookingPhone
+                ? 'Enter contact number'
+                : 'Confirm Appointment';
 
-            {/* Body */}
-            <div style={{ padding: '2rem' }}>
-              {(loadingReviews || providerReviews.length > 0) && (
-                <div style={{
-                  marginBottom: '1.5rem',
-                  padding: '1rem',
-                  borderRadius: 12,
-                  background: 'rgba(255,255,255,0.04)',
-                  border: '1px solid rgba(212,175,55,0.2)'
-                }}>
-                  <div style={{ fontSize: '0.85rem', color: 'rgba(212,175,55,0.85)', marginBottom: '0.65rem', fontWeight: 600 }}>
-                    Patient Reviews
-                    {(selectedProvider.averageRating ?? selectedProvider.rating) != null &&
-                      Number(selectedProvider.averageRating ?? selectedProvider.rating) > 0 &&
-                      Number(selectedProvider.reviewCount) > 0 && (
-                      <span style={{ marginLeft: 8, color: '#f1c40f' }}>
-                        ★ {Number(selectedProvider.averageRating ?? selectedProvider.rating).toFixed(1)}
-                        {` · ${selectedProvider.reviewCount}`}
-                      </span>
-                    )}
-                  </div>
-                  {loadingReviews ? (
-                    <p style={{ color: 'rgba(255,255,255,0.45)', fontSize: '0.85rem', margin: 0 }}>Loading reviews…</p>
-                  ) : providerReviews.length === 0 ? null : (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
-                      {providerReviews.map((r) => (
-                        <div key={r.id} style={{ fontSize: '0.82rem', color: 'rgba(255,255,255,0.7)' }}>
-                          <span style={{ color: '#f1c40f' }}>{'★'.repeat(Math.min(5, Number(r.rating) || 0))}</span>
-                          {' '}
-                          <strong style={{ color: '#fff' }}>{r.userName || 'User'}</strong>
-                          {r.comment ? ` — ${r.comment}` : ''}
-                        </div>
-                      ))}
+        return (
+          <div
+            className="booking-modal-overlay"
+            role="presentation"
+            onClick={closeBookingModal}
+          >
+            <div
+              className="booking-modal"
+              role="dialog"
+              aria-modal="true"
+              aria-label={`Book appointment with ${modalName}`}
+              data-testid="booking-modal"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <header className="booking-modal-header">
+                <div className="booking-modal-provider">
+                  {modalPic ? (
+                    <img src={modalPic} alt="" className="booking-modal-avatar" />
+                  ) : (
+                    <div className="booking-modal-avatar-fallback" aria-hidden="true">
+                      {modalName[0].toUpperCase()}
                     </div>
                   )}
-                </div>
-              )}
-              <form onSubmit={handleBookingSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-
-                {/* Step 1 */}
-                <div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '0.75rem' }}>
-                    <div style={{ width: '24px', height: '24px', borderRadius: '50%', background: 'rgba(212,175,55,0.15)', border: '1px solid rgba(212,175,55,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.75rem', color: '#d4af37', fontWeight: 'bold', flexShrink: 0 }}>1</div>
-                    <label style={{ color: 'rgba(255,255,255,0.85)', fontWeight: '600', fontSize: '0.9rem' }}>Select Date</label>
+                  <div style={{ minWidth: 0 }}>
+                    <div className="booking-modal-eyebrow">Book appointment</div>
+                    <div className="booking-modal-name">{modalName}</div>
+                    <div className="booking-modal-meta">
+                      {consultLabel}
+                      {modalMeta ? ` · ${modalMeta}` : ''}
+                    </div>
                   </div>
-                  <input
-                    type="date"
-                    value={bookingDate}
-                    onChange={e => setBookingDate(e.target.value)}
-                    required
-                    min={new Date().toISOString().split('T')[0]}
-                    style={{
-                      width: '100%', padding: '0.85rem 1rem',
-                      borderRadius: '10px',
-                      border: bookingDate ? '1px solid rgba(212,175,55,0.6)' : '1px solid rgba(255,255,255,0.12)',
-                      background: 'rgba(255,255,255,0.05)',
-                      color: '#fff', fontSize: '1rem',
-                      outline: 'none', boxSizing: 'border-box',
-                      colorScheme: 'dark'
-                    }}
-                  />
                 </div>
+                <button
+                  type="button"
+                  className="booking-modal-close"
+                  aria-label="Close booking"
+                  onClick={closeBookingModal}
+                >
+                  <X size={18} />
+                </button>
+              </header>
 
-                {/* Step 2 – Time Slots */}
-                {bookingDate && (
-                  <div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '0.75rem' }}>
-                      <div style={{ width: '24px', height: '24px', borderRadius: '50%', background: 'rgba(212,175,55,0.15)', border: '1px solid rgba(212,175,55,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.75rem', color: '#d4af37', fontWeight: 'bold', flexShrink: 0 }}>2</div>
-                      <label style={{ color: 'rgba(255,255,255,0.85)', fontWeight: '600', fontSize: '0.9rem' }}>
-                        Available Time Slots
-                        {bookingTime && <span style={{ marginLeft: '0.5rem', color: '#86efac', fontSize: '0.8rem' }}>✓ {bookingTime} selected</span>}
+              <form className="booking-modal-form" onSubmit={handleBookingSubmit}>
+                <div className="booking-modal-body">
+                  {(loadingReviews || providerReviews.length > 0) && (
+                    <div className="booking-reviews">
+                      <div className="booking-reviews-title">
+                        Patient Reviews
+                        {(selectedProvider.averageRating ?? selectedProvider.rating) != null &&
+                          Number(selectedProvider.averageRating ?? selectedProvider.rating) > 0 &&
+                          Number(selectedProvider.reviewCount) > 0 && (
+                            <span style={{ marginLeft: 8 }}>
+                              ★ {Number(selectedProvider.averageRating ?? selectedProvider.rating).toFixed(1)}
+                              {` · ${selectedProvider.reviewCount}`}
+                            </span>
+                          )}
+                      </div>
+                      {loadingReviews ? (
+                        <p className="booking-loading" style={{ margin: 0, padding: '0.5rem 0', border: 'none', background: 'none' }}>
+                          Loading reviews…
+                        </p>
+                      ) : (
+                        providerReviews.map((r) => (
+                          <div key={r.id} className="booking-review-item">
+                            <span style={{ color: 'var(--secondary-light, #e0c878)' }}>
+                              {'★'.repeat(Math.min(5, Number(r.rating) || 0))}
+                            </span>{' '}
+                            <strong style={{ color: 'var(--text-primary)' }}>{r.userName || 'User'}</strong>
+                            {r.comment ? ` — ${r.comment}` : ''}
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  )}
+
+                  <div className="booking-step">
+                    <div className="booking-step-label">
+                      <span className="booking-step-num">1</span>
+                      <label htmlFor="booking-date">Select Date</label>
+                    </div>
+                    <input
+                      id="booking-date"
+                      type="date"
+                      className="booking-input"
+                      value={bookingDate}
+                      onChange={(e) => setBookingDate(e.target.value)}
+                      required
+                      min={new Date().toISOString().split('T')[0]}
+                    />
+                  </div>
+
+                  {bookingDate && (
+                    <div className="booking-step">
+                      <div className="booking-step-label">
+                        <span className="booking-step-num">2</span>
+                        <label>
+                          Available Time Slots
+                          {bookingTime && (
+                            <span className="booking-time-hint">✓ {bookingTime} selected</span>
+                          )}
+                        </label>
+                      </div>
+
+                      {loadingSlots ? (
+                        <div className="booking-loading">Loading available slots…</div>
+                      ) : availableSlots.length === 0 ? (
+                        <div className="booking-empty">
+                          <div style={{ fontWeight: 600, marginBottom: '0.25rem' }}>No availability on this date</div>
+                          <div style={{ fontSize: '0.82rem' }}>Please try a different date.</div>
+                        </div>
+                      ) : (
+                        <>
+                          <div className="booking-slot-legend">
+                            <span><i className="booking-slot-swatch" /> Available</span>
+                            <span><i className="booking-slot-swatch selected" /> Selected</span>
+                            <span><i className="booking-slot-swatch booked" /> Booked</span>
+                          </div>
+                          <div className="booking-slots">
+                            {availableSlots.map((slot) => {
+                              const isBooked = bookedSlots.includes(slot);
+                              const isSelected = bookingTime === slot;
+                              return (
+                                <button
+                                  key={slot}
+                                  type="button"
+                                  disabled={isBooked}
+                                  className={`booking-slot${isSelected ? ' selected' : ''}${isBooked ? ' booked' : ''}`}
+                                  onClick={() => setBookingTime(slot)}
+                                >
+                                  {slot}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  )}
+
+                  <div className="booking-step">
+                    <div className="booking-step-label">
+                      <span className="booking-step-num">3</span>
+                      <label htmlFor="booking-phone">
+                        Contact Number <span style={{ color: '#ef5350' }}>*</span>
                       </label>
                     </div>
-
-                    {loadingSlots ? (
-                      <div style={{ padding: '1.5rem', textAlign: 'center', color: 'rgba(255,255,255,0.4)', background: 'rgba(255,255,255,0.03)', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.08)' }}>
-                        ⏳ Loading available slots...
-                      </div>
-                    ) : availableSlots.length === 0 ? (
-                      <div style={{ padding: '1.5rem', textAlign: 'center', background: 'rgba(220,53,69,0.1)', borderRadius: '10px', border: '1px solid rgba(220,53,69,0.3)' }}>
-                        <div style={{ fontSize: '1.4rem', marginBottom: '0.4rem' }}>🚫</div>
-                        <div style={{ color: '#f87171', fontWeight: '600' }}>No availability on this date</div>
-                        <div style={{ color: 'rgba(255,255,255,0.35)', fontSize: '0.82rem', marginTop: '0.25rem' }}>Please try a different date.</div>
-                      </div>
-                    ) : (
-                      <div>
-                        <div style={{ display: 'flex', gap: '1rem', marginBottom: '0.6rem', flexWrap: 'wrap' }}>
-                          {[['Available', 'rgba(212,175,55,0.3)', 'rgba(212,175,55,0.7)'], ['Selected', 'rgba(34,197,94,0.25)', 'rgba(34,197,94,0.8)'], ['Booked', 'rgba(255,255,255,0.04)', 'rgba(255,255,255,0.15)']].map(([label, bg, bc]) => (
-                            <span key={label} style={{ fontSize: '0.72rem', color: 'rgba(255,255,255,0.4)', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-                              <span style={{ width: '10px', height: '10px', borderRadius: '2px', background: bg, border: `1px solid ${bc}`, display: 'inline-block' }} />
-                              {label}
-                            </span>
-                          ))}
-                        </div>
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(78px, 1fr))', gap: '0.5rem' }}>
-                          {availableSlots.map(slot => {
-                            const isBooked = bookedSlots.includes(slot);
-                            const isSelected = bookingTime === slot;
-                            return (
-                              <button
-                                key={slot}
-                                type="button"
-                                disabled={isBooked}
-                                onClick={() => setBookingTime(slot)}
-                                style={{
-                                  padding: '0.6rem 0.4rem',
-                                  borderRadius: '8px',
-                                  border: '1px solid',
-                                  borderColor: isBooked ? 'rgba(255,255,255,0.08)' : isSelected ? 'rgba(34,197,94,0.8)' : 'rgba(212,175,55,0.4)',
-                                  background: isBooked ? 'rgba(255,255,255,0.03)' : isSelected ? 'rgba(34,197,94,0.2)' : 'rgba(212,175,55,0.08)',
-                                  color: isBooked ? 'rgba(255,255,255,0.18)' : isSelected ? '#86efac' : 'rgba(212,175,55,0.9)',
-                                  cursor: isBooked ? 'not-allowed' : 'pointer',
-                                  textDecoration: isBooked ? 'line-through' : 'none',
-                                  fontSize: '0.85rem', fontWeight: isSelected ? '700' : '500',
-                                  transition: 'all 0.15s',
-                                  transform: isSelected ? 'scale(1.05)' : 'scale(1)',
-                                  boxShadow: isSelected ? '0 0 12px rgba(34,197,94,0.25)' : 'none'
-                                }}
-                              >
-                                {slot}
-                              </button>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    )}
+                    <input
+                      id="booking-phone"
+                      type="tel"
+                      className="booking-input"
+                      value={bookingPhone}
+                      onChange={(e) => setBookingPhone(e.target.value)}
+                      required
+                      placeholder="e.g. 0712345678"
+                      autoComplete="tel"
+                    />
                   </div>
-                )}
 
-                {/* Step 3 – Phone Number */}
-                <div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '0.75rem' }}>
-                    <div style={{ width: '24px', height: '24px', borderRadius: '50%', background: 'rgba(212,175,55,0.15)', border: '1px solid rgba(212,175,55,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.75rem', color: '#d4af37', fontWeight: 'bold', flexShrink: 0 }}>3</div>
-                    <label style={{ color: 'rgba(255,255,255,0.85)', fontWeight: '600', fontSize: '0.9rem' }}>Contact Number <span style={{ color: '#ef4444' }}>*</span></label>
+                  <div className="booking-step">
+                    <div className="booking-step-label">
+                      <span className="booking-step-num">4</span>
+                      <label htmlFor="booking-notes">
+                        Notes / Symptoms{' '}
+                        <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>(Optional)</span>
+                      </label>
+                    </div>
+                    <textarea
+                      id="booking-notes"
+                      className="booking-textarea"
+                      value={bookingNotes}
+                      onChange={(e) => setBookingNotes(e.target.value)}
+                      rows={3}
+                      placeholder="Briefly describe your symptoms or reason for visit..."
+                    />
                   </div>
-                  <input
-                    type="tel"
-                    value={bookingPhone}
-                    onChange={e => setBookingPhone(e.target.value)}
-                    required
-                    placeholder="e.g. 0712345678"
-                    style={{
-                      width: '100%', padding: '0.85rem 1rem',
-                      borderRadius: '10px',
-                      border: bookingPhone ? '1px solid rgba(212,175,55,0.6)' : '1px solid rgba(255,255,255,0.12)',
-                      background: 'rgba(255,255,255,0.05)',
-                      color: '#fff', fontSize: '0.95rem',
-                      outline: 'none', boxSizing: 'border-box'
-                    }}
-                  />
                 </div>
 
-                {/* Step 4 – Notes */}
-                <div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '0.75rem' }}>
-                    <div style={{ width: '24px', height: '24px', borderRadius: '50%', background: 'rgba(212,175,55,0.15)', border: '1px solid rgba(212,175,55,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.75rem', color: '#d4af37', fontWeight: 'bold', flexShrink: 0 }}>4</div>
-                    <label style={{ color: 'rgba(255,255,255,0.85)', fontWeight: '600', fontSize: '0.9rem' }}>
-                      Notes / Symptoms <span style={{ color: 'rgba(255,255,255,0.3)', fontWeight: 'normal' }}>(Optional)</span>
-                    </label>
-                  </div>
-                  <textarea
-                    value={bookingNotes}
-                    onChange={e => setBookingNotes(e.target.value)}
-                    rows="3"
-                    placeholder="Briefly describe your symptoms or reason for visit..."
-                    style={{
-                      width: '100%', padding: '0.85rem 1rem',
-                      borderRadius: '10px',
-                      border: '1px solid rgba(255,255,255,0.12)',
-                      background: 'rgba(255,255,255,0.05)',
-                      color: '#fff', fontSize: '0.9rem', resize: 'vertical',
-                      outline: 'none', boxSizing: 'border-box',
-                      fontFamily: 'inherit', lineHeight: '1.5'
-                    }}
-                  />
+                <div className="booking-modal-footer">
+                  <button
+                    type="submit"
+                    className="booking-confirm-btn"
+                    disabled={isBooking || !bookingDate || !bookingTime || !bookingPhone}
+                    data-testid="booking-confirm"
+                  >
+                    {confirmLabel}
+                  </button>
                 </div>
-
-                {/* Confirm Button */}
-                <button
-                  type="submit"
-                  disabled={isBooking || !bookingDate || !bookingTime || !bookingPhone}
-                  style={{
-                    width: '100%', padding: '1rem',
-                    borderRadius: '12px', border: 'none',
-                    background: (!bookingDate || !bookingTime || !bookingPhone || isBooking)
-                      ? 'rgba(255,255,255,0.07)'
-                      : 'linear-gradient(135deg, #d4af37, #b8960c)',
-                    color: (!bookingDate || !bookingTime || !bookingPhone || isBooking) ? 'rgba(255,255,255,0.25)' : '#1a1208',
-                    fontWeight: 'bold', fontSize: '1rem',
-                    cursor: (!bookingDate || !bookingTime || !bookingPhone || isBooking) ? 'not-allowed' : 'pointer',
-                    transition: 'all 0.2s',
-                    letterSpacing: '0.5px',
-                    boxShadow: (!bookingDate || !bookingTime || !bookingPhone || isBooking) ? 'none' : '0 4px 20px rgba(212,175,55,0.35)'
-                  }}
-                >
-                  {isBooking ? '⏳ Booking...' : !bookingDate ? '← Select a date first' : !bookingTime ? '← Select a time slot' : !bookingPhone ? '← Enter contact number' : '✓ Confirm Appointment'}
-                </button>
-
               </form>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
     </div>
   );
 };

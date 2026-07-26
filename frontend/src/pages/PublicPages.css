@@ -71,26 +71,29 @@
 }
 
 .pub-card {
-  background: var(--surface, #fff);
-  border: 1px solid rgba(0, 0, 0, 0.06);
+  background: var(--surface-color, var(--surface, #fff));
+  border: 1px solid var(--glass-border, rgba(0, 0, 0, 0.06));
   border-radius: 12px;
   padding: 1.25rem;
   transition: border-color 0.2s, box-shadow 0.2s;
+  color: var(--text-primary);
 }
 
 .pub-card:hover {
-  border-color: rgba(46, 125, 50, 0.25);
+  border-color: rgba(46, 125, 50, 0.35);
   box-shadow: 0 6px 20px rgba(46, 125, 50, 0.08);
 }
 
+.pub-card h2,
 .pub-card h3 {
   margin: 0 0 0.5rem;
   font-size: 1.1rem;
+  color: var(--text-primary);
 }
 
 .pub-card p {
   margin: 0;
-  color: var(--text-muted, #666);
+  color: var(--text-secondary, var(--text-muted, #666));
   line-height: 1.5;
   font-size: 0.95rem;
 }
@@ -155,10 +158,11 @@
   display: flex;
   flex-direction: column;
   gap: 0.85rem;
-  background: var(--surface, #fff);
-  border: 1px solid rgba(0, 0, 0, 0.07);
+  background: var(--surface-color, var(--surface, #fff));
+  border: 1px solid var(--glass-border, rgba(0, 0, 0, 0.07));
   border-radius: 14px;
   padding: 1.15rem;
+  color: var(--text-primary);
 }
 
 .doctor-card-top {
@@ -197,7 +201,7 @@
 
 .doctor-meta {
   font-size: 0.85rem;
-  color: var(--text-muted, #666);
+  color: var(--text-secondary, var(--text-muted, #666));
   line-height: 1.4;
 }
 
@@ -222,8 +226,14 @@
 }
 
 .doctor-badge.muted {
-  background: rgba(0, 0, 0, 0.06);
-  color: #555;
+  background: rgba(46, 125, 50, 0.08);
+  color: var(--text-secondary);
+}
+
+[data-theme='dark'] .doctor-badge.muted,
+:root.dark .doctor-badge.muted {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text-secondary);
 }
 
 .doctor-card-actions {
@@ -275,7 +285,7 @@
 
 .profile-layout {
   display: grid;
-  grid-template-columns: 1fr 320px;
+  grid-template-columns: 1fr minmax(280px, 340px);
   gap: 1.75rem;
   align-items: start;
 }
@@ -285,10 +295,190 @@
   top: 5.5rem;
 }
 
-.profile-aside .pub-card {
+/* ── Doctor profile (theme-aware) ── */
+.doctor-profile-page {
+  background: var(--bg-color, transparent);
+}
+
+.profile-crumb {
+  padding: 1.25rem 0 0.25rem;
+}
+
+.profile-crumb-text {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+}
+
+.profile-crumb-text a {
+  color: var(--primary-color);
+  font-weight: 600;
+}
+
+.profile-section {
+  padding-top: 1rem;
+}
+
+.profile-header-card,
+.profile-block,
+.booking-side-card {
+  background: var(--surface-color);
+  border: 1px solid var(--glass-border);
+  border-radius: 14px;
+  padding: 1.35rem;
+  color: var(--text-primary);
+}
+
+.profile-header-card {
+  display: flex;
+  gap: 1.15rem;
+  align-items: flex-start;
+  margin-bottom: 1rem;
+  background:
+    linear-gradient(145deg, rgba(46, 125, 50, 0.1), transparent 55%),
+    var(--surface-color);
+}
+
+.profile-photo,
+.profile-photo-fallback {
+  width: 96px;
+  height: 96px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  object-fit: cover;
+}
+
+.profile-photo-fallback {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2rem;
+  font-weight: 700;
+  color: var(--primary-light, var(--primary-color));
+  background: linear-gradient(135deg, rgba(46, 125, 50, 0.28), rgba(201, 162, 39, 0.22));
+  border: 2px solid rgba(46, 125, 50, 0.35);
+}
+
+.profile-header-text h1 {
+  margin: 0 0 0.35rem;
+  font-size: clamp(1.45rem, 3vw, 1.85rem);
+  color: var(--text-primary);
+  line-height: 1.2;
+}
+
+.profile-title {
+  margin: 0 0 0.65rem;
+  color: var(--text-secondary);
+  font-size: 1rem;
+}
+
+.profile-block {
+  margin-bottom: 1rem;
+}
+
+.profile-block h2 {
+  margin: 0 0 0.65rem;
+  font-size: 1.05rem;
+  color: var(--text-primary);
+}
+
+.profile-block-body {
+  margin: 0;
+  color: var(--text-secondary);
+  line-height: 1.55;
+  font-size: 0.98rem;
+}
+
+.profile-block-body.pre-wrap {
+  white-space: pre-wrap;
+}
+
+.profile-block-meta {
+  margin: 0.5rem 0 0;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}
+
+.profile-chip-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.profile-chip-list li {
+  padding: 0.35rem 0.75rem;
+  border-radius: 999px;
+  background: rgba(46, 125, 50, 0.12);
+  color: var(--primary-light, var(--primary-color));
+  font-size: 0.85rem;
+  font-weight: 600;
+  border: 1px solid rgba(46, 125, 50, 0.22);
+}
+
+.profile-trust-note {
+  margin-top: 0.25rem;
+  color: var(--text-secondary);
+}
+
+.booking-side-card {
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
+  gap: 1rem;
+  background:
+    linear-gradient(180deg, rgba(46, 125, 50, 0.12), transparent 40%),
+    var(--surface-color);
+  border-color: rgba(46, 125, 50, 0.28);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.12);
+}
+
+.booking-side-card h2 {
+  margin: 0;
+  font-size: 1.2rem;
+  color: var(--text-primary);
+}
+
+.booking-side-row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.booking-side-label {
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--secondary-light, var(--secondary-color));
+}
+
+.booking-side-price {
+  font-size: 1.35rem;
+  color: var(--text-primary);
+}
+
+.booking-side-body {
+  margin: 0;
+  color: var(--text-secondary);
+  line-height: 1.45;
+  font-size: 0.95rem;
+}
+
+.booking-side-muted {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 0.92rem;
+  line-height: 1.45;
+}
+
+.booking-side-cta {
+  text-align: center;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 @media (max-width: 900px) {
@@ -312,6 +502,16 @@
   .doctor-card-actions .btn {
     flex: 1;
     text-align: center;
+  }
+
+  .profile-header-card {
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+  }
+
+  .profile-header-text .doctor-badges {
+    justify-content: center;
   }
 }
 
