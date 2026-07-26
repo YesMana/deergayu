@@ -45,6 +45,8 @@ const DEFAULT_SETTINGS = {
   },
   // P0-B2 payment foundation — appointment payments OFF until Dialog Pay approval
   appointmentPaymentsEnabled: false,
+  /** P1-C controlled specialty catalog (admin may override). */
+  providerSpecialtyCatalog: null,
   slotHoldMinutes: 10,
   providerPayoutHoldHours: 24,
   settlementCadence: 'WEEKLY',

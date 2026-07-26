@@ -16,13 +16,21 @@ import {
   isDisplayableText,
   providerPublicPath,
 } from '../utils/doctorUtils';
+import { normalizeQualifications, normalizeLanguages } from '../utils/providerProfileCompletion';
 import './PublicPages.css';
 
 function formatLanguages(languages) {
-  if (Array.isArray(languages)) {
-    return languages.map(cleanDisplayText).filter(Boolean).join(', ');
-  }
-  return cleanDisplayText(languages);
+  const list = normalizeLanguages(languages);
+  return list.join(', ');
+}
+
+function formatQualificationLine(q) {
+  if (!q?.qualificationName) return '';
+  const bits = [q.qualificationName];
+  if (q.institution) bits.push(q.institution);
+  if (q.country) bits.push(q.country);
+  if (q.year != null && String(q.year).trim() !== '') bits.push(String(q.year));
+  return bits.join(' · ');
 }
 
 const DoctorProfile = () => {
@@ -79,7 +87,7 @@ const DoctorProfile = () => {
   const initial = name[0].toUpperCase();
   const professionalTitle = getProviderTitle(provider);
   const bio = cleanDisplayText(pd.bio);
-  const qualifications = cleanDisplayText(pd.qualifications);
+  const qualificationList = normalizeQualifications(pd.qualifications);
   const registration = cleanDisplayText(pd.registrationNumber);
   const languages = formatLanguages(pd.languages);
   // Structured professional location only — never free-text address (may be personal)
@@ -170,11 +178,15 @@ const DoctorProfile = () => {
               </section>
             )}
 
-            {(isDisplayableText(qualifications) || isDisplayableText(registration)) && (
+            {(qualificationList.length > 0 || isDisplayableText(registration)) && (
               <section className="profile-block">
                 <h2>Qualifications</h2>
-                {isDisplayableText(qualifications) && (
-                  <p className="profile-block-body pre-wrap">{qualifications}</p>
+                {qualificationList.length > 0 && (
+                  <ul className="profile-chip-list">
+                    {qualificationList.map((q) => (
+                      <li key={formatQualificationLine(q)}>{formatQualificationLine(q)}</li>
+                    ))}
+                  </ul>
                 )}
                 {isDisplayableText(registration) && (
                   <p className="profile-block-meta">Registration: {registration}</p>
@@ -217,14 +229,16 @@ const DoctorProfile = () => {
               </section>
             )}
 
-            <section className="profile-block">
-              <h2>Consultation</h2>
-              <ul className="profile-chip-list">
-                {types.map((t) => (
-                  <li key={t}>{consultationTypeLabel(t)}</li>
-                ))}
-              </ul>
-            </section>
+            {types.length > 0 && (
+              <section className="profile-block">
+                <h2>Consultation</h2>
+                <ul className="profile-chip-list">
+                  {types.map((t) => (
+                    <li key={t}>{consultationTypeLabel(t)}</li>
+                  ))}
+                </ul>
+              </section>
+            )}
 
             {availText && (
               <section className="profile-block">

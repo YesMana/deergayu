@@ -15,6 +15,12 @@ const {
   consultationTypesFromProfile,
   specialtiesFromProfile,
 } = require('./availability');
+const {
+  publicSpecialtiesFromProfile,
+  normalizeQualifications,
+  normalizeLanguages,
+  cleanText,
+} = require('./providerProfile');
 
 /** Intentionally public professional profile fields (excludes free-text personal address). */
 const PUBLIC_PROFILE_KEYS = [
@@ -32,6 +38,7 @@ const PUBLIC_PROFILE_KEYS = [
   'title',
   'qualifications',
   'registrationNumber',
+  'yearsOfExperience',
   'offersInPerson',
   'offersVideo',
   'offersAudio',
@@ -46,6 +53,26 @@ function pickPublicProfileDetails(pd = {}, { includeSchedule = false } = {}) {
   const out = {};
   for (const key of PUBLIC_PROFILE_KEYS) {
     if (src[key] !== undefined) out[key] = src[key];
+  }
+  // Normalize structured arrays for public display; hide empty junk
+  if (out.qualifications !== undefined) {
+    out.qualifications = normalizeQualifications(out.qualifications);
+    if (!out.qualifications.length) delete out.qualifications;
+  }
+  if (out.languages !== undefined) {
+    out.languages = normalizeLanguages(out.languages);
+    if (!out.languages.length) delete out.languages;
+  }
+  if (out.registrationNumber !== undefined && !cleanText(out.registrationNumber)) {
+    delete out.registrationNumber;
+  }
+  if (out.bio !== undefined && !cleanText(out.bio)) delete out.bio;
+  if (out.title !== undefined && !cleanText(out.title)) delete out.title;
+  // Public specialty: trusted labels only — never promote suspicious junk
+  if (out.specialty !== undefined) {
+    const trusted = publicSpecialtiesFromProfile({ specialty: out.specialty });
+    if (trusted.length) out.specialty = trusted;
+    else delete out.specialty;
   }
   if (includeSchedule && src.schedule) {
     out.hasSchedule = hasRealSchedule(src.schedule);
@@ -84,7 +111,9 @@ function toPublicProvider(id, data = {}, opts = {}) {
     rating: Number(data.rating) || 0,
     reviewCount: Number(data.reviewCount) || 0,
     consultationTypes: consultationTypesFromProfile(pd),
-    specialties: specialtiesFromProfile(pd),
+    // Trusted public specialty labels only — suspicious junk omitted from this array
+    specialties: publicSpecialtiesFromProfile(pd),
+    // Raw specialty kept in profileDetails for admin/legacy; may include needs-cleanup values
     locationSummary: locationSummary(pd) || null,
   };
   if (opts.availabilitySummary) {
@@ -107,4 +136,6 @@ module.exports = {
   locationSummary,
   toPublicProvider,
   buildAvailabilitySummary,
+  // re-export for tests
+  specialtiesFromProfile,
 };

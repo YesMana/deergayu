@@ -55,6 +55,8 @@ const SAFE_PROFILE_DETAIL_FIELDS = [
   'offersAudio',
   'videoConsultation',
   'consultationModes',
+  'specialtyIds',
+  'yearsOfExperience',
 ];
 
 /** Settings safe for anonymous / storefront clients. */
@@ -149,6 +151,18 @@ function sanitizeSelfProfileUpdate(body = {}, existingProfileDetails = {}) {
       if (Object.prototype.hasOwnProperty.call(incoming, key)) {
         next[key] = incoming[key];
       }
+    }
+    // Normalize structured arrays when provided
+    if (Object.prototype.hasOwnProperty.call(incoming, 'qualifications')) {
+      const { normalizeQualifications } = require('./providerProfile');
+      next.qualifications = normalizeQualifications(incoming.qualifications);
+    }
+    if (Object.prototype.hasOwnProperty.call(incoming, 'languages')) {
+      const { normalizeLanguages } = require('./providerProfile');
+      next.languages = normalizeLanguages(incoming.languages);
+    }
+    if (Object.prototype.hasOwnProperty.call(incoming, 'registrationNumber')) {
+      next.registrationNumber = String(incoming.registrationNumber || '').trim();
     }
     // Never allow privilege-like keys inside profileDetails
     for (const bad of PRIVILEGED_USER_FIELDS) {

@@ -152,38 +152,35 @@ function providerHasAvailabilityOnDate(schedule, dateStr, bookedSlots = [], now 
   return free.length > 0;
 }
 
-/** Consultation types from profile flags — same semantics as frontend. */
+/**
+ * Consultation types from profile flags — same semantics as frontend.
+ * Never invents video/audio. Legacy profiles without explicit flags → in_person only.
+ * When provider/admin set explicit flags, only selected types are returned (may be empty).
+ */
 function consultationTypesFromProfile(profileDetails = {}) {
   const pd = profileDetails || {};
+  const modes = Array.isArray(pd.consultationModes) ? pd.consultationModes : [];
+  const explicit =
+    typeof pd.offersInPerson === 'boolean' ||
+    pd.offersVideo === true ||
+    pd.offersAudio === true ||
+    pd.videoConsultation === true ||
+    modes.length > 0;
   const types = [];
-  if (pd.offersInPerson !== false) types.push('in_person');
-  if (pd.offersVideo === true || pd.videoConsultation === true || pd.consultationModes?.includes?.('video')) {
-    types.push('video');
+  if (explicit) {
+    if (pd.offersInPerson === true || modes.includes('in_person')) types.push('in_person');
+    if (pd.offersVideo === true || pd.videoConsultation === true || modes.includes('video')) {
+      types.push('video');
+    }
+    if (pd.offersAudio === true || modes.includes('audio')) types.push('audio');
+    return types;
   }
-  if (pd.offersAudio === true || pd.consultationModes?.includes?.('audio')) {
-    types.push('audio');
-  }
-  if (!types.length) types.push('in_person');
-  return types;
+  return ['in_person'];
 }
 
 function specialtiesFromProfile(profileDetails = {}) {
-  const raw = profileDetails?.specialty;
-  let list = [];
-  if (Array.isArray(raw)) list = raw.map(String);
-  else if (typeof raw === 'string' && raw.trim()) {
-    list = raw.split(/[,|/]/).map((x) => x.trim());
-  }
-  const seen = new Set();
-  return list
-    .map((s) => String(s).trim().replace(/\s+/g, ' '))
-    .filter(Boolean)
-    .filter((s) => {
-      const k = s.toLowerCase();
-      if (seen.has(k)) return false;
-      seen.add(k);
-      return true;
-    });
+  const { publicSpecialtiesFromProfile } = require('./providerProfile');
+  return publicSpecialtiesFromProfile(profileDetails || {});
 }
 
 /** Run async mapper with bounded concurrency. */
