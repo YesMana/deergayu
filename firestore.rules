@@ -38,7 +38,7 @@ service cloud.firestore {
     function privilegedUserKeys() {
       return ['role', 'status', 'isAdmin', 'admin', 'approvalStatus', 'verificationStatus',
               'commission', 'commissionPercent', 'permissions', 'createdBy', 'approvedBy',
-              'rejectedBy', 'adminEmails'];
+              'rejectedBy', 'adminEmails', 'publicSlug', 'slugHistory'];
     }
 
     function userCreateKeysSafe() {
@@ -198,6 +198,24 @@ service cloud.firestore {
 
     match /counters/{id} {
       allow read, write: if false;
+    }
+
+    // ---------- P1-B facilities (API-owned writes; public read active only) ----------
+    match /facilities/{id} {
+      allow read: if resource.data.status == 'active' || isAdmin();
+      allow create, update, delete: if false;
+    }
+
+    match /facilityAffiliations/{id} {
+      allow read: if isAdmin()
+                  || (signedIn() && resource.data.providerId == request.auth.uid)
+                  || (resource.data.status == 'active');
+      allow create, update, delete: if false;
+    }
+
+    match /providerSlugs/{slug} {
+      allow read: if true;
+      allow create, update, delete: if false;
     }
 
     // Default deny

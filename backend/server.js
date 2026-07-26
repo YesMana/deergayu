@@ -39,6 +39,36 @@ const {
 } = require('./guideImages');
 const { registerFinanceRoutes } = require('./finance/routes');
 const { nextOrderReference } = require('./finance/references');
+const { ensureProviderSlug, resolveProviderIdBySlugOrId } = require('./providerSlugs');
+const {
+  generateDaySlots,
+  freeSlots,
+  filterBookableSlots,
+  todayColomboDateString,
+  providerHasAvailabilityOnDate,
+  consultationTypesFromProfile,
+  specialtiesFromProfile,
+  hasRealSchedule,
+  mapPool,
+} = require('./availability');
+const { parseCanonicalDate } = require('./finance/time');
+const { toPublicProvider, buildAvailabilitySummary } = require('./providerPublic');
+const {
+  FACILITY_TYPES,
+  FACILITY_STATUSES,
+  sanitizeFacilityInput,
+  sanitizeAffiliationConsultationTypes,
+  validateAffiliationCreate,
+  toPublicFacility,
+  toAdminFacility,
+  slugifyFacilityName,
+  ensureUniqueFacilitySlug,
+  toPublicAffiliation,
+} = require('./facilities');
+
+/** Short-term guards for date-filter N+1 appointment queries (see P1-B review). */
+const PROVIDER_LIST_HARD_LIMIT = 100;
+const AVAILABILITY_APPT_CONCURRENCY = 8;
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 const multer = require('multer');
 
@@ -327,15 +357,51 @@ apiRouter.get('/sitemap-data', async (req, res) => {
       id: d.id,
       updatedAt: d.data().updatedAt || d.data().createdAt || null,
     }));
+    const providerSnap = await db.collection('users')
+      .where('role', 'in', ['doctor', 'clinic', 'organization'])
+      .where('status', '==', 'approved')
+      .limit(500)
+      .get();
+    // Side-effect free: never generate slugs on sitemap read (use UID until backfill)
+    const doctors = providerSnap.docs.map((doc) => {
+      const data = doc.data() || {};
+      return {
+        id: doc.id,
+        slug: data.publicSlug || doc.id,
+        updatedAt: data.updatedAt || data.createdAt || null,
+      };
+    });
+
+    const facilitySnap = await db.collection('facilities').where('status', '==', 'active').limit(500).get();
+    const facilities = facilitySnap.docs.map((d) => {
+      const data = d.data() || {};
+      return {
+        id: d.id,
+        slug: data.slug || d.id,
+        type: data.type || 'clinic',
+        updatedAt: data.updatedAt || data.createdAt || null,
+      };
+    });
+
+    const staticPaths = [
+      '/', '/shop', '/doctors', '/specialties', '/channeling', '/ayurveda',
+      '/online-consultation', '/about', '/faq', '/join-as-doctor', '/join-as-clinic',
+      '/ayurvedic-guide', '/videos', '/astrology',
+      '/contact', '/privacy', '/terms', '/refund-policy',
+    ];
+    if (facilities.some((f) => f.type === 'clinic' || f.type === 'ayurveda_centre' || f.type === 'wellness_centre')) {
+      staticPaths.push('/clinics');
+    }
+    if (facilities.some((f) => f.type === 'hospital')) {
+      staticPaths.push('/hospitals');
+    }
+
     res.json({
       baseUrl: 'https://deergayu.com',
-      static: [
-        '/', '/shop', '/doctors', '/specialties', '/channeling', '/ayurveda',
-        '/online-consultation', '/about', '/faq', '/join-as-doctor', '/join-as-clinic',
-        '/ayurvedic-guide', '/videos', '/astrology',
-        '/contact', '/privacy', '/terms', '/refund-policy',
-      ],
+      static: staticPaths,
       products,
+      doctors,
+      facilities,
     });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -509,7 +575,25 @@ apiRouter.put('/me/profile', verifyUser, async (req, res) => {
     }
     updates.updatedAt = new Date().toISOString();
     await ref.set(updates, { merge: true });
-    const next = (await ref.get()).data();
+    let next = (await ref.get()).data() || {};
+    // Safe path B: approved provider onboarding/profile completion may mint slug once
+    if (
+      isProviderRole(next.role) &&
+      isApprovedProviderStatus(next.status) &&
+      !next.publicSlug
+    ) {
+      try {
+        await ensureProviderSlug(db, {
+          providerId: uid,
+          name: next.name,
+          role: next.role,
+          existingSlug: next.publicSlug,
+        });
+        next = (await ref.get()).data() || next;
+      } catch (e) {
+        console.error('slug ensure on profile update failed:', e.message);
+      }
+    }
     res.json({ message: 'Profile updated', user: { id: uid, ...next } });
   } catch (error) {
     console.error('me/profile error:', error);
@@ -825,21 +909,8 @@ apiRouter.get('/featured-providers', async (req, res) => {
       .where('status', '==', 'approved')
       .limit(6)
       .get();
-    const providers = snapshot.docs.map(doc => {
-      const data = doc.data();
-      const pd = data.profileDetails || {};
-      const { telephone, ...publicProfile } = pd;
-      return {
-        id: doc.id,
-        name: data.name,
-        role: data.role,
-        status: data.status || 'approved',
-        profileDetails: publicProfile,
-        // Real ratings only — never invent a 4.5 floor for public UI
-        rating: Number(data.rating) || 0,
-        reviewCount: Number(data.reviewCount) || 0
-      };
-    });
+    // Side-effect free: do not write slugs on public featured read
+    const providers = snapshot.docs.map((doc) => toPublicProvider(doc.id, doc.data() || {}));
     res.json(providers);
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -1131,6 +1202,22 @@ apiRouter.post('/users/:uid/status', verifyAdmin, async (req, res) => {
 
   try {
     await db.collection('users').doc(uid).set({ status }, { merge: true });
+    if (status === 'approved') {
+      const snap = await db.collection('users').doc(uid).get();
+      const data = snap.data() || {};
+      if (['doctor', 'clinic', 'organization'].includes(String(data.role || ''))) {
+        try {
+          await ensureProviderSlug(db, {
+            providerId: uid,
+            name: data.name,
+            role: data.role,
+            existingSlug: data.publicSlug,
+          });
+        } catch (e) {
+          console.error('slug ensure on approve failed:', e.message);
+        }
+      }
+    }
     res.json({ message: 'User status updated successfully' });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -2031,30 +2118,365 @@ apiRouter.post('/vendor/appointments/:id/status', requireApprovedProvider, async
 // USER ROUTES
 // ============================================================
 
-// Get approved providers/doctors (public - for Channeling page)
+// Get approved providers/doctors (public directory)
+// Query: q, specialty, type (consultation), date (YYYY-MM-DD Colombo), district, city, facility
+// Side-effect free: never writes slugs or mutates provider docs.
 apiRouter.get('/providers', async (req, res) => {
   try {
+    const q = String(req.query.q || '').trim().toLowerCase();
+    const specialty = String(req.query.specialty || '').trim().toLowerCase();
+    const consultType = String(req.query.type || req.query.consultationType || '').trim();
+    const date = String(req.query.date || '').trim();
+    const district = String(req.query.district || '').trim().toLowerCase();
+    const city = String(req.query.city || '').trim().toLowerCase();
+    const facilityId = String(req.query.facility || '').trim();
+    const includeNext = String(req.query.includeNext || '1') !== '0';
+
     const snapshot = await db.collection('users')
       .where('role', 'in', ['doctor', 'clinic', 'organization'])
       .where('status', '==', 'approved')
       .get();
-    const providers = snapshot.docs.map(doc => {
-      const data = doc.data();
-      // Public DTO: include status so UI can label "Deergayu Approved" accurately.
-      // Endpoint already filters status==approved. Do not expose payout/finance fields.
+
+    let facilityProviderIds = null;
+    if (facilityId) {
+      // Only active affiliations to active facilities
+      const fdoc = await db.collection('facilities').doc(facilityId).get();
+      if (!fdoc.exists || fdoc.data()?.status !== 'active') {
+        return res.json([]);
+      }
+      const aff = await db.collection('facilityAffiliations')
+        .where('facilityId', '==', facilityId)
+        .where('status', '==', 'active')
+        .get();
+      facilityProviderIds = new Set(aff.docs.map((d) => d.data().providerId).filter(Boolean));
+    }
+
+    const fromDate = todayColomboDateString();
+    const now = new Date();
+
+    // Reject past date filters (Asia/Colombo) — no bookable slots remain
+    if (date) {
+      const parsed = parseCanonicalDate(date);
+      if (!parsed.ok) {
+        return res.status(400).json({ error: parsed.error });
+      }
+      if (parsed.date < fromDate) {
+        return res.json([]);
+      }
+    }
+
+    // Pass 1: cheap filters BEFORE appointment queries (avoids N+1 for excluded providers)
+    const candidates = [];
+    for (const doc of snapshot.docs) {
+      const data = doc.data() || {};
+      if (facilityProviderIds && !facilityProviderIds.has(doc.id)) continue;
+
       const pd = data.profileDetails || {};
-      const { telephone, ...publicProfile } = pd;
-      return {
-        id: doc.id,
-        name: data.name,
-        role: data.role,
-        status: data.status || 'approved',
-        profileDetails: publicProfile,
-        rating: data.rating || 0,
-        reviewCount: data.reviewCount || 0
-      };
-    });
+      const specs = specialtiesFromProfile(pd);
+      const types = consultationTypesFromProfile(pd);
+
+      if (q) {
+        const hay = `${data.name || ''} ${specs.join(' ')}`.toLowerCase();
+        if (!hay.includes(q)) continue;
+      }
+      if (specialty && specialty !== 'all') {
+        if (!specs.some((s) => s.toLowerCase() === specialty || s.toLowerCase().includes(specialty))) {
+          continue;
+        }
+      }
+      if (consultType && consultType !== 'all') {
+        if (!types.includes(consultType)) continue;
+      }
+      // District/city: structured fields only (do not match personal free-text address)
+      if (district) {
+        const d = String(pd.district || '').toLowerCase();
+        if (!d.includes(district)) continue;
+      }
+      if (city) {
+        const c = String(pd.city || '').toLowerCase();
+        if (!c.includes(city)) continue;
+      }
+      if (date && !hasRealSchedule(pd.schedule)) continue;
+
+      candidates.push({ doc, data, pd });
+    }
+
+    let selected = candidates;
+    if (date) {
+      // Pass 2: bounded-concurrency appointment occupancy checks (N+1 short-term guard)
+      const checked = await mapPool(
+        candidates,
+        AVAILABILITY_APPT_CONCURRENCY,
+        async ({ doc, data, pd }) => {
+          const appts = await db.collection('appointments')
+            .where('providerId', '==', doc.id)
+            .where('date', '==', date)
+            .where('status', 'in', ['pending', 'accepted'])
+            .get();
+          const bookedForDate = appts.docs.map((a) => a.data().time);
+          if (!providerHasAvailabilityOnDate(pd.schedule, date, bookedForDate, now)) {
+            return null;
+          }
+          const gen = generateDaySlots(pd.schedule, date);
+          const free = filterBookableSlots(date, freeSlots(gen.allSlots, bookedForDate), now);
+          return {
+            doc,
+            data,
+            availabilitySummary: {
+              nextDate: date,
+              nextTime: free[0] || null,
+              freeCount: free.length,
+              sample: free.slice(0, 4),
+            },
+          };
+        }
+      );
+      selected = checked.filter(Boolean);
+    }
+
+    const providers = [];
+    for (const item of selected.slice(0, PROVIDER_LIST_HARD_LIMIT)) {
+      const { doc, data } = item;
+      let availabilitySummary = item.availabilitySummary || null;
+      if (!date && includeNext && hasRealSchedule((data.profileDetails || {}).schedule)) {
+        availabilitySummary = buildAvailabilitySummary(
+          data.profileDetails.schedule,
+          {},
+          fromDate
+        );
+      }
+      providers.push(toPublicProvider(doc.id, data, { availabilitySummary }));
+    }
+
     res.json(providers);
+  } catch (error) {
+    console.error('GET /providers error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Single provider by Firebase UID or publicSlug (legacy ID URLs remain valid)
+// Side-effect free: does not mint slugs; UID works before backfill.
+apiRouter.get('/providers/:idOrSlug', async (req, res) => {
+  try {
+    const resolved = await resolveProviderIdBySlugOrId(db, req.params.idOrSlug);
+    if (!resolved) return res.status(404).json({ error: 'Provider not found' });
+    const { id, data } = resolved;
+    if (!['doctor', 'clinic', 'organization'].includes(String(data.role || ''))) {
+      return res.status(404).json({ error: 'Provider not found' });
+    }
+    if (String(data.status || '') !== 'approved') {
+      return res.status(404).json({ error: 'Provider not found' });
+    }
+
+    const slug = data.publicSlug || null;
+    const fromDate = todayColomboDateString();
+    const pd = data.profileDetails || {};
+    let availabilitySummary = null;
+    if (hasRealSchedule(pd.schedule)) {
+      availabilitySummary = buildAvailabilitySummary(pd.schedule, {}, fromDate);
+    }
+
+    // Affiliations (public active facilities only)
+    const affSnap = await db.collection('facilityAffiliations')
+      .where('providerId', '==', id)
+      .where('status', '==', 'active')
+      .get();
+    const affiliations = [];
+    for (const a of affSnap.docs) {
+      const ad = a.data() || {};
+      let facilityPublic = null;
+      if (ad.facilityId) {
+        const fdoc = await db.collection('facilities').doc(ad.facilityId).get();
+        if (fdoc.exists) facilityPublic = toPublicFacility(fdoc.id, fdoc.data());
+      }
+      const pub = toPublicAffiliation(a.id, ad, facilityPublic);
+      if (pub) affiliations.push(pub);
+    }
+
+    const dto = toPublicProvider(id, data, { availabilitySummary, affiliations });
+    // Legacy ID request → advertise canonical slug for redirects (no write)
+    if (resolved.via === 'id' && slug && req.params.idOrSlug !== slug) {
+      dto.canonicalSlug = slug;
+    }
+    res.json(dto);
+  } catch (error) {
+    console.error('GET /providers/:idOrSlug error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ---------- Facilities (P1-B foundation) ----------
+apiRouter.get('/facilities', async (req, res) => {
+  try {
+    const type = String(req.query.type || '').trim();
+    let query = db.collection('facilities').where('status', '==', 'active');
+    const snap = await query.limit(200).get();
+    let list = snap.docs
+      .map((d) => toPublicFacility(d.id, d.data()))
+      .filter(Boolean);
+    if (type && FACILITY_TYPES.includes(type)) {
+      list = list.filter((f) => f.type === type);
+    }
+    // Convenience groups
+    if (req.query.group === 'clinics') {
+      list = list.filter((f) => ['clinic', 'ayurveda_centre', 'wellness_centre'].includes(f.type));
+    }
+    if (req.query.group === 'hospitals') {
+      list = list.filter((f) => f.type === 'hospital');
+    }
+    res.json(list);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+apiRouter.get('/facilities/:slugOrId', async (req, res) => {
+  try {
+    const key = String(req.params.slugOrId || '').trim();
+    let doc = await db.collection('facilities').doc(key).get();
+    if (!doc.exists) {
+      const q = await db.collection('facilities').where('slug', '==', key.toLowerCase()).limit(1).get();
+      if (q.empty) return res.status(404).json({ error: 'Facility not found' });
+      doc = q.docs[0];
+    }
+    const pub = toPublicFacility(doc.id, doc.data());
+    if (!pub) return res.status(404).json({ error: 'Facility not found' });
+
+    const aff = await db.collection('facilityAffiliations')
+      .where('facilityId', '==', doc.id)
+      .where('status', '==', 'active')
+      .get();
+    const providers = [];
+    for (const a of aff.docs) {
+      const providerId = a.data().providerId;
+      if (!providerId) continue;
+      const u = await db.collection('users').doc(providerId).get();
+      if (!u.exists || u.data().status !== 'approved') continue;
+      providers.push(toPublicProvider(u.id, u.data()));
+    }
+    res.json({ ...pub, providers });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+apiRouter.get('/admin/facilities', verifyAdmin, async (req, res) => {
+  try {
+    const snap = await db.collection('facilities').limit(500).get();
+    const list = snap.docs.map((d) => toAdminFacility(d.id, d.data()));
+    res.json(list);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+apiRouter.post('/admin/facilities', verifyAdmin, async (req, res) => {
+  try {
+    const input = sanitizeFacilityInput(req.body || {});
+    if (!input.name) return res.status(400).json({ error: 'name is required' });
+    if (!input.type) return res.status(400).json({ error: `type must be one of ${FACILITY_TYPES.join(', ')}` });
+    if (input.status === null) {
+      return res.status(400).json({ error: `status must be one of ${FACILITY_STATUSES.join(', ')}` });
+    }
+    const baseSlug = slugifyFacilityName(input.name);
+    const slug = await ensureUniqueFacilitySlug(db, baseSlug);
+    const now = new Date().toISOString();
+    const payload = {
+      ...input,
+      slug,
+      status: input.status || 'draft',
+      createdAt: now,
+      updatedAt: now,
+    };
+    const ref = await db.collection('facilities').add(payload);
+    res.status(201).json(toAdminFacility(ref.id, payload));
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+apiRouter.patch('/admin/facilities/:id', verifyAdmin, async (req, res) => {
+  try {
+    const ref = db.collection('facilities').doc(req.params.id);
+    const snap = await ref.get();
+    if (!snap.exists) return res.status(404).json({ error: 'Facility not found' });
+    const input = sanitizeFacilityInput(req.body || {}, { partial: true });
+    if (input.type === null) return res.status(400).json({ error: 'Invalid facility type' });
+    if (input.status === null) {
+      return res.status(400).json({ error: `status must be one of ${FACILITY_STATUSES.join(', ')}` });
+    }
+    // Never accept adminNotes / internal audit fields from body blindly
+    delete input.adminNotes;
+    delete input.internalNotes;
+    delete input.createdAt;
+    const updates = { ...input, updatedAt: new Date().toISOString() };
+    // Do not auto-rename slug on edit (stable SEO); allow explicit slug only if unused
+    if (req.body?.slug) {
+      const wanted = slugifyFacilityName(req.body.slug);
+      updates.slug = await ensureUniqueFacilitySlug(db, wanted, req.params.id);
+    }
+    await ref.set(updates, { merge: true });
+    const next = (await ref.get()).data();
+    res.json(toAdminFacility(ref.id, next));
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+apiRouter.post('/admin/facilities/:id/affiliations', verifyAdmin, async (req, res) => {
+  try {
+    const facilityId = req.params.id;
+    const providerId = String(req.body?.providerId || '').trim();
+    const result = await validateAffiliationCreate(db, {
+      facilityId,
+      providerId,
+      consultationTypes: req.body?.consultationTypes,
+      status: req.body?.status,
+      consultationTypesFromProfile,
+    });
+    if (!result.ok) return res.status(result.status).json({ error: result.error });
+    const ref = await db.collection('facilityAffiliations').add(result.payload);
+    res.status(201).json({ id: ref.id, ...result.payload });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+apiRouter.patch('/admin/facility-affiliations/:id', verifyAdmin, async (req, res) => {
+  try {
+    const ref = db.collection('facilityAffiliations').doc(req.params.id);
+    const snap = await ref.get();
+    if (!snap.exists) return res.status(404).json({ error: 'Affiliation not found' });
+    const updates = { updatedAt: new Date().toISOString() };
+    if (req.body?.status === 'active' || req.body?.status === 'inactive') {
+      updates.status = req.body.status;
+    } else if (req.body?.status !== undefined) {
+      return res.status(400).json({ error: 'status must be active or inactive' });
+    }
+    if (Array.isArray(req.body?.consultationTypes)) {
+      const types = sanitizeAffiliationConsultationTypes(req.body.consultationTypes);
+      if (!types) {
+        return res.status(400).json({ error: 'Invalid consultationTypes' });
+      }
+      updates.consultationTypes = types;
+    }
+    if (updates.status === 'active') {
+      const cur = snap.data() || {};
+      const facilityId = cur.facilityId;
+      const providerId = cur.providerId;
+      const dup = await db.collection('facilityAffiliations')
+        .where('facilityId', '==', facilityId)
+        .where('providerId', '==', providerId)
+        .where('status', '==', 'active')
+        .get();
+      const other = dup.docs.find((d) => d.id !== ref.id);
+      if (other) {
+        return res.status(409).json({ error: 'Active affiliation already exists for this provider and facility' });
+      }
+    }
+    await ref.set(updates, { merge: true });
+    res.json({ id: ref.id, ...snap.data(), ...updates });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -2537,71 +2959,49 @@ apiRouter.post('/vendor/schedule', requireProvider, async (req, res) => {
   }
 });
 
-// Get available slots for a provider on a specific date
+// Get available slots for a provider on a specific date (Asia/Colombo weekday; honors active=false)
+// Does not invent a default Mon–Fri schedule when provider has none configured.
 apiRouter.get('/appointments/available/:providerId', async (req, res) => {
   const { providerId } = req.params;
-  const { date } = req.query; // YYYY-MM-DD
-  
-  if (!date) return res.status(400).json({ error: "Date query param required" });
+  const { date } = req.query; // YYYY-MM-DD (Colombo civil date)
+
+  if (!date) return res.status(400).json({ error: 'Date query param required' });
 
   try {
-    // 1. Get Provider Schedule
-    const providerDoc = await db.collection('users').doc(providerId).get();
-    if (!providerDoc.exists) return res.status(404).json({ error: "Provider not found" });
-    
+    const resolved = await resolveProviderIdBySlugOrId(db, providerId);
+    const uid = resolved?.id || providerId;
+    const providerDoc = await db.collection('users').doc(uid).get();
+    if (!providerDoc.exists) return res.status(404).json({ error: 'Provider not found' });
+
     const profile = providerDoc.data().profileDetails || {};
-    const schedule = profile.schedule || {
-      slotDuration: 30,
-      workingDays: {
-        "Monday": { start: "09:00", end: "17:00" },
-        "Tuesday": { start: "09:00", end: "17:00" },
-        "Wednesday": { start: "09:00", end: "17:00" },
-        "Thursday": { start: "09:00", end: "17:00" },
-        "Friday": { start: "09:00", end: "17:00" },
-      },
-      unavailableDates: []
-    };
+    const schedule = profile.schedule;
 
-    // Check if date is unavailable
-    if (schedule.unavailableDates && schedule.unavailableDates.includes(date)) {
-      return res.json({ allSlots: [], bookedSlots: [] });
+    if (!hasRealSchedule(schedule)) {
+      return res.json({
+        allSlots: [],
+        bookedSlots: [],
+        businessTimezone: 'Asia/Colombo',
+        reason: 'NO_SCHEDULE',
+      });
     }
 
-    const dayOfWeek = new Date(date).toLocaleDateString('en-US', { weekday: 'long' });
-    const workingDay = schedule.workingDays ? schedule.workingDays[dayOfWeek] : null;
+    const gen = generateDaySlots(schedule, date);
+    if (!gen.ok) return res.status(400).json({ error: gen.error });
 
-    if (!workingDay || !workingDay.start || !workingDay.end) {
-      return res.json({ allSlots: [], bookedSlots: [] });
-    }
-
-    // 2. Fetch existing appointments for this provider on this date
     const apptsSnapshot = await db.collection('appointments')
-      .where('providerId', '==', providerId)
+      .where('providerId', '==', uid)
       .where('date', '==', date)
       .where('status', 'in', ['pending', 'accepted'])
       .get();
-      
-    const bookedSlots = apptsSnapshot.docs.map(doc => doc.data().time);
 
-    // 3. Generate slots
-    const availableSlots = [];
-    const [startH, startM] = workingDay.start.split(':').map(Number);
-    const [endH, endM] = workingDay.end.split(':').map(Number);
-    
-    let currentMins = startH * 60 + startM;
-    const endMins = endH * 60 + endM;
-    const slotDuration = Number(schedule.slotDuration) || 30;
+    const bookedSlots = apptsSnapshot.docs.map((doc) => doc.data().time);
 
-    while (currentMins + slotDuration <= endMins) {
-      const h = Math.floor(currentMins / 60).toString().padStart(2, '0');
-      const m = (currentMins % 60).toString().padStart(2, '0');
-      const timeString = `${h}:${m}`;
-      
-      availableSlots.push(timeString);
-      currentMins += slotDuration;
-    }
-
-    res.json({ allSlots: availableSlots, bookedSlots });
+    res.json({
+      allSlots: gen.allSlots,
+      bookedSlots,
+      businessTimezone: 'Asia/Colombo',
+      dayName: gen.dayName || null,
+    });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

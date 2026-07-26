@@ -5,6 +5,7 @@ import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
 import React, { useState, useEffect, useRef } from 'react';
+import { API_URL } from '../config/api';
 import './Navbar.css';
 
 const Navbar = () => {
@@ -17,6 +18,8 @@ const Navbar = () => {
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
+  const [showClinicsNav, setShowClinicsNav] = useState(false);
+  const [showHospitalsNav, setShowHospitalsNav] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
   const userMenuRef = useRef(null);
@@ -26,6 +29,37 @@ const Navbar = () => {
     setIsMobileMenuOpen(false);
     setIsUserMenuOpen(false);
     setMoreOpen(false);
+  }, [location.pathname]);
+
+  // P1-B: hide empty facility directories; refresh on navigation so activate/deactivate is not stale
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(`${API_URL}/api/facilities`);
+        if (!res.ok) {
+          if (!cancelled) {
+            setShowClinicsNav(false);
+            setShowHospitalsNav(false);
+          }
+          return;
+        }
+        const list = await res.json();
+        if (cancelled || !Array.isArray(list)) return;
+        setShowClinicsNav(
+          list.some((f) => ['clinic', 'ayurveda_centre', 'wellness_centre'].includes(f.type))
+        );
+        setShowHospitalsNav(list.some((f) => f.type === 'hospital'));
+      } catch {
+        if (!cancelled) {
+          setShowClinicsNav(false);
+          setShowHospitalsNav(false);
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, [location.pathname]);
 
   useEffect(() => {
@@ -98,9 +132,16 @@ const Navbar = () => {
   const profilePic = user?.profileDetails?.profileImageUrl;
   const path = location.pathname;
 
-  const moreActive = ['/specialties', '/channeling', '/videos', '/astrology', '/faq', '/join-as-doctor'].some(
-    (p) => path.startsWith(p)
-  );
+  const moreActive = [
+    '/specialties',
+    '/channeling',
+    '/videos',
+    '/astrology',
+    '/faq',
+    '/join-as-doctor',
+    '/clinics',
+    '/hospitals',
+  ].some((p) => path.startsWith(p));
 
   return (
     <nav className={`navbar ${scrolled ? 'scrolled' : ''}`} aria-label="Main">
@@ -168,6 +209,16 @@ const Navbar = () => {
                 <Link to="/specialties" role="menuitem">
                   Specialties
                 </Link>
+                {showClinicsNav && (
+                  <Link to="/clinics" role="menuitem">
+                    Clinics
+                  </Link>
+                )}
+                {showHospitalsNav && (
+                  <Link to="/hospitals" role="menuitem">
+                    Hospitals
+                  </Link>
+                )}
                 <Link to="/channeling" role="menuitem">
                   Book / Channel
                 </Link>
@@ -317,6 +368,8 @@ const Navbar = () => {
           <li><Link to="/contact">Contact</Link></li>
           <li><Link to="/channeling">Book / Channel a Doctor</Link></li>
           <li><Link to="/specialties">Specialties</Link></li>
+          {showClinicsNav && <li><Link to="/clinics">Clinics</Link></li>}
+          {showHospitalsNav && <li><Link to="/hospitals">Hospitals</Link></li>}
           <li><Link to="/faq">FAQ</Link></li>
           <li><Link to="/join-as-doctor">Join as Doctor</Link></li>
           <li className="mobile-nav-secondary"><Link to="/videos">Videos</Link></li>

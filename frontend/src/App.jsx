@@ -21,6 +21,14 @@ const ProductDetail = lazy(() => import('./pages/ProductDetail'));
 const Channeling = lazy(() => import('./pages/Channeling'));
 const Doctors = lazy(() => import('./pages/Doctors'));
 const DoctorProfile = lazy(() => import('./pages/DoctorProfile'));
+const Clinics = lazy(() => import('./pages/Facilities').then((m) => ({ default: m.Clinics })));
+const ClinicProfile = lazy(() =>
+  import('./pages/Facilities').then((m) => ({ default: m.ClinicProfile }))
+);
+const Hospitals = lazy(() => import('./pages/Facilities').then((m) => ({ default: m.Hospitals })));
+const HospitalProfile = lazy(() =>
+  import('./pages/Facilities').then((m) => ({ default: m.HospitalProfile }))
+);
 const Specialties = lazy(() => import('./pages/Specialties'));
 const Ayurveda = lazy(() => import('./pages/Ayurveda'));
 const OnlineConsultation = lazy(() => import('./pages/OnlineConsultation'));
@@ -62,6 +70,10 @@ function AppShell() {
             <Route path="/product/:id" element={<ProductDetail />} />
             <Route path="/doctors" element={<Doctors />} />
             <Route path="/doctors/:id" element={<DoctorProfile />} />
+            <Route path="/clinics" element={<Clinics />} />
+            <Route path="/clinics/:slug" element={<ClinicProfile />} />
+            <Route path="/hospitals" element={<Hospitals />} />
+            <Route path="/hospitals/:slug" element={<HospitalProfile />} />
             <Route path="/specialties" element={<Specialties />} />
             <Route path="/specialties/:slug" element={<Specialties />} />
             <Route path="/channeling" element={<Channeling />} />
