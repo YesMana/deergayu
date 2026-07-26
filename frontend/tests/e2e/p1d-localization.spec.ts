@@ -67,7 +67,7 @@ test.describe('P1-D EN/SI/TA localization', () => {
 
   test('toggle language updates UI without losing route', async ({ page }) => {
     await gotoWithLang(page, '/doctors', 'en');
-    await page.getByRole('button', { name: /switch language/i }).click();
+    await page.locator('button.lang-btn').click();
     await expect(page.locator('html')).toHaveAttribute('lang', 'si');
     await expect(page).toHaveURL(/\/doctors/);
     await expect(page.locator('body')).toContainText('Deergayu අනුමත');
