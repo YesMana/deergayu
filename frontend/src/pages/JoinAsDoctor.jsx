@@ -1,35 +1,34 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import SEO from '../components/SEO';
+import { useLanguage } from '../context/LanguageContext';
 import './PublicPages.css';
 
-const JoinAsDoctor = () => (
-  <div className="pub-page animate-fade-in">
-    <SEO
-      title="Join as a Doctor | Deergayu"
-      description="Register as a healthcare provider on Deergayu. Free registration at launch, no monthly subscription — commercial terms agreed per provider."
-      url="https://deergayu.com/join-as-doctor"
-      canonical="https://deergayu.com/join-as-doctor"
-    />
-    <section className="pub-hero">
-      <div className="container">
-        <h1>Join Deergayu as a doctor</h1>
-        <p className="pub-si">නොමිලේ ලියාපදිංචිය — දියුණුවට එක්වන්න</p>
-        <p className="pub-lead">
-          Free registration. No monthly subscription at launch. Deergayu earns when successful
-          consultations and bookings occur. Consultation pricing and provider payout are agreed and
-          configured per provider — not a single universal contract for everyone.
-        </p>
-        <div className="pub-actions">
-          <Link to="/login?mode=signup&role=doctor" className="btn btn-primary">
-            Create provider account
-          </Link>
-          <Link to="/contact" className="btn btn-outline">
-            Ask a question
-          </Link>
+const JoinAsDoctor = () => {
+  const { t } = useLanguage();
+
+  return (
+    <div className="pub-page animate-fade-in">
+      <SEO
+        title={`${t('jad_title')} | Deergayu`}
+        description={t('jad_subtitle')}
+        url="https://deergayu.com/join-as-doctor"
+        canonical="https://deergayu.com/join-as-doctor"
+      />
+      <section className="pub-hero">
+        <div className="container">
+          <h1>{t('jad_title')}</h1>
+          <p className="pub-lead">{t('jad_subtitle')}</p>
+          <div className="pub-actions">
+            <Link to="/login?mode=signup&role=doctor" className="btn btn-primary">
+              {t('jad_cta_register')}
+            </Link>
+            <Link to="/contact" className="btn btn-outline">
+              {t('jad_cta_question')}
+            </Link>
+          </div>
         </div>
-      </div>
-    </section>
+      </section>
 
     <section className="pub-section">
       <div className="container">
@@ -96,6 +95,7 @@ const JoinAsDoctor = () => (
       </div>
     </section>
   </div>
-);
+  );
+};
 
 export default JoinAsDoctor;

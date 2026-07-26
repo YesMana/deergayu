@@ -98,6 +98,34 @@ body {
   overflow-x: hidden;
 }
 
+html[lang="si"], html[lang="ta"],
+body.lang-si, body.lang-ta {
+  line-height: 1.65;
+}
+
+.btn, .nav-link, .doctor-badge,
+body.lang-si .nav-cta,
+body.lang-ta .nav-cta {
+  line-height: 1.45;
+  white-space: normal;
+}
+
+/* Longer SI/TA labels: prefer hamburger earlier to avoid desktop wrap */
+@media (max-width: 1280px) {
+  body.lang-si .desktop-only,
+  body.lang-ta .desktop-only {
+    display: none !important;
+  }
+  body.lang-si .mobile-menu-btn,
+  body.lang-ta .mobile-menu-btn {
+    display: flex !important;
+  }
+  body.lang-si .mobile-menu,
+  body.lang-ta .mobile-menu {
+    display: block;
+  }
+}
+
 :root[data-theme='light'] body {
   background-image:
     radial-gradient(ellipse 80% 50% at 50% -10%, rgba(46, 125, 50, 0.08), transparent 55%),
@@ -267,7 +295,6 @@ button {
   cursor: pointer;
   border: none;
   font-family: var(--font-body);
-  white-space: nowrap;
   position: relative;
   overflow: hidden;
 }

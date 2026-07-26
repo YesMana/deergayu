@@ -2,8 +2,10 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { RefreshCw } from 'lucide-react';
 import { auth } from '../../firebase';
 import { useToast } from '../../context/ToastContext';
+import { useLanguage } from '../../context/LanguageContext';
 import { useProvidersQuery } from '../../hooks/queries/useProviders';
 import { API_URL } from '../../config/api';
+import { localizeConsultationType } from '../../i18n/catalogLabels';
 
 const TYPES = ['in_person', 'video', 'audio'];
 
@@ -22,6 +24,7 @@ function num(v) {
 }
 
 export default function ManageCommercialTerms() {
+  const { t } = useLanguage();
   const { success, error } = useToast();
   const { data: providers = [], isLoading: loadingProviders, refetch: refetchProviders } =
     useProvidersQuery();
@@ -109,13 +112,13 @@ export default function ManageCommercialTerms() {
       };
     }
     if (equationOk) {
-      return { text: '✓ Equation balanced', color: 'var(--primary-color)' };
+      return { text: `✓ ${t('admin_equation_balanced')}`, color: 'var(--primary-color)' };
     }
     return {
       text: '✗ Invalid split: consultationFee must equal providerPayout + platformGross + facilityFee',
       color: '#c62828',
     };
-  }, [requiredMoneyComplete, equationOk]);
+  }, [requiredMoneyComplete, equationOk, t]);
 
   const fillSuggested = () => {
     const t = defaults?.suggestedAdminFormTemplate;
@@ -199,19 +202,19 @@ export default function ManageCommercialTerms() {
     <div className="admin-section animate-fade-in">
       <div className="admin-page-header" style={{ marginBottom: '1.25rem' }}>
         <div>
-          <h1 style={{ fontSize: '1.45rem', margin: 0 }}>Commercial Terms</h1>
+          <h1 style={{ fontSize: '1.45rem', margin: 0 }}>{t('admin_commercial_terms')}</h1>
           <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', margin: '0.35rem 0 0' }}>
             Equation: consultationFee = providerPayout + platformGross + facilityFee. Fields are
             required explicitly — defaults are never saved silently.
           </p>
         </div>
         <button type="button" className="btn btn-outline btn-sm" onClick={() => refetchProviders()}>
-          <RefreshCw size={14} /> Refresh providers
+          <RefreshCw size={14} /> {t('admin_refresh_providers')}
         </button>
       </div>
 
       <div className="glass-panel" style={{ padding: '1.25rem', marginBottom: '1rem' }}>
-        <label htmlFor="ct-provider">Provider</label>
+        <label htmlFor="ct-provider">{t('admin_provider')}</label>
         <select
           id="ct-provider"
           value={providerId}
@@ -219,7 +222,7 @@ export default function ManageCommercialTerms() {
           disabled={loadingProviders}
           style={{ width: '100%', minHeight: 44, marginTop: 6 }}
         >
-          <option value="">Select provider…</option>
+          <option value="">{t('admin_provider')}...</option>
           {approvedProviders.map((p) => (
             <option key={p.id} value={p.id}>
               {p.name || p.email} ({p.role}) — {p.status || 'n/a'}
@@ -230,21 +233,21 @@ export default function ManageCommercialTerms() {
 
       {providerId && (
         <div className="glass-panel" style={{ padding: '1.25rem', marginBottom: '1rem' }}>
-          <h3 style={{ marginTop: 0 }}>Configured types</h3>
+          <h3 style={{ marginTop: 0 }}>{t('vd_consultation_types')}</h3>
           {loadingTerms ? (
-            <p>Loading…</p>
+            <p>{t('common_loading')}</p>
           ) : (
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
-              {TYPES.map((t) => {
-                const term = terms?.types?.[t];
+              {TYPES.map((type) => {
+                const term = terms?.types?.[type];
                 return (
                   <button
-                    key={t}
+                    key={type}
                     type="button"
                     className="btn btn-outline btn-sm"
-                    onClick={() => loadTypeIntoForm(t)}
+                    onClick={() => loadTypeIntoForm(type)}
                   >
-                    {t}
+                    {localizeConsultationType(type, t)}
                     {term
                       ? ` · LKR ${Number(term.consultationPrice || 0).toLocaleString()}${
                           term.active === false ? ' (off)' : ''
@@ -267,22 +270,22 @@ export default function ManageCommercialTerms() {
           }}
         >
           <div>
-            <label htmlFor="ct-type">Consultation type</label>
+            <label htmlFor="ct-type">{t('vd_consultation_types')}</label>
             <select
               id="ct-type"
               value={form.consultationType}
               onChange={(e) => setForm((p) => ({ ...p, consultationType: e.target.value }))}
               style={{ width: '100%', minHeight: 44, marginTop: 4 }}
             >
-              {TYPES.map((t) => (
-                <option key={t} value={t}>
-                  {t}
+              {TYPES.map((type) => (
+                <option key={type} value={type}>
+                  {localizeConsultationType(type, t)}
                 </option>
               ))}
             </select>
           </div>
           <div>
-            <label htmlFor="ct-fee">Patient price (consultationFee)</label>
+            <label htmlFor="ct-fee">{t('vd_patient_price')}</label>
             <input
               id="ct-fee"
               type="number"
@@ -295,7 +298,7 @@ export default function ManageCommercialTerms() {
             />
           </div>
           <div>
-            <label htmlFor="ct-payout">Provider payout</label>
+            <label htmlFor="ct-payout">{t('vd_your_payout')}</label>
             <input
               id="ct-payout"
               type="number"
@@ -308,7 +311,7 @@ export default function ManageCommercialTerms() {
             />
           </div>
           <div>
-            <label htmlFor="ct-gross">Deergayu gross</label>
+            <label htmlFor="ct-gross">{t('vd_deergayu_gross')}</label>
             <input
               id="ct-gross"
               type="number"
@@ -321,7 +324,7 @@ export default function ManageCommercialTerms() {
             />
           </div>
           <div>
-            <label htmlFor="ct-facility">Facility fee</label>
+            <label htmlFor="ct-facility">{t('vd_facility_fee')}</label>
             <input
               id="ct-facility"
               type="number"
@@ -374,7 +377,7 @@ export default function ManageCommercialTerms() {
               userSelect: 'none',
             }}
           >
-            Active for this consultation type
+            {t('common_active')}
           </span>
         </label>
 
@@ -391,7 +394,7 @@ export default function ManageCommercialTerms() {
 
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.65rem', marginTop: '1rem' }}>
           <button type="submit" className="btn btn-primary" disabled={saving || !canSave}>
-            {saving ? 'Saving…' : 'Save terms'}
+            {saving ? `${t('common_save')}...` : t('common_save')}
           </button>
           <button type="button" className="btn btn-outline" onClick={fillSuggested}>
             Fill suggested template (review before save)

@@ -2,6 +2,8 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import SEO from '../components/SEO';
+import { useLanguage } from '../context/LanguageContext';
+import { localizeSpecialty } from '../i18n/catalogLabels';
 import { API_URL } from '../config/api';
 import {
   collectSpecialtiesFromProviders,
@@ -18,6 +20,7 @@ import {
 import './PublicPages.css';
 
 const Doctors = () => {
+  const { t, lang } = useLanguage();
   const [searchParams, setSearchParams] = useSearchParams();
   const [nameQ, setNameQ] = useState(searchParams.get('q') || '');
   const [specialty, setSpecialty] = useState(searchParams.get('specialty') || 'all');
@@ -138,25 +141,22 @@ const Doctors = () => {
   return (
     <div className="pub-page animate-fade-in">
       <SEO
-        title="Find a Doctor | Deergayu"
-        description="Find approved doctors and healthcare providers on Deergayu. Filter by name, specialty, consultation type, and real availability date."
+        title={t('doc_seo_title')}
+        description={t('doc_seo_desc')}
         url="https://deergayu.com/doctors"
         canonical="https://deergayu.com/doctors"
       />
       <section className="pub-hero">
         <div className="container">
-          <h1>Find a Doctor</h1>
-          <p className="pub-si">ඔබේ වෛද්‍යවරයා සොයා ගන්න</p>
-          <p className="pub-lead">
-            Browse approved providers on Deergayu. Date filter uses real schedule data only — no fake
-            availability.
-          </p>
+          <h1>{t('doc_title')}</h1>
+          {lang === 'si' && <p className="pub-si">ඔබේ වෛද්‍යවරයා සොයා ගන්න</p>}
+          <p className="pub-lead">{t('doc_subtitle')}</p>
           <div className="pub-actions">
             <Link to="/channeling" className="btn btn-outline">
-              Book / Channel a Doctor
+              {t('home_book_channel')}
             </Link>
             <Link to="/specialties" className="btn btn-outline">
-              Browse specialties
+              {t('home_specialties_title')}
             </Link>
           </div>
         </div>
@@ -164,47 +164,47 @@ const Doctors = () => {
 
       <section className="pub-section">
         <div className="container">
-          <div className="doctor-filters doctor-filters-4" role="search" aria-label="Filter doctors">
+          <div className="doctor-filters doctor-filters-4" role="search" aria-label={t('doc_title')}>
             <label className="sr-only" htmlFor="doc-name">
-              Doctor name
+              {t('home_doctor_name')}
             </label>
             <input
               id="doc-name"
               type="search"
-              placeholder="Search by name or specialty"
+              placeholder={t('doc_search_ph')}
               value={nameQ}
               onChange={(e) => setNameQ(e.target.value)}
             />
             <label className="sr-only" htmlFor="doc-specialty">
-              Specialty
+              {t('home_specialty')}
             </label>
             <select
               id="doc-specialty"
               value={specialty}
               onChange={(e) => setSpecialty(e.target.value)}
             >
-              <option value="all">All specialties</option>
+              <option value="all">{t('doc_all_specialties')}</option>
               {specialties.map((s) => (
                 <option key={s} value={s}>
-                  {s}
+                  {localizeSpecialty(s, t)}
                 </option>
               ))}
             </select>
             <label className="sr-only" htmlFor="doc-type">
-              Consultation type
+              {t('home_consult_type')}
             </label>
             <select
               id="doc-type"
               value={consultType}
               onChange={(e) => setConsultType(e.target.value)}
             >
-              <option value="all">All consultation types</option>
-              <option value="in_person">In person</option>
-              <option value="video">Video</option>
-              <option value="audio">Audio</option>
+              <option value="all">{t('doc_all_consult')}</option>
+              <option value="in_person">{consultationTypeLabel('in_person', t)}</option>
+              <option value="video">{consultationTypeLabel('video', t)}</option>
+              <option value="audio">{consultationTypeLabel('audio', t)}</option>
             </select>
             <label className="sr-only" htmlFor="doc-date">
-              Available on date
+              {t('doc_date')}
             </label>
             <input
               id="doc-date"
@@ -212,19 +212,19 @@ const Doctors = () => {
               value={dateFilter}
               min={new Date().toISOString().split('T')[0]}
               onChange={(e) => setDateFilter(e.target.value)}
-              title="Show providers with real open slots on this date (Asia/Colombo)"
+              title={t('doc_date')}
             />
             {showDistrictFilter && (
               <select
                 id="doc-district"
                 value={district}
                 onChange={(e) => setDistrict(e.target.value)}
-                aria-label="District"
+                aria-label={t('doc_all_districts')}
               >
-                <option value="all">All districts</option>
+                <option value="all">{t('doc_all_districts')}</option>
                 {districtOptions.map((d) => (
                   <option key={d} value={d}>
-                    {d}
+                    {t(d)}
                   </option>
                 ))}
               </select>
@@ -234,9 +234,9 @@ const Doctors = () => {
                 id="doc-city"
                 value={city}
                 onChange={(e) => setCity(e.target.value)}
-                aria-label="City"
+                aria-label={t('vd_city')}
               >
-                <option value="all">All cities</option>
+                <option value="all">{t('common_all')} {t('vd_city')}</option>
                 {cityOptions.map((c) => (
                   <option key={c} value={c}>
                     {c}
@@ -249,9 +249,9 @@ const Doctors = () => {
                 id="doc-facility"
                 value={facilityId}
                 onChange={(e) => setFacilityId(e.target.value)}
-                aria-label="Facility"
+                aria-label={t('doc_facility')}
               >
-                <option value="all">All facilities</option>
+                <option value="all">{t('common_all')} {t('doc_facility')}</option>
                 {activeFacilities.map((f) => (
                   <option key={f.id} value={f.id}>
                     {f.name}
@@ -262,28 +262,27 @@ const Doctors = () => {
           </div>
           {dateFilter && (
             <p className="pub-note" style={{ marginTop: '-0.5rem', marginBottom: '1rem' }}>
-              Showing providers with open slots on <strong>{dateFilter}</strong> (Asia/Colombo).{' '}
+              {t('doc_date')}: <strong>{dateFilter}</strong>.{' '}
               <button type="button" className="btn btn-outline btn-sm" onClick={() => setDateFilter('')}>
-                Clear date
+                {t('doc_clear_filters')}
               </button>
             </p>
           )}
 
-          {isLoading && <div className="pub-loading">Loading doctors…</div>}
+          {isLoading && <div className="pub-loading">{t('doc_loading')}</div>}
           {isError && (
             <div className="pub-error">
-              Could not load doctors.{' '}
+              {t('doc_error')}{' '}
               <button type="button" className="btn btn-outline btn-sm" onClick={() => refetch()}>
-                Retry
+                {t('common_retry')}
               </button>
             </div>
           )}
           {!isLoading && !isError && providers.length === 0 && (
             <div className="pub-empty">
-              {dateFilter
-                ? 'No providers have open slots on that date. Try another day or clear the date filter.'
-                : 'No doctors match your filters. Try another specialty or '}
-              {!dateFilter && <Link to="/contact">contact support</Link>}
+              {dateFilter ? t('doc_empty_date') : t('doc_empty')}
+              {!dateFilter && ' '}
+              {!dateFilter && <Link to="/contact">{t('doc_contact_support')}</Link>}
               {!dateFilter && '.'}
             </div>
           )}
@@ -295,31 +294,33 @@ const Doctors = () => {
               const pic = p.profileDetails?.profileImageUrl;
               const price = prices[p.id];
               const initial = (p.name || 'D')[0].toUpperCase();
-              const avail = formatAvailabilitySummary(p.availabilitySummary);
+              const avail = formatAvailabilitySummary(p.availabilitySummary, t);
               const path = providerPublicPath(p);
               return (
                 <article key={p.id} className="doctor-card">
                   <div className="doctor-card-top">
                     {pic ? (
-                      <img src={pic} alt={p.name || 'Doctor'} className="doctor-avatar" />
+                      <img src={pic} alt={p.name || t('dp_crumb_doctors')} className="doctor-avatar" />
                     ) : (
                       <div className="doctor-avatar-fallback" aria-hidden>
                         {initial}
                       </div>
                     )}
                     <div>
-                      <h3>{p.name || 'Provider'}</h3>
+                      <h3>{p.name || t('dp_crumb_doctors')}</h3>
                       <div className="doctor-meta">{getProviderTitle(p)}</div>
                       <div className="doctor-meta">
-                        {specs.length ? specs.slice(0, 2).join(' · ') : 'Specialty not listed'}
+                        {specs.length
+                          ? specs.slice(0, 2).map((s) => localizeSpecialty(s, t)).join(' · ')
+                          : t('doc_specialty_not_listed')}
                       </div>
                       <div className="doctor-badges">
                         {isApprovedProvider(p) && (
-                          <span className="doctor-badge verified">Deergayu Approved</span>
+                          <span className="doctor-badge verified">{t('badge_deergayu_approved')}</span>
                         )}
-                        {types.map((t) => (
-                          <span key={t} className="doctor-badge muted">
-                            {consultationTypeLabel(t)}
+                        {types.map((type) => (
+                          <span key={type} className="doctor-badge muted">
+                            {consultationTypeLabel(type, t)}
                           </span>
                         ))}
                       </div>
@@ -331,21 +332,21 @@ const Doctors = () => {
                   {avail && <div className="doctor-meta doctor-avail">{avail}</div>}
                   {price ? (
                     <div className="doctor-meta">
-                      Consultation from {price.currency}{' '}
+                      {t('dp_consultation_price')} {t('doc_price_from')} {price.currency}{' '}
                       {Number(price.consultationPrice).toLocaleString()}
                     </div>
                   ) : (
-                    <div className="doctor-meta">Consultation fee: see booking / profile</div>
+                    <div className="doctor-meta">{t('dp_availability_note')}</div>
                   )}
                   <div className="doctor-card-actions">
                     <Link to={path} className="btn btn-outline btn-sm">
-                      View profile
+                      {t('doc_view_profile')}
                     </Link>
                     <Link
                       to={`/channeling?book=${encodeURIComponent(p.id)}`}
                       className="btn btn-primary btn-sm"
                     >
-                      Book
+                      {t('dp_book')}
                     </Link>
                   </div>
                 </article>

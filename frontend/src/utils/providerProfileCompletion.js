@@ -128,20 +128,86 @@ function hasExplicitConsultationChoice(pd = {}) {
 }
 
 const REQUIRED = [
-  { key: 'name', label: 'Provider name', action: 'Add display name' },
-  { key: 'title', label: 'Professional title / type', action: 'Add professional title' },
-  { key: 'specialty', label: 'Specialty', action: 'Add specialty' },
-  { key: 'bio', label: 'Professional bio', action: 'Add professional bio' },
-  { key: 'consultationTypes', label: 'Consultation type', action: 'Set consultation type' },
-  { key: 'schedule', label: 'Schedule', action: 'Set schedule' },
-  { key: 'location', label: 'District / city', action: 'Add city or district' },
+  {
+    key: 'name',
+    label: 'Provider name',
+    labelKey: 'vd_display_name',
+    action: 'Add display name',
+    actionKey: 'pc_add_display_name',
+  },
+  {
+    key: 'title',
+    label: 'Professional title / type',
+    labelKey: 'vd_professional_title',
+    action: 'Add professional title',
+    actionKey: 'pc_add_title',
+  },
+  {
+    key: 'specialty',
+    label: 'Specialty',
+    labelKey: 'vd_specialties_label',
+    action: 'Add specialty',
+    actionKey: 'pc_add_specialty',
+  },
+  {
+    key: 'bio',
+    label: 'Professional bio',
+    labelKey: 'vd_bio',
+    action: 'Add professional bio',
+    actionKey: 'pc_add_bio',
+  },
+  {
+    key: 'consultationTypes',
+    label: 'Consultation type',
+    labelKey: 'vd_consultation_types',
+    action: 'Set consultation type',
+    actionKey: 'pc_set_consult',
+  },
+  {
+    key: 'schedule',
+    label: 'Schedule',
+    labelKey: 'vd_schedule',
+    action: 'Set schedule',
+    actionKey: 'pc_set_schedule',
+  },
+  {
+    key: 'location',
+    label: 'District / city',
+    labelKey: 'vd_district',
+    action: 'Add city or district',
+    actionKey: 'pc_add_location',
+  },
 ];
 
 const RECOMMENDED = [
-  { key: 'photo', label: 'Profile photo', action: 'Add profile photo' },
-  { key: 'qualifications', label: 'Qualifications', action: 'Add qualification' },
-  { key: 'registrationNumber', label: 'Registration number', action: 'Add registration number' },
-  { key: 'languages', label: 'Languages', action: 'Add languages' },
+  {
+    key: 'photo',
+    label: 'Profile photo',
+    labelKey: 'pc_add_photo',
+    action: 'Add profile photo',
+    actionKey: 'pc_add_photo',
+  },
+  {
+    key: 'qualifications',
+    label: 'Qualifications',
+    labelKey: 'vd_qualifications',
+    action: 'Add qualification',
+    actionKey: 'pc_add_qualification',
+  },
+  {
+    key: 'registrationNumber',
+    label: 'Registration number',
+    labelKey: 'vd_registration',
+    action: 'Add registration number',
+    actionKey: 'pc_add_registration',
+  },
+  {
+    key: 'languages',
+    label: 'Languages',
+    labelKey: 'vd_languages',
+    action: 'Add languages',
+    actionKey: 'pc_add_languages',
+  },
 ];
 
 export function computeProfileCompletion(user = {}) {

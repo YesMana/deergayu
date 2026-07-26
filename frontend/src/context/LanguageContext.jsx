@@ -1,232 +1,51 @@
-import React, { createContext, useState, useContext } from 'react';
-
-const translations = {
-  en: {
-    nav_home: "Home",
-    nav_shop: "Ayurvedic Shop",
-    nav_channeling: "Channeling",
-    nav_symptoms: "Symptom Checker",
-    nav_videos: "Videos",
-    nav_astrology: "Yanthra Manthra",
-    nav_admin: "Admin Dashboard",
-    nav_login: "Login",
-    hero_title: "Discover Ancient Healing with",
-    hero_subtitle: "Your trusted platform for authentic Ayurvedic medicines, expert doctor channeling, and profound astrological guidance.",
-    btn_shop: "Shop Medicines",
-    btn_book: "Book Appointment",
-    services_title: "Our Services",
-    srv_shop_title: "Ayurvedic Shop",
-    srv_shop_desc: "Authentic and verified Ayurvedic medicines delivered to your doorstep.",
-    srv_shop_link: "Browse Products",
-    srv_doc_title: "Doctor Channeling",
-    srv_doc_desc: "Consult with Sri Lanka's top Ayurvedic physicians online or in-person.",
-    srv_doc_link: "Find Doctors",
-    srv_astro_title: "Astrology & Yantra",
-    srv_astro_desc: "Connect with expert astrologers for guidance, yantra, and mantra services.",
-    srv_astro_link: "Consult Astrologers",
-    ch_title: "Find Your Healer",
-    ch_subtitle: "Book appointments with Sri Lanka's finest Ayurvedic Doctors and Astrologers.",
-    ch_tab_all: "All Experts",
-    ch_tab_doc: "Ayurvedic Doctors",
-    ch_tab_astro: "Astrologers",
-    ch_search: "Search by name or specialty...",
-    ch_all_prov: "All Provinces",
-    ch_all_dist: "All Districts",
-    ch_all_spec: "All Specialties",
-    ch_no_results: "No providers found matching your criteria. Try adjusting your filters.",
-    ch_btn_video: "Video Consult",
-    ch_btn_book: "Book Visit",
-    "Horoscope Reading": "Horoscope Reading",
-    "Yanthra Preparation": "Yanthra Preparation",
-    "Auspicious Times": "Auspicious Times",
-    "Vasthu Vidya": "Vasthu Vidya"
-  },
-  si: {
-    nav_home: "මුල් පිටුව",
-    nav_shop: "ආයුර්වේද ඔසුසල",
-    nav_channeling: "චැනලින් සේවා",
-    nav_symptoms: "රෝග ලක්ෂණ පරීක්ෂාව",
-    nav_videos: "වීඩියෝ දර්ශන",
-    nav_astrology: "යන්ත්‍ර මන්ත්‍ර",
-    nav_admin: "පරිපාලන පැනලය",
-    nav_login: "ඇතුල් වන්න",
-    hero_title: "පෞරාණික ආයුර්වේද සුවය අත්විඳින්න",
-    hero_subtitle: "විශ්වාසවන්ත ආයුර්වේද ඖෂධ, ප්‍රවීණ වෛද්‍යවරුන් චැනල් කිරීම සහ ජ්‍යොතිෂ්‍ය සේවා සඳහා ඔබේ විශ්වාසවන්ත වේදිකාව.",
-    btn_shop: "ඖෂධ මිලදී ගන්න",
-    btn_book: "වෙලාවක් වෙන්කරගන්න",
-    services_title: "අපගේ සේවාවන්",
-    srv_shop_title: "ආයුර්වේද ඔසුසල",
-    srv_shop_desc: "උසස්ම තත්ත්වයේ, පිරිසිදු ආයුර්වේද ඖෂධ නිවසටම ගෙන්වා ගන්න.",
-    srv_shop_link: "ඖෂධ බලන්න",
-    srv_doc_title: "වෛද්‍ය චැනලින්",
-    srv_doc_desc: "ශ්‍රී ලංකාවේ ප්‍රවීණතම ආයුර්වේද වෛද්‍යවරුන් මාර්ගගතව හෝ ඍජුවම හමුවන්න.",
-    srv_doc_link: "වෛද්‍යවරුන් සොයන්න",
-    srv_astro_title: "ජ්‍යොතිෂ්‍ය හා යන්ත්‍ර මන්ත්‍ර",
-    srv_astro_desc: "ඔබේ ජීවිතයේ ගැටළු වලට ප්‍රවීණ ජ්‍යොතිෂ්‍යවේදීන්ගෙන් නිවැරදි විසඳුම් ලබාගන්න.",
-    srv_astro_link: "සේවාවන් ලබාගන්න",
-    ch_title: "ඔබේ වෛද්‍යවරයා සොයාගන්න",
-    ch_subtitle: "ශ්‍රී ලංකාවේ ප්‍රවීණතම ආයුර්වේද වෛද්‍යවරුන් සහ ජ්‍යොතිෂ්‍යවේදීන් හමුවීමට වෙලාවක් වෙන්කරගන්න.",
-    ch_tab_all: "සියලුම ප්‍රවීණයන්",
-    ch_tab_doc: "ආයුර්වේද වෛද්‍යවරුන්",
-    ch_tab_astro: "ජ්‍යොතිෂ්‍යවේදීන්",
-    ch_search: "නමින් හෝ රෝග අංශයෙන් සොයන්න...",
-    ch_all_prov: "සියලුම පළාත්",
-    ch_all_dist: "සියලුම දිස්ත්‍රික්ක",
-    ch_all_spec: "සියලුම රෝග අංශ",
-    ch_no_results: "ඔබ සෙවූ තොරතුරු වලට ගැලපෙන අය නොමැත. වෙනත් විස්තරයක් ඇතුළත් කර බලන්න.",
-    ch_btn_video: "වීඩියෝ ඇමතුම්",
-    ch_btn_book: "හමුවන්න",
-    "Western": "බස්නාහිර",
-    "Central": "මධ්‍යම",
-    "Southern": "දකුණු",
-    "Northern": "උතුරු",
-    "Eastern": "නැගෙනහිර",
-    "North Western": "වයඹ",
-    "North Central": "උතුරු මැද",
-    "Uva": "ඌව",
-    "Sabaragamuwa": "සබරගමුව",
-    "Colombo": "කොළඹ",
-    "Gampaha": "ගම්පහ",
-    "Kalutara": "කළුතර",
-    "Kandy": "මහනුවර",
-    "Matale": "මාතලේ",
-    "Nuwara Eliya": "නුවරඑළිය",
-    "Galle": "ගාල්ල",
-    "Matara": "මාතර",
-    "Hambantota": "හම්බන්තොට",
-    "Jaffna": "යාපනය",
-    "Kilinochchi": "කිලිනොච්චිය",
-    "Mannar": "මන්නාරම",
-    "Mullaitivu": "මුලතිව්",
-    "Vavuniya": "වවුනියාව",
-    "Trincomalee": "ත්‍රිකුණාමලය",
-    "Batticaloa": "මඩකලපුව",
-    "Ampara": "අම්පාර",
-    "Kurunegala": "කුරුණෑගල",
-    "Puttalam": "පුත්තලම",
-    "Anuradhapura": "අනුරාධපුරය",
-    "Polonnaruwa": "පොළොන්නරුව",
-    "Badulla": "බදුල්ල",
-    "Monaragala": "මොණරාගල",
-    "Ratnapura": "රත්නපුර",
-    "Kegalle": "කෑගල්ල",
-    "Online": "මාර්ගගත (Online)",
-    "Sarwanga Roga (General)": "සර්වාංග රෝග (සාමාන්‍ය)",
-    "Kadum Bindum (Orthopedic)": "කැඩුම් බිඳුම්",
-    "Sarpa Visha (Toxicology)": "සර්ප විෂ",
-    "Yantra & Mantra": "යන්ත්‍ර මන්ත්‍ර",
-    "Vastu Shastra": "වාස්තු විද්‍යාව",
-    "Horoscope Reading": "කේන්දර පරීක්ෂාව",
-    "Yanthra Preparation": "යන්ත්‍ර පැළඳවීම",
-    "Auspicious Times": "නැකැත් සෑදීම",
-    "Vasthu Vidya": "වාස්තු විද්‍යාව"
-  },
-  ta: {
-    nav_home: "முகப்பு",
-    nav_shop: "ஆயுர்வேத கடை",
-    nav_channeling: "மருத்துவர் ஆலோசனை",
-    nav_symptoms: "அறிகுறி சோதனையாளர்",
-    nav_videos: "காணொளிகள்",
-    nav_astrology: "யந்திரம் மற்றும் மந்திரம்",
-    nav_admin: "நிர்வாக குழு",
-    nav_login: "உள்நுழைக",
-    hero_title: "பண்டைய குணப்படுத்தும் முறையை கண்டறியுங்கள்",
-    hero_subtitle: "உண்மையான ஆயுர்வேத மருந்துகள், சிறந்த மருத்துவர் ஆலோசனை மற்றும் ஜோதிட வழிகாட்டுதலுக்கான உங்கள் நம்பகமான தளம்.",
-    btn_shop: "மருந்துகள் வாங்குங்கள்",
-    btn_book: "நேரத்தை பதிவு செய்யுங்கள்",
-    services_title: "எங்கள் சேவைகள்",
-    srv_shop_title: "ஆயுர்வேத கடை",
-    srv_shop_desc: "உயர்தர மற்றும் உண்மையான ஆயுர்வேத மருந்துகள் உங்கள் வீட்டு வாசலில்.",
-    srv_shop_link: "தயாரிப்புகளைக் காண்க",
-    srv_doc_title: "மருத்துவர் ஆலோசனை",
-    srv_doc_desc: "இலங்கையின் சிறந்த ஆயுர்வேத மருத்துவர்களுடன் ஆன்லைனில் அல்லது நேரில் ஆலோசனை பெறுங்கள்.",
-    srv_doc_link: "மருத்துவர்களை தேடுங்கள்",
-    srv_astro_title: "ஜோதிடம் & யந்திரம்",
-    srv_astro_desc: "ஜோதிடர்களுடன் தொடர்புகொண்டு வழிகாட்டுதல் மற்றும் யந்திர சேவைகளை பெறுங்கள்.",
-    srv_astro_link: "சேவைகளை பெறுங்கள்",
-    ch_title: "உங்கள் மருத்துவரை கண்டறியுங்கள்",
-    ch_subtitle: "இலங்கையின் சிறந்த ஆயுர்வேத மருத்துவர்கள் மற்றும் ஜோதிடர்களுடன் சந்திப்புகளை பதிவு செய்யவும்.",
-    ch_tab_all: "அனைத்து வல்லுநர்கள்",
-    ch_tab_doc: "ஆயுர்வேத மருத்துவர்கள்",
-    ch_tab_astro: "ஜோதிடர்கள்",
-    ch_search: "பெயர் அல்லது சிறப்பு மூலம் தேடவும்...",
-    ch_all_prov: "அனைத்து மாகாணங்கள்",
-    ch_all_dist: "அனைத்து மாவட்டங்கள்",
-    ch_all_spec: "அனைத்து சிறப்புகள்",
-    ch_no_results: "உங்கள் தேடலுக்கு எந்த தகவலும் கிடைக்கவில்லை.",
-    ch_btn_video: "வீடியோ ஆலோசனை",
-    ch_btn_book: "பார்வை பதிவு",
-    "Western": "மேல்",
-    "Central": "மத்திய",
-    "Southern": "தென்",
-    "Northern": "வடக்கு",
-    "Eastern": "கிழக்கு",
-    "North Western": "வடமேல்",
-    "North Central": "வடமத்திய",
-    "Uva": "ஊவா",
-    "Sabaragamuwa": "சபரகமுவ",
-    "Colombo": "கொழும்பு",
-    "Gampaha": "கம்பஹா",
-    "Kalutara": "களுத்துறை",
-    "Kandy": "கண்டி",
-    "Matale": "மாத்தளை",
-    "Nuwara Eliya": "நுவரெலியா",
-    "Galle": "காலி",
-    "Matara": "மாத்தறை",
-    "Hambantota": "அம்பாந்தோட்டை",
-    "Jaffna": "யாழ்ப்பாணம்",
-    "Kilinochchi": "கிளிநொச்சி",
-    "Mannar": "மன்னார்",
-    "Mullaitivu": "முல்லைத்தீவு",
-    "Vavuniya": "வவுனியா",
-    "Trincomalee": "திருகோணமலை",
-    "Batticaloa": "மட்டக்களப்பு",
-    "Ampara": "அம்பாறை",
-    "Kurunegala": "குருநாகல்",
-    "Puttalam": "புத்தளம்",
-    "Anuradhapura": "அனுராதபுரம்",
-    "Polonnaruwa": "பொலன்னறுவை",
-    "Badulla": "பதுளை",
-    "Monaragala": "மொனராகலை",
-    "Ratnapura": "இரத்தினபுரி",
-    "Kegalle": "கேகாலை",
-    "Online": "நிகழ்நிலை (Online)",
-    "Sarwanga Roga (General)": "சர்வாங்க ரோகம் (பொது)",
-    "Kadum Bindum (Orthopedic)": "எலும்பு முறிவு",
-    "Sarpa Visha (Toxicology)": "விஷக்கடி",
-    "Yantra & Mantra": "யந்திரம் மற்றும் மந்திரம்",
-    "Vastu Shastra": "வாஸ்து சாஸ்திரம்",
-    "Horoscope Reading": "ஜாதகம் பார்த்தல்",
-    "Yanthra Preparation": "யந்திரம் தயாரித்தல்",
-    "Auspicious Times": "சுப நேரங்கள்",
-    "Vasthu Vidya": "வாஸ்து வித்யா"
-  }
-};
+import { createContext, useState, useContext, useCallback, useEffect } from 'react';
+import { translations } from '../i18n/translations';
 
 const LanguageContext = createContext();
 
 export const useLanguage = () => useContext(LanguageContext);
 
+/**
+ * Safe translator: requested lang → English → key string.
+ * Never returns undefined/null/[object Object].
+ */
+export function translate(lang, key) {
+  if (key == null || key === '') return '';
+  const k = String(key);
+  const fromLang = translations[lang]?.[k];
+  if (fromLang != null && fromLang !== '') return fromLang;
+  const fromEn = translations.en?.[k];
+  if (fromEn != null && fromEn !== '') return fromEn;
+  return k;
+}
+
 export const LanguageProvider = ({ children }) => {
   const [lang, setLangState] = useState(localStorage.getItem('appLang') || 'en');
   const [hasChosen, setHasChosen] = useState(!!localStorage.getItem('appLang'));
 
-  const setLanguage = (selectedLang) => {
-    setLangState(selectedLang);
-    setHasChosen(true);
-    localStorage.setItem('appLang', selectedLang);
-  };
+  useEffect(() => {
+    document.documentElement.lang = lang;
+    document.body.classList.remove('lang-en', 'lang-si', 'lang-ta');
+    document.body.classList.add(`lang-${lang}`);
+  }, [lang]);
 
-  const toggleLanguage = () => {
+  const setLanguage = useCallback((selectedLang) => {
+    const next = ['en', 'si', 'ta'].includes(selectedLang) ? selectedLang : 'en';
+    setLangState(next);
+    setHasChosen(true);
+    localStorage.setItem('appLang', next);
+  }, []);
+
+  const toggleLanguage = useCallback(() => {
     const sequence = ['en', 'si', 'ta'];
     const nextIndex = (sequence.indexOf(lang) + 1) % sequence.length;
     setLanguage(sequence[nextIndex]);
-  };
+  }, [lang, setLanguage]);
 
-  const t = (key) => translations[lang]?.[key] || translations['en'][key] || key;
+  const t = useCallback((key) => translate(lang, key), [lang]);
 
   return (
-    <LanguageContext.Provider value={{ lang, toggleLanguage, setLanguage, hasChosen, t }}>
+    <LanguageContext.Provider value={{ lang, toggleLanguage, setLanguage, hasChosen, t, translations }}>
       {children}
     </LanguageContext.Provider>
   );

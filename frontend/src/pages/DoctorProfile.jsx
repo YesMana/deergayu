@@ -2,6 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { Link, Navigate, useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import SEO from '../components/SEO';
+import { useLanguage } from '../context/LanguageContext';
+import { localizeSpecialty } from '../i18n/catalogLabels';
 import { API_URL } from '../config/api';
 import {
   cleanDisplayText,
@@ -35,6 +37,7 @@ function formatQualificationLine(q) {
 
 const DoctorProfile = () => {
   const { id } = useParams();
+  const { t } = useLanguage();
   const [price, setPrice] = useState(null);
 
   const { data: provider, isLoading, isError, refetch } = useQuery({
@@ -51,7 +54,7 @@ const DoctorProfile = () => {
   if (isLoading) {
     return (
       <div className="pub-page doctor-profile-page">
-        <div className="container pub-loading">Loading profile…</div>
+        <div className="container pub-loading">{t('dp_loading')}</div>
       </div>
     );
   }
@@ -60,11 +63,11 @@ const DoctorProfile = () => {
     return (
       <div className="pub-page doctor-profile-page">
         <div className="container pub-error">
-          Doctor not found.{' '}
-          <Link to="/doctors">Back to Find a Doctor</Link>
+          {t('dp_not_found')}{' '}
+          <Link to="/doctors">{t('dp_crumb_doctors')}</Link>
           {' · '}
           <button type="button" className="btn btn-outline btn-sm" onClick={() => refetch()}>
-            Retry
+            {t('common_retry')}
           </button>
         </div>
       </div>
@@ -83,7 +86,7 @@ const DoctorProfile = () => {
     ? provider.consultationTypes
     : getConsultationTypes(provider);
   const pic = cleanDisplayText(pd.profileImageUrl);
-  const name = cleanDisplayText(provider.name) || 'Provider';
+  const name = cleanDisplayText(provider.name) || t('dp_crumb_doctors');
   const initial = name[0].toUpperCase();
   const professionalTitle = getProviderTitle(provider);
   const bio = cleanDisplayText(pd.bio);
@@ -96,7 +99,7 @@ const DoctorProfile = () => {
     [cleanDisplayText(pd.city), cleanDisplayText(pd.district), cleanDisplayText(pd.province), cleanDisplayText(pd.country)]
       .filter(Boolean)
       .join(', ');
-  const availText = formatAvailabilitySummary(provider.availabilitySummary);
+  const availText = formatAvailabilitySummary(provider.availabilitySummary, t);
   const affiliations = Array.isArray(provider.affiliations) ? provider.affiliations : [];
   const pageTitle = `${name} | Deergayu`;
   const desc = `${name} — ${professionalTitle}${specs[0] ? `, ${specs[0]}` : ''}. Book on Deergayu.`;
@@ -121,7 +124,7 @@ const DoctorProfile = () => {
       <section className="profile-crumb">
         <div className="container">
           <p className="profile-crumb-text">
-            <Link to="/doctors">Find a Doctor</Link>
+            <Link to="/doctors">{t('dp_crumb_doctors')}</Link>
             <span aria-hidden="true"> / </span>
             <span>{name}</span>
           </p>
@@ -144,16 +147,16 @@ const DoctorProfile = () => {
                 <p className="profile-title">{professionalTitle}</p>
                 <div className="doctor-badges">
                   {isApprovedProvider(provider) && (
-                    <span className="doctor-badge verified">Deergayu Approved</span>
+                    <span className="doctor-badge verified">{t('badge_deergayu_approved')}</span>
                   )}
                   {specs.slice(0, 2).map((s) => (
                     <span key={s} className="doctor-badge">
-                      {s}
+                      {localizeSpecialty(s, t)}
                     </span>
                   ))}
-                  {types.map((t) => (
-                    <span key={t} className="doctor-badge muted">
-                      {consultationTypeLabel(t)}
+                  {types.map((type) => (
+                    <span key={type} className="doctor-badge muted">
+                      {consultationTypeLabel(type, t)}
                     </span>
                   ))}
                 </div>
@@ -162,17 +165,17 @@ const DoctorProfile = () => {
 
             {isDisplayableText(bio) && (
               <section className="profile-block">
-                <h2>About</h2>
+                <h2>{t('dp_about')}</h2>
                 <p className="profile-block-body pre-wrap">{bio}</p>
               </section>
             )}
 
             {specs.length > 0 && (
               <section className="profile-block">
-                <h2>Specialties</h2>
+                <h2>{t('dp_specialties')}</h2>
                 <ul className="profile-chip-list">
                   {specs.map((s) => (
-                    <li key={s}>{s}</li>
+                    <li key={s}>{localizeSpecialty(s, t)}</li>
                   ))}
                 </ul>
               </section>
@@ -180,7 +183,7 @@ const DoctorProfile = () => {
 
             {(qualificationList.length > 0 || isDisplayableText(registration)) && (
               <section className="profile-block">
-                <h2>Qualifications</h2>
+                <h2>{t('dp_qualifications')}</h2>
                 {qualificationList.length > 0 && (
                   <ul className="profile-chip-list">
                     {qualificationList.map((q) => (
@@ -189,28 +192,30 @@ const DoctorProfile = () => {
                   </ul>
                 )}
                 {isDisplayableText(registration) && (
-                  <p className="profile-block-meta">Registration: {registration}</p>
+                  <p className="profile-block-meta">
+                    {t('dp_registration')}: {registration}
+                  </p>
                 )}
               </section>
             )}
 
             {isDisplayableText(languages) && (
               <section className="profile-block">
-                <h2>Languages</h2>
+                <h2>{t('dp_languages')}</h2>
                 <p className="profile-block-body">{languages}</p>
               </section>
             )}
 
             {isDisplayableText(locationLine) && (
               <section className="profile-block">
-                <h2>Location</h2>
+                <h2>{t('dp_location')}</h2>
                 <p className="profile-block-body">{locationLine}</p>
               </section>
             )}
 
             {affiliations.length > 0 && (
               <section className="profile-block">
-                <h2>Clinics & facilities</h2>
+                <h2>{t('dp_facilities')}</h2>
                 <ul className="profile-chip-list">
                   {affiliations.map((a) => {
                     const f = a.facility;
@@ -231,10 +236,10 @@ const DoctorProfile = () => {
 
             {types.length > 0 && (
               <section className="profile-block">
-                <h2>Consultation</h2>
+                <h2>{t('dp_consultation')}</h2>
                 <ul className="profile-chip-list">
-                  {types.map((t) => (
-                    <li key={t}>{consultationTypeLabel(t)}</li>
+                  {types.map((type) => (
+                    <li key={type}>{consultationTypeLabel(type, t)}</li>
                   ))}
                 </ul>
               </section>
@@ -242,49 +247,45 @@ const DoctorProfile = () => {
 
             {availText && (
               <section className="profile-block">
-                <h2>Availability</h2>
+                <h2>{t('dp_availability')}</h2>
                 <p className="profile-block-body">{availText}</p>
                 {provider.availabilitySummary?.sample?.length ? (
                   <p className="profile-block-meta">
-                    Sample times: {provider.availabilitySummary.sample.join(', ')}
+                    {t('dp_sample_times')}: {provider.availabilitySummary.sample.join(', ')}
                   </p>
                 ) : null}
-                <p className="profile-block-meta">
-                  Choose a date in booking to see the full schedule for that day (Asia/Colombo).
-                </p>
+                <p className="profile-block-meta">{t('dp_availability_note')}</p>
               </section>
             )}
 
             <p className="pub-note profile-trust-note">
-              Secure booking on Deergayu. See{' '}
-              <Link to="/privacy">Privacy</Link>, <Link to="/terms">Terms</Link>, and{' '}
-              <Link to="/refund-policy">Refund Policy</Link>.
+              {t('dp_trust_note')}{' '}
+              <Link to="/privacy">{t('footer_privacy')}</Link>, <Link to="/terms">{t('footer_terms')}</Link>,{' '}
+              <Link to="/refund-policy">{t('footer_refund')}</Link>.
             </p>
           </div>
 
           <aside className="profile-aside">
             <div className="booking-side-card">
-              <h2>Book appointment</h2>
+              <h2>{t('dp_book')}</h2>
 
               <div className="booking-side-row">
-                <span className="booking-side-label">Consultation price</span>
+                <span className="booking-side-label">{t('dp_consultation_price')}</span>
                 {price ? (
                   <strong className="booking-side-price">
                     {price.currency} {Number(price.consultationPrice).toLocaleString()}
                   </strong>
                 ) : (
-                  <p className="booking-side-muted">
-                    Consultation fee will be confirmed during booking.
-                  </p>
+                  <p className="booking-side-muted">{t('dp_availability_note')}</p>
                 )}
               </div>
 
               <div className="booking-side-row">
-                <span className="booking-side-label">Availability</span>
+                <span className="booking-side-label">{t('dp_availability')}</span>
                 {availText ? (
                   <p className="booking-side-body">{availText}</p>
                 ) : (
-                  <p className="booking-side-muted">Open booking to check available times.</p>
+                  <p className="booking-side-muted">{t('dp_availability_note')}</p>
                 )}
               </div>
 
@@ -292,10 +293,10 @@ const DoctorProfile = () => {
                 to={`/channeling?book=${encodeURIComponent(provider.id)}`}
                 className="btn btn-primary booking-side-cta"
               >
-                Book Appointment
+                {t('dp_book')}
               </Link>
               <Link to="/contact" className="btn btn-outline booking-side-cta">
-                Contact Support
+                {t('dp_contact_support')}
               </Link>
             </div>
           </aside>

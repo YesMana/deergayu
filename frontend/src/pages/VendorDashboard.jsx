@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Package, ShoppingBag, Settings, CheckCircle, Clock, Calendar, Trash2, Wallet } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
+import { useLanguage } from '../context/LanguageContext';
 import { db, auth } from '../firebase';
 import { collection, query, where, orderBy, onSnapshot } from 'firebase/firestore';
 import PartnerSupportCard from '../components/PartnerSupportCard';
@@ -16,6 +17,10 @@ import {
   parseSpecialtyList,
   looksLikeSuspiciousSpecialty,
 } from '../utils/providerProfileCompletion';
+import {
+  localizeConsultationType,
+  localizeSpecialty,
+} from '../i18n/catalogLabels';
 
 
 
@@ -111,6 +116,7 @@ const compressImage = (file, maxWidth = 800, maxHeight = 800, quality = 0.75) =>
 };
 
 const VendorDashboard = () => {
+  const { t } = useLanguage();
   const { user, refreshUser } = useAuth();
   const { success, error } = useToast();
   const [activeTab, setActiveTab] = useState('overview');
@@ -124,6 +130,7 @@ const VendorDashboard = () => {
   const [platformConfig, setPlatformConfig] = useState({ defaultCommissionPercent: 10, minCommissionRs: 300 });
   const [earnings, setEarnings] = useState({ totalEarnings: 0, monthEarnings: 0, bookingEarnings: 0 });
   const [newProduct, setNewProduct] = useState({ name: '', category: 'Medicine', basePrice: 0, imageUrl: '', images: [], description: '' });
+  const [showAddProductModal, setShowAddProductModal] = useState(false);
   const [productImages, setProductImages] = useState([null, null, null, null]);
   const [uploadingSlot, setUploadingSlot] = useState(null);
   const [addingProduct, setAddingProduct] = useState(false);
@@ -981,13 +988,13 @@ const VendorDashboard = () => {
           <div className="admin-brand-icon">🌿</div>
           <div className="admin-brand-text">
             <h2>{user?.displayName || user?.name || 'User'}</h2>
-            <span>{isDoctor ? 'Doctor Console' : 'Vendor Panel'}</span>
+            <span>{isDoctor ? t('admin_console') : t('vd_settings')}</span>
           </div>
         </div>
         <ul className="admin-nav">
           <li className="admin-nav-section-title">Main</li>
           <li className={activeTab === 'overview' ? 'active' : ''} onClick={() => { setActiveTab('overview'); }}>
-            <Settings size={17} /> Overview
+            <Settings size={17} /> {t('vd_overview')}
           </li>
           <li className="admin-nav-section-title">Manage</li>
           {!isDoctor && (
@@ -1003,23 +1010,23 @@ const VendorDashboard = () => {
           )}
           {isDoctor && (
             <li className={activeTab === 'appointments' ? 'active' : ''} onClick={() => setActiveTab('appointments')}>
-              <Calendar size={17} /> Appointments
+              <Calendar size={17} /> {t('pat_appointments')}
               {upcomingAppts.length > 0 && <span style={{ marginLeft: 'auto', background: '#ffa726', color: 'white', borderRadius: '999px', padding: '0.1rem 0.45rem', fontSize: '0.68rem', fontWeight: '700' }}>{upcomingAppts.length}</span>}
             </li>
           )}
           <li className="admin-nav-section-title">Profile</li>
           {isDoctor && (
             <li className={activeTab === 'schedule' ? 'active' : ''} onClick={() => setActiveTab('schedule')}>
-              <Clock size={17} /> My Schedule
+              <Clock size={17} /> {t('vd_my_schedule')}
             </li>
           )}
           {isDoctor && (
             <li className={activeTab === 'commercial' ? 'active' : ''} onClick={() => setActiveTab('commercial')}>
-              <Wallet size={17} /> Commercial Terms
+              <Wallet size={17} /> {t('vd_commercial_terms')}
             </li>
           )}
           <li className={activeTab === 'settings' ? 'active' : ''} onClick={() => setActiveTab('settings')}>
-            <Settings size={17} /> {isDoctor ? 'My Profile' : 'Settings'}
+            <Settings size={17} /> {isDoctor ? t('vd_my_profile') : t('vd_settings')}
           </li>
         </ul>
         <PartnerSupportCard context={isDoctor ? (user?.role || 'doctor') : 'vendor'} />
@@ -1030,15 +1037,15 @@ const VendorDashboard = () => {
         <div className="admin-page-header">
           <div>
             <h1 style={{ fontSize: '1.65rem', fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>
-              {activeTab === 'overview' ? 'Dashboard Overview' :
+              {activeTab === 'overview' ? t('vd_overview') :
                activeTab === 'products' ? 'My Products' :
                activeTab === 'orders' ? 'Customer Orders' :
-               activeTab === 'appointments' ? 'Appointments' :
-               activeTab === 'schedule' ? 'My Schedule' :
-               activeTab === 'commercial' ? 'Commercial Terms' : 'Settings'}
+               activeTab === 'appointments' ? t('pat_appointments') :
+               activeTab === 'schedule' ? t('vd_my_schedule') :
+               activeTab === 'commercial' ? t('vd_commercial_terms') : t('vd_settings')}
             </h1>
             <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', margin: '0.3rem 0 0' }}>
-              {activeTab === 'overview' ? `Welcome back, ${user?.displayName || user?.name || 'User'}` :
+              {activeTab === 'overview' ? `${t('vd_welcome')}, ${user?.displayName || user?.name || 'User'}` :
                activeTab === 'products' ? `${vendorProducts.length} products · ${approvedProducts} live` :
                activeTab === 'orders' ? `${orders.length} total orders` :
                activeTab === 'appointments' ? `${appointments.length} total appointments` : ''}
@@ -1108,9 +1115,9 @@ const VendorDashboard = () => {
                 }}
               >
                 <div className="dash-section-header" style={{ flexWrap: 'wrap', gap: '0.75rem' }}>
-                  <h3 style={{ margin: 0 }}>Complete your professional profile</h3>
+                  <h3 style={{ margin: 0 }}>{t('vd_complete_profile')}</h3>
                   <strong style={{ color: 'var(--secondary-color)' }}>
-                    Profile completion: {profileCompletion.percent}%
+                    {t('vd_profile_completion')}: {profileCompletion.percent}%
                   </strong>
                 </div>
                 <div
@@ -1132,12 +1139,12 @@ const VendorDashboard = () => {
                   />
                 </div>
                 <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginTop: 0 }}>
-                  Patients see structured specialties, bio, consultation types, and location. Fill the items below.
+                  {t('vd_profile_completion_hint')}
                 </p>
                 {(profileCompletion.suspiciousSpecialties?.length > 0 ||
                   profileCompletion.suspiciousAddress?.length > 0) && (
                   <p style={{ color: '#ef9a9a', fontSize: '0.85rem' }}>
-                    Needs cleanup (not shown publicly as specialty):{' '}
+                    {t('vd_needs_cleanup')}:{' '}
                     {[...(profileCompletion.suspiciousSpecialties || []), ...(profileCompletion.suspiciousAddress || [])]
                       .map((s) => `"${s}"`)
                       .join(', ')}
@@ -1148,19 +1155,19 @@ const VendorDashboard = () => {
                   {[...profileCompletion.missingRequired, ...profileCompletion.missingRecommended.slice(0, 4)].map(
                     (item) => (
                       <li key={item.key} style={{ marginBottom: '0.35rem' }}>
-                        {item.action}
-                        {!item.required ? ' (recommended)' : ''}
+                        {t(item.actionKey || item.action)}
+                        {!item.required ? ` (${t('pc_recommended')})` : ''}
                       </li>
                     )
                   )}
                 </ul>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
                   <button type="button" className="btn btn-primary" onClick={() => setActiveTab('settings')}>
-                    Edit profile
+                    {t('vd_edit_profile')}
                   </button>
                   {profileCompletion.presence && !profileCompletion.presence.schedule && (
                     <button type="button" className="btn btn-outline" onClick={() => setActiveTab('schedule')}>
-                      Set schedule
+                      {t('vd_set_schedule')}
                     </button>
                   )}
                 </div>
@@ -1341,7 +1348,7 @@ const VendorDashboard = () => {
           {activeTab === 'schedule' && (
             <div className="glass-panel" style={{ padding: '2rem' }}>
               <h2 style={{ color: 'var(--secondary-color)', marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <Clock size={24} /> Schedule Management
+                <Clock size={24} /> {t('vd_schedule')}
               </h2>
               <p style={{ color: 'var(--text-secondary)', marginBottom: '2rem' }}>
                 Set your working hours and appointment slot duration. This will determine the time slots available for patients to book.
@@ -1349,7 +1356,7 @@ const VendorDashboard = () => {
 
               <form onSubmit={handleScheduleSubmit}>
                 <div className="form-group" style={{ marginBottom: '2rem' }}>
-                  <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold' }}>Slot Duration (minutes)</label>
+                  <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold' }}>{t('vd_slot_duration')}</label>
                   <select 
                     value={schedule.slotDuration} 
                     onChange={e => setSchedule({...schedule, slotDuration: Number(e.target.value)})}
@@ -1365,7 +1372,7 @@ const VendorDashboard = () => {
                 </div>
 
                 <div style={{ marginBottom: '2rem' }}>
-                  <h3 style={{ marginBottom: '1rem', color: 'var(--text-primary)' }}>Working Days</h3>
+                  <h3 style={{ marginBottom: '1rem', color: 'var(--text-primary)' }}>{t('vd_working_days')}</h3>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                     {Object.keys(schedule.workingDays).map(day => (
                       <div key={day} style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap', background: 'var(--surface-color)', padding: '1rem', borderRadius: '8px' }}>
@@ -1416,7 +1423,7 @@ const VendorDashboard = () => {
                           </div>
                         )}
                         {schedule.workingDays[day].active === false && (
-                          <span style={{ color: 'var(--text-secondary)', fontStyle: 'italic' }}>Closed</span>
+                          <span style={{ color: 'var(--text-secondary)', fontStyle: 'italic' }}>{t('vd_closed')}</span>
                         )}
                       </div>
                     ))}
@@ -1424,9 +1431,9 @@ const VendorDashboard = () => {
                 </div>
 
                 <div style={{ marginBottom: '2rem' }}>
-                  <h3 style={{ marginBottom: '0.5rem', color: 'var(--text-primary)' }}>Unavailable dates</h3>
+                  <h3 style={{ marginBottom: '0.5rem', color: 'var(--text-primary)' }}>{t('vd_unavailable_dates')}</h3>
                   <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginBottom: '0.75rem' }}>
-                    Block specific calendar days (Asia/Colombo). Booking uses your existing schedule engine.
+                    {t('vd_unavailable_hint')}
                   </p>
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', alignItems: 'center', marginBottom: '0.75rem' }}>
                     <input
@@ -1454,11 +1461,11 @@ const VendorDashboard = () => {
                         setUnavailableDateInput('');
                       }}
                     >
-                      Add date
+                      {t('vd_add_date')}
                     </button>
                   </div>
                   {(schedule.unavailableDates || []).length === 0 ? (
-                    <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', margin: 0 }}>No blocked dates.</p>
+                    <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', margin: 0 }}>{t('vd_no_blocked')}</p>
                   ) : (
                     <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
                       {(schedule.unavailableDates || []).map((d) => (
@@ -1503,7 +1510,7 @@ const VendorDashboard = () => {
 
                 <div style={{ marginTop: '2rem', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '2rem' }}>
                   <button disabled={savingSchedule} type="submit" className="btn btn-primary">
-                    {savingSchedule ? 'Saving...' : 'Save Schedule'}
+                    {savingSchedule ? `${t('common_save')}...` : t('vd_save_schedule')}
                   </button>
                 </div>
               </form>
@@ -2016,28 +2023,27 @@ const VendorDashboard = () => {
 
           {activeTab === 'commercial' && isDoctor && (
             <div className="glass-panel table-container" style={{ maxWidth: 720 }}>
-              <h2 style={{ color: 'var(--text-primary)', marginTop: 0 }}>Your commercial terms</h2>
+              <h2 style={{ color: 'var(--text-primary)', marginTop: 0 }}>{t('vd_commercial_terms')}</h2>
               <p style={{ color: 'var(--text-secondary)', fontSize: '0.875rem' }}>
-                Read-only view of patient fee, your payout, and Deergayu gross for each consultation type.
-                Changes require admin agreement. Appointment online payments may still be disabled platform-wide.
+                {t('vd_readonly_commercial_hint')} {t('vd_commercial_readonly')}
               </p>
               {loadingCommercial ? (
-                <p>Loading…</p>
+                <p>{t('common_loading')}</p>
               ) : !commercialTerms || !commercialTerms.types || !Object.keys(commercialTerms.types).length ? (
                 <p style={{ color: 'var(--text-secondary)' }}>
-                  No commercial terms configured yet. Contact Deergayu admin to set patient price and payout.
+                  {t('vd_no_commercial')}
                 </p>
               ) : (
                 <div style={{ display: 'grid', gap: '0.85rem', marginTop: '1rem' }}>
                   {Object.entries(commercialTerms.types).map(([type, term]) => (
                     <div key={type} style={{ border: '1px solid var(--glass-border)', borderRadius: 12, padding: '1rem' }}>
-                      <strong style={{ textTransform: 'capitalize' }}>{String(type).replace('_', ' ')}</strong>
-                      {term.active === false && <span style={{ marginLeft: 8, color: '#ef5350' }}>(inactive)</span>}
+                      <strong>{localizeConsultationType(type, t)}</strong>
+                      {term.active === false && <span style={{ marginLeft: 8, color: '#ef5350' }}>({t('common_inactive')})</span>}
                       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '0.65rem', marginTop: '0.65rem', fontSize: '0.9rem' }}>
-                        <div>Patient price<br /><strong>LKR {Number(term.consultationPrice || 0).toLocaleString()}</strong></div>
-                        <div>Your payout<br /><strong>LKR {Number(term.providerPayout || 0).toLocaleString()}</strong></div>
-                        <div>Deergayu gross<br /><strong>LKR {Number(term.platformGross || 0).toLocaleString()}</strong></div>
-                        <div>Facility fee<br /><strong>LKR {Number(term.facilityFee || 0).toLocaleString()}</strong></div>
+                        <div>{t('vd_patient_price')}<br /><strong>LKR {Number(term.consultationPrice || 0).toLocaleString()}</strong></div>
+                        <div>{t('vd_your_payout')}<br /><strong>LKR {Number(term.providerPayout || 0).toLocaleString()}</strong></div>
+                        <div>{t('vd_deergayu_gross')}<br /><strong>LKR {Number(term.platformGross || 0).toLocaleString()}</strong></div>
+                        <div>{t('vd_facility_fee')}<br /><strong>LKR {Number(term.facilityFee || 0).toLocaleString()}</strong></div>
                       </div>
                     </div>
                   ))}
@@ -2049,17 +2055,17 @@ const VendorDashboard = () => {
           {activeTab === 'settings' && (
             <div className="glass-panel table-container" style={{ maxWidth: '720px', width: '100%', overflow: 'hidden' }}>
               <h2 style={{ color: 'var(--text-primary)', marginBottom: '0.25rem' }}>
-                {isDoctor ? 'My professional profile' : 'Profile Settings'}
+                {isDoctor ? t('vd_professional_profile') : t('vd_settings')}
               </h2>
               <p style={{ color: 'var(--text-secondary)', fontSize: '0.875rem', marginBottom: '1.75rem' }}>
                 {isDoctor
-                  ? 'Structured fields power your public doctor page. Private address stays off the public profile.'
+                  ? t('vd_profile_completion_hint')
                   : 'Update your photo and profile details.'}
               </p>
 
               {isDoctor && profileCompletion && (
                 <p style={{ marginBottom: '1rem', fontWeight: 600, color: 'var(--secondary-color)' }}>
-                  Profile completion: {profileCompletion.percent}%
+                  {t('vd_profile_completion')}: {profileCompletion.percent}%
                 </p>
               )}
               
@@ -2118,7 +2124,7 @@ const VendorDashboard = () => {
 
                 <div style={{ flex: 1, minWidth: '200px' }}>
                   <label style={{ color: 'var(--text-primary)', fontWeight: '700', display: 'block', marginBottom: '0.5rem' }}>
-                    Profile Picture
+                    {t('vd_profile_picture')}
                   </label>
                   <p style={{ color: 'var(--text-secondary)', fontSize: '0.78rem', marginBottom: '0.75rem' }}>
                     JPG, PNG or WEBP. Square images work best. Click Save after uploading.
@@ -2151,12 +2157,12 @@ const VendorDashboard = () => {
               </div>
 
               <div className="form-group" style={{marginBottom: '1rem'}}>
-                <label style={{color: 'var(--text-secondary)'}}>Email Address</label>
+                  <label style={{color: 'var(--text-secondary)'}}>{t('vd_email_address')}</label>
                 <input type="email" defaultValue={user?.email || ''} disabled className="form-control" style={{width: '100%', padding: '0.75rem', borderRadius: 'var(--radius-sm)', border: '1px solid rgba(212, 175, 55, 0.3)', background: 'rgba(255, 255, 255, 0.05)', color: 'var(--text-secondary)', opacity: 0.7}} />
               </div>
 
               <div className="form-group" style={{marginBottom: '1rem'}}>
-                <label style={{color: 'var(--text-secondary)'}}>Display Name</label>
+                <label style={{color: 'var(--text-secondary)'}}>{t('vd_display_name')}</label>
                 <input type="text" value={settingsData.name} onChange={e => setSettingsData({...settingsData, name: e.target.value})} className="form-control" style={{width: '100%', maxWidth: '100%', padding: '0.75rem', borderRadius: 'var(--radius-sm)', border: '1px solid rgba(212, 175, 55, 0.3)', background: 'rgba(255, 255, 255, 0.05)', color: 'var(--text-primary)'}} />
               </div>
 
@@ -2164,7 +2170,7 @@ const VendorDashboard = () => {
                 <>
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '0.75rem' }}>
                     <div className="form-group" style={{ marginBottom: '1rem' }}>
-                      <label style={{ color: 'var(--text-secondary)' }}>Professional title</label>
+                      <label style={{ color: 'var(--text-secondary)' }}>{t('vd_professional_title')}</label>
                       <input
                         type="text"
                         value={settingsData.title}
@@ -2175,7 +2181,7 @@ const VendorDashboard = () => {
                       />
                     </div>
                     <div className="form-group" style={{ marginBottom: '1rem' }}>
-                      <label style={{ color: 'var(--text-secondary)' }}>Provider type</label>
+                      <label style={{ color: 'var(--text-secondary)' }}>{t('vd_provider_type')}</label>
                       <input
                         type="text"
                         value={settingsData.doctorType}
@@ -2189,7 +2195,7 @@ const VendorDashboard = () => {
 
                   <div className="form-group" style={{ marginBottom: '1rem' }}>
                     <label style={{ color: 'var(--text-secondary)', display: 'block', marginBottom: '0.5rem' }}>
-                      Specialties (select one or more)
+                      {t('vd_specialties_label')}
                     </label>
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem 1rem' }}>
                       {specialtyCatalog.map((s) => {
@@ -2210,7 +2216,7 @@ const VendorDashboard = () => {
                                 });
                               }}
                             />
-                            {s}
+                            {localizeSpecialty(s, t)}
                           </label>
                         );
                       })}
@@ -2219,13 +2225,13 @@ const VendorDashboard = () => {
                       type="text"
                       value={settingsData.specialtyOther}
                       onChange={(e) => setSettingsData({ ...settingsData, specialtyOther: e.target.value })}
-                      placeholder="Additional specialty (optional free text)"
+                      placeholder={t('vd_additional_specialty')}
                       className="form-control"
                       style={{ width: '100%', marginTop: '0.65rem', padding: '0.75rem', borderRadius: 'var(--radius-sm)', border: '1px solid rgba(212, 175, 55, 0.3)', background: 'rgba(255, 255, 255, 0.05)', color: 'var(--text-primary)' }}
                     />
                     {parseSpecialtyList(user?.profileDetails?.specialty).some(looksLikeSuspiciousSpecialty) && (
                       <p style={{ color: '#ef9a9a', fontSize: '0.8rem', marginTop: '0.5rem' }}>
-                        Legacy specialty needs cleanup:{' '}
+                        {t('vd_needs_cleanup')}:{' '}
                         {parseSpecialtyList(user.profileDetails.specialty)
                           .filter(looksLikeSuspiciousSpecialty)
                           .join(', ')}
@@ -2236,24 +2242,24 @@ const VendorDashboard = () => {
 
                   <div className="form-group" style={{ marginBottom: '1rem' }}>
                     <label style={{ color: 'var(--text-secondary)', display: 'block', marginBottom: '0.5rem' }}>
-                      Consultation types
+                      {t('vd_consultation_types')}
                     </label>
                     <p style={{ color: 'var(--text-secondary)', fontSize: '0.8rem', marginTop: 0 }}>
-                      Only checked types appear publicly. Video is never assumed.
+                      {t('vd_consultation_hint')}
                     </p>
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1rem' }}>
                       {[
-                        { key: 'offersInPerson', label: 'In-person' },
-                        { key: 'offersVideo', label: 'Video consultation' },
-                        { key: 'offersAudio', label: 'Audio consultation' },
-                      ].map(({ key, label }) => (
+                        { key: 'offersInPerson', type: 'in_person' },
+                        { key: 'offersVideo', type: 'video' },
+                        { key: 'offersAudio', type: 'audio' },
+                      ].map(({ key, type }) => (
                         <label key={key} style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', cursor: 'pointer' }}>
                           <input
                             type="checkbox"
                             checked={Boolean(settingsData[key])}
                             onChange={(e) => setSettingsData({ ...settingsData, [key]: e.target.checked })}
                           />
-                          {label}
+                          {localizeConsultationType(type, t)}
                         </label>
                       ))}
                     </div>
@@ -2261,48 +2267,48 @@ const VendorDashboard = () => {
 
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '0.75rem' }}>
                     <div className="form-group" style={{ marginBottom: '1rem' }}>
-                      <label style={{ color: 'var(--text-secondary)' }}>Province</label>
+                      <label style={{ color: 'var(--text-secondary)' }}>{t('vd_province')}</label>
                       <input type="text" value={settingsData.province} onChange={(e) => setSettingsData({ ...settingsData, province: e.target.value })} className="form-control" style={{ width: '100%', padding: '0.75rem', borderRadius: 'var(--radius-sm)', border: '1px solid rgba(212, 175, 55, 0.3)', background: 'rgba(255, 255, 255, 0.05)', color: 'var(--text-primary)' }} />
                     </div>
                     <div className="form-group" style={{ marginBottom: '1rem' }}>
-                      <label style={{ color: 'var(--text-secondary)' }}>District</label>
+                      <label style={{ color: 'var(--text-secondary)' }}>{t('vd_district')}</label>
                       <input type="text" value={settingsData.district} onChange={(e) => setSettingsData({ ...settingsData, district: e.target.value })} className="form-control" style={{ width: '100%', padding: '0.75rem', borderRadius: 'var(--radius-sm)', border: '1px solid rgba(212, 175, 55, 0.3)', background: 'rgba(255, 255, 255, 0.05)', color: 'var(--text-primary)' }} />
                     </div>
                     <div className="form-group" style={{ marginBottom: '1rem' }}>
-                      <label style={{ color: 'var(--text-secondary)' }}>City</label>
+                      <label style={{ color: 'var(--text-secondary)' }}>{t('vd_city')}</label>
                       <input type="text" value={settingsData.city} onChange={(e) => setSettingsData({ ...settingsData, city: e.target.value })} className="form-control" style={{ width: '100%', padding: '0.75rem', borderRadius: 'var(--radius-sm)', border: '1px solid rgba(212, 175, 55, 0.3)', background: 'rgba(255, 255, 255, 0.05)', color: 'var(--text-primary)' }} />
                     </div>
                     <div className="form-group" style={{ marginBottom: '1rem' }}>
-                      <label style={{ color: 'var(--text-secondary)' }}>Country</label>
+                      <label style={{ color: 'var(--text-secondary)' }}>{t('vd_country')}</label>
                       <input type="text" value={settingsData.country} onChange={(e) => setSettingsData({ ...settingsData, country: e.target.value })} className="form-control" style={{ width: '100%', padding: '0.75rem', borderRadius: 'var(--radius-sm)', border: '1px solid rgba(212, 175, 55, 0.3)', background: 'rgba(255, 255, 255, 0.05)', color: 'var(--text-primary)' }} />
                     </div>
                   </div>
 
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '0.75rem' }}>
                     <div className="form-group" style={{ marginBottom: '1rem' }}>
-                      <label style={{ color: 'var(--text-secondary)' }}>Phone (private)</label>
+                      <label style={{ color: 'var(--text-secondary)' }}>{t('vd_phone_private')}</label>
                       <input type="tel" value={settingsData.telephone} onChange={(e) => setSettingsData({ ...settingsData, telephone: e.target.value })} className="form-control" style={{ width: '100%', padding: '0.75rem', borderRadius: 'var(--radius-sm)', border: '1px solid rgba(212, 175, 55, 0.3)', background: 'rgba(255, 255, 255, 0.05)', color: 'var(--text-primary)' }} />
                     </div>
                     <div className="form-group" style={{ marginBottom: '1rem' }}>
-                      <label style={{ color: 'var(--text-secondary)' }}>Years of experience</label>
+                      <label style={{ color: 'var(--text-secondary)' }}>{t('vd_years_exp')}</label>
                       <input type="number" min="0" max="80" value={settingsData.yearsOfExperience} onChange={(e) => setSettingsData({ ...settingsData, yearsOfExperience: e.target.value })} placeholder="e.g. 10" className="form-control" style={{ width: '100%', padding: '0.75rem', borderRadius: 'var(--radius-sm)', border: '1px solid rgba(212, 175, 55, 0.3)', background: 'rgba(255, 255, 255, 0.05)', color: 'var(--text-primary)' }} />
                     </div>
                     <div className="form-group" style={{ marginBottom: '1rem' }}>
-                      <label style={{ color: 'var(--text-secondary)' }}>Registration number</label>
+                      <label style={{ color: 'var(--text-secondary)' }}>{t('vd_registration')}</label>
                       <input type="text" value={settingsData.registrationNumber} onChange={(e) => setSettingsData({ ...settingsData, registrationNumber: e.target.value })} placeholder="Does not auto-verify credentials" className="form-control" style={{ width: '100%', padding: '0.75rem', borderRadius: 'var(--radius-sm)', border: '1px solid rgba(212, 175, 55, 0.3)', background: 'rgba(255, 255, 255, 0.05)', color: 'var(--text-primary)' }} />
                     </div>
                   </div>
 
                   <div className="form-group" style={{ marginBottom: '1rem' }}>
-                    <label style={{ color: 'var(--text-secondary)' }}>Private address (not shown publicly)</label>
+                    <label style={{ color: 'var(--text-secondary)' }}>{t('vd_private_address')}</label>
                     <input type="text" value={settingsData.address} onChange={(e) => setSettingsData({ ...settingsData, address: e.target.value })} className="form-control" style={{ width: '100%', padding: '0.75rem', borderRadius: 'var(--radius-sm)', border: '1px solid rgba(212, 175, 55, 0.3)', background: 'rgba(255, 255, 255, 0.05)', color: 'var(--text-primary)' }} />
                     <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', margin: '0.35rem 0 0' }}>
-                      Public location uses city / district / province above. Facility affiliations use facility address when set.
+                      {t('vd_private_address_hint')}
                     </p>
                   </div>
 
                   <div className="form-group" style={{ marginBottom: '1rem' }}>
-                    <label style={{ color: 'var(--text-secondary)', display: 'block', marginBottom: '0.5rem' }}>Languages</label>
+                    <label style={{ color: 'var(--text-secondary)', display: 'block', marginBottom: '0.5rem' }}>{t('vd_languages')}</label>
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem' }}>
                       {languageCatalog.map((lang) => {
                         const checked = settingsData.languages.some((l) => l.toLowerCase() === lang.toLowerCase());
@@ -2329,7 +2335,7 @@ const VendorDashboard = () => {
 
                   <div className="form-group" style={{ marginBottom: '1rem' }}>
                     <label style={{ color: 'var(--text-secondary)', display: 'block', marginBottom: '0.5rem' }}>
-                      Qualifications
+                      {t('vd_qualifications')}
                     </label>
                     {(settingsData.qualifications || []).map((q, idx) => (
                       <div
@@ -2399,7 +2405,7 @@ const VendorDashboard = () => {
                             })
                           }
                         >
-                          Remove
+                          {t('vd_remove')}
                         </button>
                       </div>
                     ))}
@@ -2413,12 +2419,12 @@ const VendorDashboard = () => {
                         })
                       }
                     >
-                      Add qualification
+                      {t('vd_add_qualification')}
                     </button>
                   </div>
 
                   <div className="form-group" style={{ marginBottom: '1.5rem' }}>
-                    <label style={{ color: 'var(--text-secondary)' }}>Professional bio</label>
+                    <label style={{ color: 'var(--text-secondary)' }}>{t('vd_bio')}</label>
                     <textarea
                       value={settingsData.bio}
                       onChange={(e) => setSettingsData({ ...settingsData, bio: e.target.value })}
@@ -2432,7 +2438,7 @@ const VendorDashboard = () => {
 
               <div style={{ display: 'flex', gap: '1rem', marginTop: '0.5rem', flexWrap: 'wrap' }}>
                 <button className="btn btn-primary" onClick={handleSettingsSubmit} disabled={savingSettings || settingsUploadingImage}>
-                  {savingSettings ? <><div className="spinner spinner-sm" style={{width:'14px',height:'14px',border:'2px solid rgba(255,255,255,0.4)',borderTopColor:'white',display:'inline-block',marginRight:'0.4rem'}}/> Saving...</> : '✓ Save Changes'}
+                  {savingSettings ? <><div className="spinner spinner-sm" style={{width:'14px',height:'14px',border:'2px solid rgba(255,255,255,0.4)',borderTopColor:'white',display:'inline-block',marginRight:'0.4rem'}}/> {t('common_save')}...</> : `✓ ${t('vd_save_changes')}`}
                 </button>
                 <button className="btn btn-outline" style={{ borderColor: 'var(--error-color)', color: 'var(--error-color)', marginLeft: 'auto' }} onClick={() => { localStorage.clear(); window.location.href = '/'; }}>Logout</button>
               </div>

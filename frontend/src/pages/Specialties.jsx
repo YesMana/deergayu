@@ -3,6 +3,8 @@ import { Link, useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import SEO from '../components/SEO';
 import { API_URL } from '../config/api';
+import { useLanguage } from '../context/LanguageContext';
+import { localizeSpecialty } from '../i18n/catalogLabels';
 import {
   collectSpecialtiesFromProviders,
   specialtyToSlug,
@@ -11,6 +13,7 @@ import {
 import './PublicPages.css';
 
 const Specialties = () => {
+  const { t } = useLanguage();
   const { slug } = useParams();
 
   const { data: providers = [], isLoading, isError, refetch } = useQuery({
@@ -30,34 +33,35 @@ const Specialties = () => {
     return (
       <div className="pub-page">
         <div className="container pub-empty">
-          Specialty not found. <Link to="/specialties">View all specialties</Link>
+          {t('spec_not_found')} <Link to="/specialties">{t('spec_all_specialties')}</Link>
         </div>
       </div>
     );
   }
 
   if (slug && matched) {
+    const matchedLabel = localizeSpecialty(matched, t);
     return (
       <div className="pub-page animate-fade-in">
         <SEO
-          title={`${matched} | Specialties | Deergayu`}
-          description={`Find Deergayu doctors for ${matched}.`}
+          title={`${matchedLabel} | ${t('spec_page_title')} | Deergayu`}
+          description={`${t('spec_approved_listing')}: ${matchedLabel}.`}
           url={`https://deergayu.com/specialties/${slug}`}
           canonical={`https://deergayu.com/specialties/${slug}`}
         />
         <section className="pub-hero">
           <div className="container">
-            <h1>{matched}</h1>
-            <p className="pub-lead">Approved providers listing this specialty.</p>
+            <h1>{matchedLabel}</h1>
+            <p className="pub-lead">{t('spec_approved_listing')}</p>
             <div className="pub-actions">
               <Link
                 to={`/doctors?specialty=${encodeURIComponent(matched)}`}
                 className="btn btn-primary"
               >
-                View doctors
+                {t('spec_view_doctors')}
               </Link>
               <Link to="/specialties" className="btn btn-outline">
-                All specialties
+                {t('spec_all_specialties')}
               </Link>
             </div>
           </div>
@@ -69,35 +73,31 @@ const Specialties = () => {
   return (
     <div className="pub-page animate-fade-in">
       <SEO
-        title="Specialties | Deergayu"
-        description="Browse doctor specialties available on Deergayu."
+        title={`${t('spec_page_title')} | Deergayu`}
+        description={t('spec_page_sub')}
         url="https://deergayu.com/specialties"
         canonical="https://deergayu.com/specialties"
       />
       <section className="pub-hero">
         <div className="container">
-          <h1>Specialties</h1>
-          <p className="pub-lead">
-            Specialties shown here come from real provider profiles — we do not invent counts or
-            categories.
-          </p>
+          <h1>{t('spec_page_title')}</h1>
+          <p className="pub-lead">{t('spec_page_sub')}</p>
         </div>
       </section>
       <section className="pub-section">
         <div className="container">
-          {isLoading && <div className="pub-loading">Loading specialties…</div>}
+          {isLoading && <div className="pub-loading">{t('spec_loading')}</div>}
           {isError && (
             <div className="pub-error">
-              Could not load specialties.{' '}
+              {t('spec_error')}{' '}
               <button type="button" className="btn btn-outline btn-sm" onClick={() => refetch()}>
-                Retry
+                {t('common_retry')}
               </button>
             </div>
           )}
           {!isLoading && !isError && specialties.length === 0 && (
             <div className="pub-empty">
-              No specialties listed yet. <Link to="/doctors">Browse doctors</Link> or{' '}
-              <Link to="/contact">contact us</Link>.
+              {t('spec_empty')} <Link to="/doctors">{t('spec_browse_doctors')}</Link>.
             </div>
           )}
           <div className="pub-grid-3">
@@ -108,8 +108,8 @@ const Specialties = () => {
                 className="pub-card"
                 style={{ textDecoration: 'none', color: 'inherit' }}
               >
-                <h3>{s}</h3>
-                <p>View doctors in this specialty</p>
+                <h3>{localizeSpecialty(s, t)}</h3>
+                <p>{t('spec_view_doctors')}</p>
               </Link>
             ))}
           </div>

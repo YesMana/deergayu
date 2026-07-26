@@ -175,16 +175,16 @@ const Navbar = () => {
   const linkClass = (match) => (match ? 'active' : undefined);
 
   return (
-    <nav className={`navbar ${scrolled ? 'scrolled' : ''}`} aria-label="Main">
+    <nav className={`navbar ${scrolled ? 'scrolled' : ''}`} aria-label={t('nav_home')}>
       <div className="container nav-content">
-        <Link to="/" className="brand" aria-label="Deergayu home">
+        <Link to="/" className="brand" aria-label={`Deergayu ${t('nav_home')}`}>
           <img src="/logo.png" alt="Deergayu" className="brand-logo" />
         </Link>
 
         <ul className="nav-links desktop-only">
           <li>
             <Link to="/doctors" className={linkClass(path.startsWith('/doctors'))}>
-              Find a Doctor
+              {t('nav_find_doctor')}
             </Link>
           </li>
           <li>
@@ -192,7 +192,7 @@ const Navbar = () => {
               to="/ayurveda"
               className={linkClass(path === '/ayurveda' || path.startsWith('/ayurveda/'))}
             >
-              Ayurveda
+              {t('nav_ayurveda')}
             </Link>
           </li>
           <li>
@@ -200,12 +200,12 @@ const Navbar = () => {
               to="/online-consultation"
               className={linkClass(path.startsWith('/online-consultation'))}
             >
-              Online Consultation
+              {t('nav_online_consult')}
             </Link>
           </li>
           <li>
             <Link to="/ayurvedic-guide" className={linkClass(path.startsWith('/ayurvedic-guide'))}>
-              Guide
+              {t('nav_guide')}
             </Link>
           </li>
           <li>
@@ -223,7 +223,7 @@ const Navbar = () => {
               id={`${moreMenuId}-trigger`}
               onClick={() => setMoreOpen((v) => !v)}
             >
-              More <ChevronDown size={14} aria-hidden="true" />
+              {t('nav_more')} <ChevronDown size={14} aria-hidden="true" />
             </button>
             {moreOpen && (
               <div
@@ -233,35 +233,35 @@ const Navbar = () => {
                 aria-labelledby={`${moreMenuId}-trigger`}
               >
                 <Link to="/about" role="menuitem">
-                  About
+                  {t('nav_about')}
                 </Link>
                 <Link to="/contact" role="menuitem">
-                  Contact
+                  {t('nav_contact')}
                 </Link>
                 <Link to="/specialties" role="menuitem">
-                  Specialties
+                  {t('home_specialties_title')}
                 </Link>
                 <Link to="/videos" role="menuitem">
-                  Videos
+                  {t('nav_videos')}
                 </Link>
                 <Link to="/astrology" role="menuitem">
-                  Astrology
+                  {t('nav_astrology')}
                 </Link>
                 {showClinicsNav && (
                   <Link to="/clinics" role="menuitem">
-                    Clinics
+                    {t('nav_clinics')}
                   </Link>
                 )}
                 {showHospitalsNav && (
                   <Link to="/hospitals" role="menuitem">
-                    Hospitals
+                    {t('nav_hospitals')}
                   </Link>
                 )}
                 <Link to="/faq" role="menuitem">
-                  FAQ
+                  {t('nav_faq')}
                 </Link>
                 <Link to="/join-as-doctor" role="menuitem">
-                  Join as Doctor
+                  {t('nav_join_doctor')}
                 </Link>
                 <button
                   type="button"
@@ -270,7 +270,7 @@ const Navbar = () => {
                   onClick={handleVoiceSearch}
                 >
                   <Mic size={16} aria-hidden="true" />
-                  Voice search
+                  {t('nav_voice_search')}
                 </button>
               </div>
             )}
@@ -279,7 +279,7 @@ const Navbar = () => {
 
         <div className="nav-actions">
           <Link to="/channeling" className="btn btn-primary btn-sm nav-cta desktop-only">
-            Book Appointment
+            {t('nav_book_appointment')}
           </Link>
 
           <button
@@ -296,13 +296,13 @@ const Navbar = () => {
             type="button"
             className="icon-btn lang-btn"
             onClick={toggleLanguage}
-            title="Switch Language"
-            aria-label="Switch language"
+            title={t('nav_switch_lang')}
+            aria-label={t('nav_switch_lang')}
           >
             <Globe size={17} /> <span>{lang.toUpperCase()}</span>
           </button>
 
-          <Link to="/shop/cart" className="icon-btn cart-btn" title="Cart" aria-label="Cart">
+          <Link to="/shop/cart" className="icon-btn cart-btn" title={t('nav_cart')} aria-label={t('nav_cart')}>
             <ShoppingBag size={18} />
             {cartCount > 0 && <span className="cart-badge">{cartCount}</span>}
           </Link>
@@ -313,7 +313,7 @@ const Navbar = () => {
                 type="button"
                 className="user-avatar-btn"
                 onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
-                aria-label="Account menu"
+                aria-label={t('nav_account')}
                 aria-expanded={isUserMenuOpen}
                 aria-haspopup="menu"
               >
@@ -353,20 +353,20 @@ const Navbar = () => {
                     ['vendor', 'doctor', 'clinic', 'organization'].includes(user.role)) && (
                     <Link to={getDashboardLink()} className="dropdown-item" role="menuitem">
                       {user.role === 'admin' ? <Shield size={16} /> : <LayoutDashboard size={16} />}
-                      {user.role === 'admin' ? 'Admin Panel' : 'My Dashboard'}
+                      {user.role === 'admin' ? t('nav_admin_panel') : t('nav_my_dashboard')}
                     </Link>
                   )}
 
                   {user.role === 'user' && (
                     <>
                       <Link to="/my-account" className="dropdown-item" role="menuitem">
-                        <User size={16} /> My Account
+                        <User size={16} /> {t('nav_account')}
                       </Link>
                       <Link to="/my-orders" className="dropdown-item" role="menuitem">
-                        <Package size={16} /> My Orders
+                        <Package size={16} /> {t('nav_my_orders')}
                       </Link>
                       <Link to="/my-appointments" className="dropdown-item" role="menuitem">
-                        <Calendar size={16} /> My Appointments
+                        <Calendar size={16} /> {t('nav_my_appointments')}
                       </Link>
                     </>
                   )}
@@ -374,7 +374,7 @@ const Navbar = () => {
                   <div className="dropdown-divider" />
 
                   <button type="button" onClick={logout} className="dropdown-item danger" role="menuitem">
-                    <LogOut size={16} /> Sign Out
+                    <LogOut size={16} /> {t('nav_logout')}
                   </button>
                 </div>
               )}
@@ -390,7 +390,7 @@ const Navbar = () => {
             type="button"
             className="mobile-menu-btn"
             onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-            aria-label={isMobileMenuOpen ? 'Close menu' : 'Open menu'}
+            aria-label={isMobileMenuOpen ? t('nav_close_menu') : t('nav_open_menu')}
             aria-expanded={isMobileMenuOpen}
           >
             {isMobileMenuOpen ? <X size={26} /> : <Menu size={26} />}
@@ -401,62 +401,62 @@ const Navbar = () => {
       <div className={`mobile-menu ${isMobileMenuOpen ? 'open' : ''}`} id="mobile-nav-panel">
         <ul className="mobile-nav-links">
           <li>
-            <Link to="/">Home</Link>
+            <Link to="/">{t('nav_home')}</Link>
           </li>
           <li>
-            <Link to="/doctors">Find a Doctor</Link>
+            <Link to="/doctors">{t('nav_find_doctor')}</Link>
           </li>
           <li>
             <Link to="/channeling" className="mobile-book-link">
-              Book Appointment
+              {t('nav_book_appointment')}
             </Link>
           </li>
           <li>
-            <Link to="/ayurveda">Ayurveda</Link>
+            <Link to="/ayurveda">{t('nav_ayurveda')}</Link>
           </li>
           <li>
-            <Link to="/online-consultation">Online Consultation</Link>
+            <Link to="/online-consultation">{t('nav_online_consult')}</Link>
           </li>
           <li>
-            <Link to="/ayurvedic-guide">Guide</Link>
+            <Link to="/ayurvedic-guide">{t('nav_guide')}</Link>
           </li>
           <li>
-            <Link to="/shop">Shop</Link>
+            <Link to="/shop">{t('nav_shop')}</Link>
           </li>
           <li>
-            <Link to="/specialties">Specialties</Link>
+            <Link to="/specialties">{t('home_specialties_title')}</Link>
           </li>
           <li>
-            <Link to="/about">About</Link>
+            <Link to="/about">{t('nav_about')}</Link>
           </li>
           <li>
-            <Link to="/contact">Contact</Link>
+            <Link to="/contact">{t('nav_contact')}</Link>
           </li>
           {showClinicsNav && (
             <li>
-              <Link to="/clinics">Clinics</Link>
+              <Link to="/clinics">{t('nav_clinics')}</Link>
             </li>
           )}
           {showHospitalsNav && (
             <li>
-              <Link to="/hospitals">Hospitals</Link>
+              <Link to="/hospitals">{t('nav_hospitals')}</Link>
             </li>
           )}
           <li className="mobile-nav-secondary">
-            <Link to="/videos">Videos</Link>
+            <Link to="/videos">{t('nav_videos')}</Link>
           </li>
           <li className="mobile-nav-secondary">
-            <Link to="/astrology">Astrology</Link>
+            <Link to="/astrology">{t('nav_astrology')}</Link>
           </li>
           <li className="mobile-nav-secondary">
-            <Link to="/faq">FAQ</Link>
+            <Link to="/faq">{t('nav_faq')}</Link>
           </li>
           <li className="mobile-nav-secondary">
-            <Link to="/join-as-doctor">Join as Doctor</Link>
+            <Link to="/join-as-doctor">{t('nav_join_doctor')}</Link>
           </li>
           <li className="mobile-nav-secondary">
             <button type="button" className="mobile-voice-btn" onClick={handleVoiceSearch}>
-              <Mic size={16} aria-hidden="true" /> Voice search
+              <Mic size={16} aria-hidden="true" /> {t('nav_voice_search')}
             </button>
           </li>
           {user && (
@@ -464,25 +464,25 @@ const Navbar = () => {
               <li>
                 <Link to={getDashboardLink()}>
                   {user.role === 'admin'
-                    ? 'Admin Panel'
+                    ? t('nav_admin_panel')
                     : ['vendor', 'doctor', 'clinic', 'organization'].includes(user.role)
-                      ? 'My Dashboard'
-                      : 'My Account'}
+                      ? t('nav_my_dashboard')
+                      : t('nav_account')}
                 </Link>
               </li>
               {user.role === 'user' && (
                 <>
                   <li>
-                    <Link to="/my-orders">My Orders</Link>
+                    <Link to="/my-orders">{t('nav_my_orders')}</Link>
                   </li>
                   <li>
-                    <Link to="/my-appointments">My Appointments</Link>
+                    <Link to="/my-appointments">{t('nav_my_appointments')}</Link>
                   </li>
                 </>
               )}
               <li>
                 <button type="button" onClick={logout} className="mobile-logout-btn">
-                  Sign Out
+                  {t('nav_logout')}
                 </button>
               </li>
             </>
@@ -490,7 +490,7 @@ const Navbar = () => {
           {!user && (
             <li>
               <Link to="/login" className="mobile-login-btn">
-                Login / Sign Up
+                {t('nav_login')}
               </Link>
             </li>
           )}

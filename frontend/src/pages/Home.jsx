@@ -20,6 +20,8 @@ import {
 import { motion } from 'framer-motion';
 import SEO from '../components/SEO';
 import SocialLinks from '../components/SocialLinks';
+import { useLanguage } from '../context/LanguageContext';
+import { localizeConsultationType, localizeSpecialty } from '../i18n/catalogLabels';
 import {
   collectSpecialtiesFromProviders,
   getProviderSpecialties,
@@ -31,6 +33,7 @@ import { API_URL } from '../config/api';
 
 const Home = () => {
   const navigate = useNavigate();
+  const { t, lang } = useLanguage();
   const [providers, setProviders] = useState([]);
   const [featuredProducts, setFeaturedProducts] = useState([]);
   const [loadingProviders, setLoadingProviders] = useState(true);
@@ -80,8 +83,8 @@ const Home = () => {
   return (
     <div className="home-page animate-fade-in">
       <SEO
-        title="Deergayu | Find Doctors & Ayurveda Care in Sri Lanka"
-        description="Book approved doctors and Ayurveda consultations on Deergayu — Sri Lankan digital healthcare, guide content, and wellness shop."
+        title={t('home_seo_title')}
+        description={t('home_seo_desc')}
         url="https://deergayu.com/"
         canonical="https://deergayu.com/"
       />
@@ -99,29 +102,26 @@ const Home = () => {
             <p className="hero-brand-signal">
               <Leaf size={16} aria-hidden="true" /> Deergayu
             </p>
-            <h1 className="hero-title">
-              Your Health. Your Doctor. Your Time.
-            </h1>
-            <p className="hero-si" lang="si">
-              ඔබේ සෞඛ්‍යයට, ඔබට පහසුම ඩිජිටල් මාර්ගය.
-            </p>
-            <p className="hero-subtitle">
-              Find approved providers, book consultations, and explore Ayurveda care on one Sri
-              Lankan healthcare platform.
-            </p>
+            <h1 className="hero-title">{t('home_hero_title')}</h1>
+            {lang === 'si' && (
+              <p className="hero-si" lang="si">
+                ඔබේ සෞඛ්‍යයට, ඔබට පහසුම ඩිජිටල් මාර්ගය.
+              </p>
+            )}
+            <p className="hero-subtitle">{t('home_hero_subtitle')}</p>
 
-            <form onSubmit={handleDoctorSearch} className="hero-doctor-search" aria-label="Find a doctor">
+            <form onSubmit={handleDoctorSearch} className="hero-doctor-search" aria-label={t('home_aria_find_doctor')}>
               <div className="doctor-search-grid glass-panel">
                 <div>
                   <label htmlFor="home-doctor-name" className="sr-only">
-                    Doctor name
+                    {t('home_doctor_name')}
                   </label>
                   <div className="search-field">
                     <Search size={18} aria-hidden="true" />
                     <input
                       id="home-doctor-name"
                       type="search"
-                      placeholder="Doctor name"
+                      placeholder={t('home_doctor_name')}
                       value={doctorName}
                       onChange={(e) => setDoctorName(e.target.value)}
                     />
@@ -129,60 +129,60 @@ const Home = () => {
                 </div>
                 <div>
                   <label htmlFor="home-specialty" className="sr-only">
-                    Specialty
+                    {t('home_specialty')}
                   </label>
                   <select
                     id="home-specialty"
                     value={specialty}
                     onChange={(e) => setSpecialty(e.target.value)}
                   >
-                    <option value="">Any specialty</option>
+                    <option value="">{t('home_any_specialty')}</option>
                     {specialties.map((s) => (
                       <option key={s} value={s}>
-                        {s}
+                        {localizeSpecialty(s, t)}
                       </option>
                     ))}
                   </select>
                 </div>
                 <div>
                   <label htmlFor="home-consult-type" className="sr-only">
-                    Consultation type
+                    {t('home_consult_type')}
                   </label>
                   <select
                     id="home-consult-type"
                     value={consultType}
                     onChange={(e) => setConsultType(e.target.value)}
                   >
-                    <option value="all">Any consultation type</option>
-                    <option value="in_person">In person</option>
-                    <option value="video">Video</option>
-                    <option value="audio">Audio</option>
+                    <option value="all">{t('home_any_consult')}</option>
+                    <option value="in_person">{localizeConsultationType('in_person', t)}</option>
+                    <option value="video">{localizeConsultationType('video', t)}</option>
+                    <option value="audio">{localizeConsultationType('audio', t)}</option>
                   </select>
                 </div>
                 <button type="submit" className="btn btn-primary search-btn">
-                  Find a Doctor
+                  {t('home_find_doctor')}
                 </button>
               </div>
             </form>
 
             <div className="hero-cta-row">
               <Link to="/channeling" className="btn btn-secondary">
-                Book / Channel a Doctor
+                {t('home_book_channel')}
               </Link>
               <Link to="/ayurveda" className="btn btn-outline hero-outline-light">
-                Explore Ayurveda
+                {t('home_explore_ayurveda')}
               </Link>
             </div>
 
             <div className="hero-trust">
               <div className="trust-item">
-                <CheckCircle size={14} className="text-primary-color" aria-hidden="true" /> Secure booking
+                <CheckCircle size={14} className="text-primary-color" aria-hidden="true" /> {t('home_secure_booking')}
               </div>
               <div className="trust-item">
-                <Shield size={14} className="text-primary-color" aria-hidden="true" /> Approved providers only
+                <Shield size={14} className="text-primary-color" aria-hidden="true" /> {t('home_approved_only')}
               </div>
               <div className="trust-item">
-                <Link to="/contact">Contact support</Link>
+                <Link to="/contact">{t('home_contact_support')}</Link>
               </div>
             </div>
           </motion.div>
@@ -192,7 +192,7 @@ const Home = () => {
       {/* Honest trust signals — no floored / inflated platform-scale numbers */}
       <motion.section
         className="stats-section home-trust-section"
-        aria-label="Platform trust signals"
+        aria-label={t('home_trust_aria')}
         initial="hidden"
         whileInView="visible"
         viewport={{ once: true, margin: '-50px' }}
@@ -202,15 +202,15 @@ const Home = () => {
           <ul className="stats-grid stats-grid-real home-trust-grid">
             <li className="stat-card glass-panel home-trust-card">
               <Users size={22} aria-hidden="true" />
-              <div className="stat-label home-trust-label">Approved providers</div>
+              <div className="stat-label home-trust-label">{t('home_trust_approved')}</div>
             </li>
             <li className="stat-card glass-panel home-trust-card">
               <Shield size={22} aria-hidden="true" />
-              <div className="stat-label home-trust-label">Secure appointment booking</div>
+              <div className="stat-label home-trust-label">{t('home_trust_secure')}</div>
             </li>
             <li className="stat-card glass-panel home-trust-card">
               <Package size={22} aria-hidden="true" />
-              <div className="stat-label home-trust-label">Ayurvedic products &amp; wellness</div>
+              <div className="stat-label home-trust-label">{t('home_trust_products')}</div>
             </li>
           </ul>
         </div>
@@ -227,11 +227,9 @@ const Home = () => {
       >
         <div className="container">
           <div className="section-header">
-            <div className="section-label">Directory</div>
-            <h2 className="section-title">Doctors on Deergayu</h2>
-            <p className="section-subtitle">
-              Approved providers from the live directory. Availability is confirmed when you book.
-            </p>
+            <div className="section-label">{t('home_directory')}</div>
+            <h2 className="section-title">{t('home_doctors_title')}</h2>
+            <p className="section-subtitle">{t('home_doctors_sub')}</p>
           </div>
           {loadingProviders ? (
             <div className="featured-grid">
@@ -247,9 +245,10 @@ const Home = () => {
             </div>
           ) : featuredProviders.length === 0 ? (
             <p className="section-subtitle" style={{ textAlign: 'center' }}>
-              No approved doctors listed yet.{' '}
-              <Link to="/join-as-doctor">Join as a doctor</Link> or{' '}
-              <Link to="/contact">contact us</Link>.
+              {t('home_no_doctors')}{' '}
+              <Link to="/join-as-doctor">{t('nav_join_doctor')}</Link>
+              {' · '}
+              <Link to="/contact">{t('home_contact_support')}</Link>.
             </p>
           ) : (
             <motion.div className="featured-grid" variants={staggerContainer}>
@@ -277,13 +276,15 @@ const Home = () => {
                           <CheckCircle
                             size={16}
                             color="var(--secondary-color)"
-                            aria-label="Deergayu Approved"
+                            aria-label={t('badge_deergayu_approved')}
                           />
                         )}
                       </h3>
                       <p className="doctor-role">{getProviderTitle(provider)}</p>
                       {specs.length > 0 && (
-                        <p className="doctor-specialty">{specs.slice(0, 2).join(' · ')}</p>
+                        <p className="doctor-specialty">
+                          {specs.slice(0, 2).map((s) => localizeSpecialty(s, t)).join(' · ')}
+                        </p>
                       )}
                       {provider.profileDetails?.address && (
                         <p className="doctor-location">
@@ -296,14 +297,14 @@ const Home = () => {
                           className="btn btn-outline btn-sm"
                           style={{ flex: 1, textAlign: 'center' }}
                         >
-                          View profile
+                          {t('home_view_profile')}
                         </Link>
                         <Link
                           to={`/channeling?book=${encodeURIComponent(provider.id)}`}
                           className="btn btn-primary btn-sm"
                           style={{ flex: 1, textAlign: 'center' }}
                         >
-                          Book
+                          {t('dp_book')}
                         </Link>
                       </div>
                     </div>
@@ -314,7 +315,7 @@ const Home = () => {
           )}
           <div style={{ textAlign: 'center', marginTop: '2rem' }}>
             <Link to="/doctors" className="btn btn-outline btn-lg">
-              View all doctors <ChevronRight size={18} />
+              {t('common_view_all')} {t('dp_crumb_doctors')} <ChevronRight size={18} />
             </Link>
           </div>
         </div>
@@ -331,20 +332,20 @@ const Home = () => {
         >
           <div className="container">
             <div className="section-header">
-              <div className="section-label">Care areas</div>
-              <h2 className="section-title">Specialties</h2>
-              <p className="section-subtitle">From specialties listed on current provider profiles.</p>
+              <div className="section-label">{t('home_specialty')}</div>
+              <h2 className="section-title">{t('home_specialties_title')}</h2>
+              <p className="section-subtitle">{t('home_specialties_sub')}</p>
             </div>
             <div className="home-chip-row">
               {specialties.slice(0, 12).map((s) => (
                 <Link key={s} to={`/doctors?specialty=${encodeURIComponent(s)}`} className="home-chip">
-                  {s}
+                  {localizeSpecialty(s, t)}
                 </Link>
               ))}
             </div>
             <div style={{ textAlign: 'center', marginTop: '1.5rem' }}>
               <Link to="/specialties" className="btn btn-outline">
-                All specialties
+                {t('doc_all_specialties')}
               </Link>
             </div>
           </div>
@@ -362,22 +363,18 @@ const Home = () => {
       >
         <div className="container">
           <div className="section-header">
-            <div className="section-label">Differentiator</div>
-            <h2 className="section-title">Ayurveda consultations</h2>
-            <p className="section-subtitle">
-              Connect with Ayurveda practitioners and educational content — without cure guarantees.
-            </p>
+            <div className="section-label">{t('nav_ayurveda')}</div>
+            <h2 className="section-title">{t('ay_title')}</h2>
+            <p className="section-subtitle">{t('ay_subtitle')}</p>
           </div>
           <div className="home-feature-band glass-panel">
             <Stethoscope size={32} color="var(--primary-color)" aria-hidden="true" />
             <div>
-              <h3 style={{ margin: '0 0 0.5rem' }}>Ayurveda on Deergayu</h3>
-              <p style={{ margin: 0, color: 'var(--text-secondary)' }}>
-                Find practitioners, learn from the guide, and book through the same trusted flow.
-              </p>
+              <h3 style={{ margin: '0 0 0.5rem' }}>{t('ay_title')}</h3>
+              <p style={{ margin: 0, color: 'var(--text-secondary)' }}>{t('ay_subtitle')}</p>
             </div>
             <Link to="/ayurveda" className="btn btn-primary">
-              Explore Ayurveda
+              {t('home_explore_ayurveda')}
             </Link>
           </div>
         </div>
@@ -395,14 +392,11 @@ const Home = () => {
         <div className="home-astrology-motif" aria-hidden="true" />
         <div className="container home-astrology-inner">
           <div className="section-header">
-            <div className="section-label home-astrology-eyebrow">Astrology</div>
+            <div className="section-label home-astrology-eyebrow">{t('nav_astrology')}</div>
             <h2 id="home-astrology-heading" className="section-title">
-              Discover Guidance Through the Stars
+              {t('home_astrology_title')}
             </h2>
-            <p className="section-subtitle">
-              Explore traditional astrology services, birth-chart insights, compatibility
-              guidance and auspicious times through Deergayu.
-            </p>
+            <p className="section-subtitle">{t('home_astrology_sub')}</p>
           </div>
 
           <ul className="home-astrology-cards">
@@ -410,29 +404,29 @@ const Home = () => {
               <div className="home-astrology-card-icon" aria-hidden="true">
                 <Star size={22} />
               </div>
-              <h3>Birth Chart</h3>
-              <p>Personalised traditional birth-chart insights.</p>
+              <h3>{t('home_birth_chart')}</h3>
+              <p>{t('home_birth_chart_desc')}</p>
             </li>
             <li className="home-astrology-card glass-panel">
               <div className="home-astrology-card-icon" aria-hidden="true">
                 <Heart size={22} />
               </div>
-              <h3>Compatibility</h3>
-              <p>Explore traditional compatibility guidance.</p>
+              <h3>{t('home_compatibility')}</h3>
+              <p>{t('home_compatibility_desc')}</p>
             </li>
             <li className="home-astrology-card glass-panel">
               <div className="home-astrology-card-icon" aria-hidden="true">
                 <MoonStar size={22} />
               </div>
-              <h3>Auspicious Times</h3>
-              <p>Discover traditional guidance for important dates and occasions.</p>
+              <h3>{t('home_auspicious_times')}</h3>
+              <p>{t('home_auspicious_desc')}</p>
             </li>
           </ul>
 
           <div className="home-astrology-cta">
             <Link to="/astrology" className="btn btn-outline home-astrology-cta-btn">
               <Sparkles size={16} aria-hidden="true" />
-              Explore Astrology
+              {t('home_explore_astrology')}
               <ChevronRight size={16} aria-hidden="true" />
             </Link>
           </div>
@@ -449,29 +443,29 @@ const Home = () => {
       >
         <div className="container">
           <div className="section-header">
-            <h2 className="section-title">How Deergayu works</h2>
-            <p className="section-subtitle">Simple steps using the current booking system.</p>
+            <h2 className="section-title">{t('home_how_title')}</h2>
+            <p className="section-subtitle">{t('home_how_sub')}</p>
           </div>
           <ol className="home-steps">
             <li>
               <span>1</span>
               <div>
-                <strong>Search</strong>
-                <p>Find a doctor by name, specialty, or consultation type.</p>
+                <strong>{t('home_how_1_title')}</strong>
+                <p>{t('home_how_1_desc')}</p>
               </div>
             </li>
             <li>
               <span>2</span>
               <div>
-                <strong>Choose a time</strong>
-                <p>Pick an open slot from the provider&apos;s schedule.</p>
+                <strong>{t('home_how_2_title')}</strong>
+                <p>{t('home_how_2_desc')}</p>
               </div>
             </li>
             <li>
               <span>3</span>
               <div>
-                <strong>Book &amp; track</strong>
-                <p>Submit your request and follow status in My Appointments.</p>
+                <strong>{t('home_how_3_title')}</strong>
+                <p>{t('home_how_3_desc')}</p>
               </div>
             </li>
           </ol>
@@ -489,29 +483,30 @@ const Home = () => {
       >
         <div className="container">
           <div className="section-header">
-            <h2 className="section-title">Why choose Deergayu</h2>
+            <h2 className="section-title">{t('home_why_title')}</h2>
+            <p className="section-subtitle">{t('home_why_sub')}</p>
           </div>
           <div className="services-grid">
             <div className="service-card glass-panel">
               <div className="service-icon-wrapper">
                 <Shield size={28} />
               </div>
-              <h3>Approved providers</h3>
-              <p>Public listings show providers after admin approval — not unreviewed profiles.</p>
+              <h3>{t('home_trust_approved')}</h3>
+              <p>{t('home_approved_only')}</p>
             </div>
             <div className="service-card glass-panel">
               <div className="service-icon-wrapper">
                 <Leaf size={28} />
               </div>
-              <h3>Healthcare + Ayurveda</h3>
-              <p>Modern booking alongside Ayurveda care and educational guide content.</p>
+              <h3>{t('home_trust_secure')}</h3>
+              <p>{t('home_secure_booking')}</p>
             </div>
             <div className="service-card glass-panel">
               <div className="service-icon-wrapper">
                 <Users size={28} />
               </div>
-              <h3>Built for Sri Lanka</h3>
-              <p>Local focus, Sinhala-friendly messaging, and islandwide digital access.</p>
+              <h3>{t('home_trust_products')}</h3>
+              <p>{t('home_shop_sub')}</p>
             </div>
           </div>
         </div>
@@ -529,15 +524,11 @@ const Home = () => {
           <div className="home-feature-band glass-panel">
             <Calendar size={32} color="var(--primary-color)" aria-hidden="true" />
             <div>
-              <h3 style={{ margin: '0 0 0.5rem' }}>Online consultation</h3>
-              <p style={{ margin: 0, color: 'var(--text-secondary)' }}>
-                Book video or remote consultation types when a provider offers them. Deergayu
-                records the booking; a built-in live video studio is not required for the current
-                flow.
-              </p>
+              <h3 style={{ margin: '0 0 0.5rem' }}>{t('oc_title')}</h3>
+              <p style={{ margin: 0, color: 'var(--text-secondary)' }}>{t('oc_subtitle')}</p>
             </div>
             <Link to="/online-consultation" className="btn btn-outline">
-              Learn more
+              {t('oc_cta')}
             </Link>
           </div>
         </div>
@@ -554,27 +545,28 @@ const Home = () => {
       >
         <div className="container">
           <div className="section-header">
-            <h2 className="section-title">Health content &amp; wellness</h2>
+            <h2 className="section-title">{t('home_shop_title')}</h2>
+            <p className="section-subtitle">{t('home_shop_sub')}</p>
           </div>
           <div className="services-grid">
             <div className="service-card glass-panel glass-panel-hover">
               <div className="service-icon-wrapper">
                 <BookOpen size={32} />
               </div>
-              <h3>Guide / Articles</h3>
-              <p>Practical Ayurvedic routines and educational content from the Deergayu guide.</p>
+              <h3>{t('nav_guide')}</h3>
+              <p>{t('ay_subtitle')}</p>
               <Link to="/ayurvedic-guide" className="service-link">
-                Read guide <ChevronRight size={16} />
+                {t('nav_guide')} <ChevronRight size={16} />
               </Link>
             </div>
             <div className="service-card glass-panel glass-panel-hover">
               <div className="service-icon-wrapper">
                 <Package size={32} />
               </div>
-              <h3>Wellness shop</h3>
-              <p>Browse herbal and wellness products from approved vendors.</p>
+              <h3>{t('home_shop_title')}</h3>
+              <p>{t('home_shop_sub')}</p>
               <Link to="/shop" className="service-link">
-                Visit shop <ChevronRight size={16} />
+                {t('home_view_shop')} <ChevronRight size={16} />
               </Link>
             </div>
           </div>
@@ -592,9 +584,9 @@ const Home = () => {
         >
           <div className="container">
             <div className="section-header">
-              <div className="section-label">Shop</div>
-              <h2 className="section-title">Featured products</h2>
-              <p className="section-subtitle">From the live storefront — only real listed items.</p>
+              <div className="section-label">{t('nav_shop')}</div>
+              <h2 className="section-title">{t('home_shop_title')}</h2>
+              <p className="section-subtitle">{t('home_shop_sub')}</p>
             </div>
             <motion.div className="featured-grid" variants={staggerContainer}>
               {loadingProducts
@@ -624,7 +616,7 @@ const Home = () => {
                             Rs. {Number(product.price || 0).toLocaleString()}
                           </span>
                           <Link to={`/product/${product.id}`} className="btn btn-primary btn-sm">
-                            View
+                            {t('common_view_all')}
                           </Link>
                         </div>
                       </div>
@@ -633,7 +625,7 @@ const Home = () => {
             </motion.div>
             <div style={{ textAlign: 'center', marginTop: '2rem' }}>
               <Link to="/shop" className="btn btn-outline btn-lg">
-                Visit full shop <ChevronRight size={18} />
+                {t('home_view_shop')} <ChevronRight size={18} />
               </Link>
             </div>
           </div>
@@ -651,29 +643,26 @@ const Home = () => {
         <div className="container">
           <div className="cta-card glass-panel">
             <div className="cta-content">
-              <div className="section-label">Support &amp; partners</div>
-              <h2>Need help, or joining as a provider?</h2>
-              <p>
-                Contact Deergayu support, or register as a doctor or clinic. Provider profiles go
-                live only after verification.
-              </p>
+              <div className="section-label">{t('home_contact_support')}</div>
+              <h2>{t('home_why_title')}</h2>
+              <p>{t('home_why_sub')}</p>
               <div className="cta-buttons">
                 <Link to="/contact" className="btn btn-primary btn-lg">
-                  Contact support
+                  {t('home_contact_support')}
                 </Link>
                 <Link to="/join-as-doctor" className="btn btn-secondary btn-lg">
-                  Join as doctor
+                  {t('nav_join_doctor')}
                 </Link>
                 <Link to="/faq" className="btn btn-outline btn-lg">
-                  FAQ
+                  {t('nav_faq')}
                 </Link>
               </div>
               <p style={{ marginTop: '1rem', fontSize: '0.9rem' }}>
-                <Link to="/privacy">Privacy</Link>
+                <Link to="/privacy">{t('footer_privacy')}</Link>
                 {' · '}
-                <Link to="/terms">Terms</Link>
+                <Link to="/terms">{t('footer_terms')}</Link>
                 {' · '}
-                <Link to="/refund-policy">Refund policy</Link>
+                <Link to="/refund-policy">{t('footer_refund')}</Link>
               </p>
             </div>
           </div>

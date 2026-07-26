@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Search, Calendar as CalendarIcon, Star, Video, MapPin, X } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext';
@@ -15,6 +15,7 @@ import {
   getProviderSpecialties,
   getProviderTitle,
 } from '../utils/doctorUtils';
+import { localizeSpecialty } from '../i18n/catalogLabels';
 
 
 const sriLankaData = {
@@ -34,7 +35,7 @@ const docSpecialties = ["Sarwanga Roga (General)", "Kadum Bindum (Orthopedic)", 
 const astroSpecialties = ["Horoscope Reading", "Yanthra Preparation", "Auspicious Times", "Vasthu Vidya"];
 
 const Channeling = () => {
-  const { t } = useLanguage();
+  const { t, lang } = useLanguage();
   const { user } = useAuth();
   const { success, error, info } = useToast();
   const navigate = useNavigate();
@@ -159,12 +160,12 @@ const Channeling = () => {
 
   const handleBookClick = (provider, mode = 'in_person') => {
     if (!user) {
-      error("Please login to book an appointment.");
+      error(t('ch_login_to_book'));
       navigate(`/login?returnUrl=${encodeURIComponent(`/channeling?book=${provider.id}`)}`);
       return;
     }
     setConsultMode(mode);
-    setBookingNotes(mode === 'video' ? 'Video consultation requested. Doctor will share Google Meet / Zoom link after confirmation.' : '');
+    setBookingNotes(mode === 'video' ? t('ch_video_request_note') : '');
     setSelectedProvider(provider);
     setProviderReviews([]);
     setLoadingReviews(true);
@@ -178,7 +179,7 @@ const Channeling = () => {
   const handleBookingSubmit = async (e) => {
     e.preventDefault();
     if (!bookingDate || !bookingTime) {
-      error("Please select a date and time.");
+      error(t('ch_select_slot'));
       return;
     }
 
@@ -204,23 +205,23 @@ const Channeling = () => {
       });
 
       if (res.ok) {
-        success("Appointment booked successfully! ✓");
+        success(t('ch_book_success'));
         closeBookingModal();
         navigate('/my-appointments');
       } else {
         const errData = await res.json().catch(() => ({}));
-        error(errData.error || "Failed to book appointment. Please try again.");
+        error(errData.error || t('ch_book_error'));
       }
     } catch (err) {
       console.error('Error booking:', err);
-      error("Network error. Please check your connection and try again.");
+      error(t('ch_book_error'));
     } finally {
       setIsBooking(false);
     }
   };
 
   return (
-    <div className="channeling-page animate-fade-in">
+    <div className="channeling-page animate-fade-in" lang={lang}>
       <SEO title="Book Ayurvedic Doctors | Deergayu" />
       <div className="channeling-header">
         <div className="container">
@@ -290,9 +291,9 @@ const Channeling = () => {
                 className="filter-select"
               >
                 <option value="all">{t('ch_all_spec')}</option>
-                {filterType === 'doctor' && docSpecialties.map(s => <option key={s} value={s}>{s}</option>)}
-                {filterType === 'astrologer' && astroSpecialties.map(s => <option key={s} value={s}>{s}</option>)}
-                {filterType === 'all' && [...docSpecialties, ...astroSpecialties].map(s => <option key={s} value={s}>{s}</option>)}
+                {filterType === 'doctor' && docSpecialties.map(s => <option key={s} value={s}>{localizeSpecialty(s, t)}</option>)}
+                {filterType === 'astrologer' && astroSpecialties.map(s => <option key={s} value={s}>{localizeSpecialty(s, t)}</option>)}
+                {filterType === 'all' && [...docSpecialties, ...astroSpecialties].map(s => <option key={s} value={s}>{localizeSpecialty(s, t)}</option>)}
               </select>
             </div>
           </div>
@@ -302,7 +303,7 @@ const Channeling = () => {
       <div className="container channeling-content">
         <div className="providers-list">
           {loading ? (
-            <div style={{ textAlign: 'center', padding: '4rem', color: 'var(--text-secondary)' }}>Loading experts...</div>
+            <div style={{ textAlign: 'center', padding: '4rem', color: 'var(--text-secondary)' }}>{t('ch_loading_experts')}</div>
           ) : filteredProviders.length > 0 ? (
             filteredProviders.map(provider => {
               const avg = provider.averageRating ?? provider.rating;
@@ -347,7 +348,7 @@ const Channeling = () => {
                     <h3 className="provider-name">
                       {provider.name}{' '}
                       <span className="doctor-badge verified" style={{ fontSize: '0.7rem', verticalAlign: 'middle' }}>
-                        Deergayu Approved
+                        {t('badge_deergayu_approved')}
                       </span>
                     </h3>
                     <p className="provider-role">{provider.profileDetails?.doctorType || provider.role}</p>
@@ -357,18 +358,18 @@ const Channeling = () => {
                     {provider.profileDetails?.doctorType === 'Vedic Astrologer' && provider.profileDetails?.astrologyServices?.length > 0 ? (
                       provider.profileDetails.astrologyServices.map(service => (
                         <span key={service} className="detail-tag" style={{background: 'rgba(212,175,55,0.15)', border: '1px solid rgba(212,175,55,0.3)', color: '#d4af37'}}>
-                          {t(service)}
+                          {localizeSpecialty(service, t)}
                         </span>
                       ))
                     ) : (
                       getProviderSpecialties(provider).map((service) => (
                         <span key={service} className="detail-tag" style={{background: 'rgba(76,175,80,0.15)', border: '1px solid rgba(76,175,80,0.3)', color: '#4caf50'}}>
-                          {t(service)}
+                          {localizeSpecialty(service, t)}
                         </span>
                       ))
                     )}
                     {provider.profileDetails?.experience && (
-                      <span className="detail-tag">{provider.profileDetails.experience} Experience</span>
+                      <span className="detail-tag">{provider.profileDetails.experience} {t('ch_experience')}</span>
                     )}
                     {(provider.locationSummary ||
                       [provider.profileDetails?.city, provider.profileDetails?.district, provider.profileDetails?.province]
@@ -415,20 +416,20 @@ const Channeling = () => {
         );
         const modalSpecs = getProviderSpecialties(selectedProvider);
         const modalMeta =
-          modalSpecs[0] ||
+          (modalSpecs[0] && localizeSpecialty(modalSpecs[0], t)) ||
           getProviderTitle(selectedProvider) ||
           formatDoctorTypeLabel(selectedProvider.profileDetails?.doctorType) ||
           '';
-        const consultLabel = consultMode === 'video' ? 'Video consultation' : 'In-person consultation';
+        const consultLabel = consultMode === 'video' ? t('ch_video_consult') : t('ch_inperson_consult');
         const confirmLabel = isBooking
-          ? 'Booking…'
+          ? t('ch_booking')
           : !bookingDate
-            ? 'Select a date first'
+            ? t('ch_select_date_first')
             : !bookingTime
-              ? 'Select a time slot'
+              ? t('ch_select_slot')
               : !bookingPhone
-                ? 'Enter contact number'
-                : 'Confirm Appointment';
+                ? t('ch_enter_contact_number')
+                : t('ch_confirm_appointment');
 
         return (
           <div
@@ -440,7 +441,7 @@ const Channeling = () => {
               className="booking-modal"
               role="dialog"
               aria-modal="true"
-              aria-label={`Book appointment with ${modalName}`}
+              aria-label={`${t('ch_book_appointment')} ${modalName}`}
               data-testid="booking-modal"
               onClick={(e) => e.stopPropagation()}
             >
@@ -454,7 +455,7 @@ const Channeling = () => {
                     </div>
                   )}
                   <div style={{ minWidth: 0 }}>
-                    <div className="booking-modal-eyebrow">Book appointment</div>
+                    <div className="booking-modal-eyebrow">{t('ch_book_appointment')}</div>
                     <div className="booking-modal-name">{modalName}</div>
                     <div className="booking-modal-meta">
                       {consultLabel}
@@ -465,7 +466,7 @@ const Channeling = () => {
                 <button
                   type="button"
                   className="booking-modal-close"
-                  aria-label="Close booking"
+                  aria-label={t('ch_close')}
                   onClick={closeBookingModal}
                 >
                   <X size={18} />
@@ -477,7 +478,7 @@ const Channeling = () => {
                   {(loadingReviews || providerReviews.length > 0) && (
                     <div className="booking-reviews">
                       <div className="booking-reviews-title">
-                        Patient Reviews
+                        {t('ch_patient_reviews')}
                         {(selectedProvider.averageRating ?? selectedProvider.rating) != null &&
                           Number(selectedProvider.averageRating ?? selectedProvider.rating) > 0 &&
                           Number(selectedProvider.reviewCount) > 0 && (
@@ -489,7 +490,7 @@ const Channeling = () => {
                       </div>
                       {loadingReviews ? (
                         <p className="booking-loading" style={{ margin: 0, padding: '0.5rem 0', border: 'none', background: 'none' }}>
-                          Loading reviews…
+                          {t('ch_loading_reviews')}
                         </p>
                       ) : (
                         providerReviews.map((r) => (
@@ -508,7 +509,7 @@ const Channeling = () => {
                   <div className="booking-step">
                     <div className="booking-step-label">
                       <span className="booking-step-num">1</span>
-                      <label htmlFor="booking-date">Select Date</label>
+                      <label htmlFor="booking-date">{t('ch_select_date')}</label>
                     </div>
                     <input
                       id="booking-date"
@@ -526,26 +527,26 @@ const Channeling = () => {
                       <div className="booking-step-label">
                         <span className="booking-step-num">2</span>
                         <label>
-                          Available Time Slots
+                          {t('ch_available_slots')}
                           {bookingTime && (
-                            <span className="booking-time-hint">✓ {bookingTime} selected</span>
+                            <span className="booking-time-hint">✓ {bookingTime} {t('ch_legend_selected')}</span>
                           )}
                         </label>
                       </div>
 
                       {loadingSlots ? (
-                        <div className="booking-loading">Loading available slots…</div>
+                        <div className="booking-loading">{t('ch_loading_slots')}</div>
                       ) : availableSlots.length === 0 ? (
                         <div className="booking-empty">
-                          <div style={{ fontWeight: 600, marginBottom: '0.25rem' }}>No availability on this date</div>
-                          <div style={{ fontSize: '0.82rem' }}>Please try a different date.</div>
+                          <div style={{ fontWeight: 600, marginBottom: '0.25rem' }}>{t('ch_no_availability')}</div>
+                          <div style={{ fontSize: '0.82rem' }}>{t('ch_try_different_date')}</div>
                         </div>
                       ) : (
                         <>
                           <div className="booking-slot-legend">
-                            <span><i className="booking-slot-swatch" /> Available</span>
-                            <span><i className="booking-slot-swatch selected" /> Selected</span>
-                            <span><i className="booking-slot-swatch booked" /> Booked</span>
+                            <span><i className="booking-slot-swatch" /> {t('ch_legend_available')}</span>
+                            <span><i className="booking-slot-swatch selected" /> {t('ch_legend_selected')}</span>
+                            <span><i className="booking-slot-swatch booked" /> {t('ch_legend_booked')}</span>
                           </div>
                           <div className="booking-slots">
                             {availableSlots.map((slot) => {
@@ -573,7 +574,7 @@ const Channeling = () => {
                     <div className="booking-step-label">
                       <span className="booking-step-num">3</span>
                       <label htmlFor="booking-phone">
-                        Contact Number <span style={{ color: '#ef5350' }}>*</span>
+                        {t('ch_contact_number')} <span style={{ color: '#ef5350' }}>*</span>
                       </label>
                     </div>
                     <input
@@ -592,8 +593,8 @@ const Channeling = () => {
                     <div className="booking-step-label">
                       <span className="booking-step-num">4</span>
                       <label htmlFor="booking-notes">
-                        Notes / Symptoms{' '}
-                        <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>(Optional)</span>
+                        {t('ch_notes')}{' '}
+                        <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>({t('common_optional')})</span>
                       </label>
                     </div>
                     <textarea
@@ -602,7 +603,7 @@ const Channeling = () => {
                       value={bookingNotes}
                       onChange={(e) => setBookingNotes(e.target.value)}
                       rows={3}
-                      placeholder="Briefly describe your symptoms or reason for visit..."
+                      placeholder={t('ch_notes_ph')}
                     />
                   </div>
                 </div>

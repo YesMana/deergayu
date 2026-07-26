@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { Trash2, ShoppingBag, ArrowRight, CheckCircle, Minus, Plus } from 'lucide-react';
 import { useCart } from '../context/CartContext';
 import { useToast } from '../context/ToastContext';
+import { useLanguage } from '../context/LanguageContext';
 import { auth } from '../firebase';
 import './Cart.css';
 import { API_URL } from '../config/api';
@@ -16,14 +17,22 @@ const DEFAULT_BANK = {
 };
 
 const BASE_PAYMENT_OPTIONS = [
-  { value: 'cash_on_delivery', label: 'Cash on Delivery', icon: '💵', desc: 'Pay when your order arrives at your door' },
-  { value: 'qr_pay',           label: 'QR Pay',           icon: '📱', desc: 'Scan & pay instantly via any banking app' },
-  { value: 'bank_transfer',    label: 'Bank Transfer',    icon: '🏦', desc: 'Transfer to our bank account directly' },
+  { value: 'cash_on_delivery', labelKey: 'cart_payment_cash_label', icon: '💵', descKey: 'cart_payment_cash_desc' },
+  { value: 'qr_pay',           labelKey: 'cart_payment_qr_label',   icon: '📱', descKey: 'cart_payment_qr_desc' },
+  { value: 'bank_transfer',    labelKey: 'cart_payment_bank_label', icon: '🏦', descKey: 'cart_payment_bank_desc' },
 ];
+
+const PAYHERE_OPTION = {
+  value: 'payhere',
+  labelKey: 'cart_payment_payhere_label',
+  icon: '💳',
+  descKey: 'cart_payment_payhere_desc',
+};
 
 const Cart = () => {
   const { cartItems, cartCount, loading, removeFromCart, updateQuantity, checkout } = useCart();
   const { success, error } = useToast();
+  const { t } = useLanguage();
 
   const [deliveryAddress, setDeliveryAddress] = useState('');
   const [phone, setPhone]                     = useState('');
@@ -38,6 +47,7 @@ const Cart = () => {
   const [bankDetails, setBankDetails] = useState(DEFAULT_BANK);
   const [payhereEnabled, setPayhereEnabled] = useState(false);
   const [payhereMsg, setPayhereMsg] = useState('');
+  const [qrImageFailed, setQrImageFailed] = useState(false);
 
   useEffect(() => {
     fetch(`${API_URL}/api/storefront-settings`)
@@ -57,15 +67,20 @@ const Cart = () => {
   const selectedZone = shippingZones.find((z) => z.id === shippingZoneId);
   const shippingFee = Number(selectedZone?.fee) || 0;
   const grandTotal = itemsTotal + shippingFee;
+  const formatText = (key, values = {}) =>
+    Object.entries(values).reduce(
+      (text, [name, value]) => text.split(`{${name}}`).join(String(value)),
+      t(key)
+    );
 
   const paymentOptions = payhereEnabled
-    ? [...BASE_PAYMENT_OPTIONS, { value: 'payhere', label: 'Card (PayHere)', icon: '💳', desc: 'Pay securely with Visa / Mastercard' }]
+    ? [...BASE_PAYMENT_OPTIONS, PAYHERE_OPTION]
     : BASE_PAYMENT_OPTIONS;
 
   const tryPayHere = async (data, total) => {
     const orderId = data?.orderIds?.[0];
     if (!orderId) {
-      setPayhereMsg('Order placed. Card payment needs merchant configuration — please use bank transfer or contact support.');
+      setPayhereMsg(t('cart_payhere_missing_order'));
       return;
     }
     try {
@@ -77,7 +92,7 @@ const Cart = () => {
       });
       const hashData = await res.json().catch(() => ({}));
       if (!res.ok) {
-        setPayhereMsg(hashData.error || 'Card pay needs merchant config. Your order is saved — pay via bank transfer or contact support.');
+        setPayhereMsg(hashData.error || t('cart_payhere_config'));
         return;
       }
 
@@ -109,7 +124,7 @@ const Cart = () => {
       document.body.appendChild(form);
       form.submit();
     } catch {
-      setPayhereMsg('Could not start PayHere checkout. Your order is saved — please contact support or use another payment method.');
+      setPayhereMsg(t('cart_payhere_start_failed'));
     }
   };
 
@@ -117,10 +132,11 @@ const Cart = () => {
     e.preventDefault();
     setErrMsg('');
     setPayhereMsg('');
-    if (!deliveryAddress.trim()) { setErrMsg('Please enter a delivery address.'); return; }
-    if (!phone.trim())           { setErrMsg('Please enter a phone number.');     return; }
+    setQrImageFailed(false);
+    if (!deliveryAddress.trim()) { setErrMsg(t('cart_enter_delivery_address')); return; }
+    if (!phone.trim())           { setErrMsg(t('cart_enter_phone'));             return; }
     if (shippingZones.length && !shippingZoneId) {
-      setErrMsg('Please select a shipping zone.');
+      setErrMsg(t('cart_select_shipping_zone'));
       return;
     }
     try {
@@ -133,12 +149,12 @@ const Cart = () => {
         method: paymentMethod,
         shippingFee: data?.shippingFee ?? shippingFee,
       });
-      success('Order placed successfully! ✓');
+      success(t('cart_order_success_toast'));
       if (data?.payhereReady) {
         await tryPayHere(data, total);
       }
     } catch (err) {
-      const msg = err.message || 'Checkout failed. Please try again.';
+      const msg = err.message || t('cart_checkout_failed');
       setErrMsg(msg);
       error(msg);
     } finally {
@@ -149,8 +165,8 @@ const Cart = () => {
   // ── Loading ──────────────────────────────────────────────────
   if (loading) return (
     <div className="cart-page animate-fade-in">
-      <div className="cart-header"><div className="container"><h1 className="cart-title">Your Cart</h1></div></div>
-      <div className="container"><div className="cart-loading"><div className="cart-spinner"></div><p>Loading your cart...</p></div></div>
+      <div className="cart-header"><div className="container"><h1 className="cart-title">{t('cart_title')}</h1></div></div>
+      <div className="container"><div className="cart-loading"><div className="cart-spinner"></div><p>{t('cart_loading')}</p></div></div>
     </div>
   );
 
@@ -158,20 +174,23 @@ const Cart = () => {
   if (orderResult) {
     const ref = orderResult.orderIds?.[0]?.slice(-8).toUpperCase() || 'DEERGAYU';
     const isOnline = orderResult.method === 'qr_pay' || orderResult.method === 'bank_transfer';
+    const orderPlacedParts = t('cart_order_placed_ref').split('{ref}');
 
     return (
       <div className="cart-page animate-fade-in">
-        <div className="cart-header"><div className="container"><h1 className="cart-title">Order Placed! 🎉</h1></div></div>
+        <div className="cart-header"><div className="container"><h1 className="cart-title">{t('cart_order_placed_title')}</h1></div></div>
         <div className="container">
           <div style={{ maxWidth: 580, margin: '2rem auto' }}>
             <div className="glass-panel" style={{ padding: '2.5rem', textAlign: 'center' }}>
               <div style={{ fontSize: '3.5rem', marginBottom: '1rem' }}>✅</div>
-              <h2 style={{ margin: '0 0 0.5rem' }}>Thank You!</h2>
+              <h2 style={{ margin: '0 0 0.5rem' }}>{t('cart_thank_you')}</h2>
               <p style={{ color: 'var(--text-secondary)', marginBottom: '0.5rem' }}>
-                Your order <strong style={{ color: 'var(--primary-color)' }}>#{ref}</strong> has been placed.
+                {orderPlacedParts[0]}
+                <strong style={{ color: 'var(--primary-color)' }}>#{ref}</strong>
+                {orderPlacedParts[1] || ''}
               </p>
               <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: '1.5rem' }}>
-                A confirmation email has been sent to you.
+                {t('cart_confirmation_email')}
               </p>
 
               {payhereMsg && (
@@ -194,46 +213,52 @@ const Cart = () => {
                   margin: '0 0 1.5rem', textAlign: 'left'
                 }}>
                   <h3 style={{ color: 'var(--primary-color)', margin: '0 0 1rem', display: 'flex', alignItems: 'center', gap: 8 }}>
-                    {orderResult.method === 'qr_pay' ? '📱 Scan to Pay' : '🏦 Bank Transfer Details'}
+                    {orderResult.method === 'qr_pay' ? `📱 ${t('cart_scan_to_pay')}` : `🏦 ${t('cart_bank_transfer_details')}`}
                   </h3>
 
                   {orderResult.method === 'qr_pay' && (
                     <div style={{ textAlign: 'center', marginBottom: '1rem' }}>
-                      <img
-                        src="/qr-pay.png"
-                        alt="QR Code"
-                        onError={e => { e.target.parentNode.innerHTML = '<div style="width:160px;height:160px;background:rgba(255,255,255,0.05);border:2px dashed rgba(212,175,55,0.4);border-radius:12px;display:flex;align-items:center;justify-content:center;margin:0 auto;color:rgba(212,175,55,0.6);font-size:0.8rem;text-align:center;padding:1rem">Place your QR code image at<br/>/public/qr-pay.png</div>'; }}
-                        style={{ width: 160, height: 160, borderRadius: 12, border: '2px solid rgba(212,175,55,0.4)', background: '#fff' }}
-                      />
-                      <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', marginTop: 8 }}>Scan with BOC, Sampath, Commercial, HNB or any banking app</p>
+                      {qrImageFailed ? (
+                        <div style={{ width: 160, height: 160, background: 'rgba(255,255,255,0.05)', border: '2px dashed rgba(212,175,55,0.4)', borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto', color: 'rgba(212,175,55,0.6)', fontSize: '0.8rem', textAlign: 'center', padding: '1rem' }}>
+                          {t('cart_qr_missing')}
+                        </div>
+                      ) : (
+                        <img
+                          src="/qr-pay.png"
+                          alt={t('cart_qr_alt')}
+                          onError={() => setQrImageFailed(true)}
+                          style={{ width: 160, height: 160, borderRadius: 12, border: '2px solid rgba(212,175,55,0.4)', background: '#fff' }}
+                        />
+                      )}
+                      <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', marginTop: 8 }}>{t('cart_qr_scan_hint')}</p>
                     </div>
                   )}
 
                   <div style={{ display: 'grid', gap: '0.5rem', fontSize: '0.88rem' }}>
                     {[
-                      ['Bank',         bankDetails.bank],
-                      ['Branch',       bankDetails.branch],
-                      ['Account Name', bankDetails.accountName],
-                      ['Account No.',  bankDetails.accountNo],
-                      ['Amount',       `Rs. ${orderResult.total.toLocaleString()}`],
-                      ['Reference No.', `#${ref} (required)`],
-                    ].map(([label, val]) => (
-                      <div key={label} style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                      { key: 'bank', label: t('cart_bank'), val: bankDetails.bank },
+                      { key: 'branch', label: t('cart_branch'), val: bankDetails.branch },
+                      { key: 'accountName', label: t('cart_account_name'), val: bankDetails.accountName },
+                      { key: 'accountNo', label: t('cart_account_no'), val: bankDetails.accountNo },
+                      { key: 'amount', label: t('cart_amount'), val: `Rs. ${orderResult.total.toLocaleString()}` },
+                      { key: 'reference', label: t('cart_reference_no'), val: `#${ref} (${t('cart_required_suffix')})` },
+                    ].map(({ key, label, val }) => (
+                      <div key={key} style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
                         <span style={{ color: 'var(--text-secondary)', minWidth: 110 }}>{label}:</span>
-                        <strong style={{ color: label === 'Reference No.' ? 'var(--primary-color)' : 'var(--text-primary)' }}>{val}</strong>
+                        <strong style={{ color: key === 'reference' ? 'var(--primary-color)' : 'var(--text-primary)' }}>{val}</strong>
                       </div>
                     ))}
                   </div>
                   <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', margin: '1rem 0 0' }}>
-                    ⚠️ Your order is reserved for 24 hours. Please include the reference number when transferring.
-                    Send your receipt to <strong>WhatsApp +94 76 220 9299</strong> for faster confirmation.
+                    ⚠️ {t('cart_transfer_hold_notice')}{' '}
+                    {t('cart_receipt_notice')} <strong>WhatsApp +94 76 220 9299</strong>.
                   </p>
                 </div>
               )}
 
               <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center', flexWrap: 'wrap' }}>
-                <Link to="/my-orders" className="btn btn-primary"><CheckCircle size={18} /> View My Orders</Link>
-                <Link to="/shop" className="btn btn-outline"><ShoppingBag size={18} /> Continue Shopping</Link>
+                <Link to="/my-orders" className="btn btn-primary"><CheckCircle size={18} /> {t('cart_view_my_orders')}</Link>
+                <Link to="/shop" className="btn btn-outline"><ShoppingBag size={18} /> {t('cart_continue_shopping')}</Link>
               </div>
             </div>
           </div>
@@ -246,15 +271,15 @@ const Cart = () => {
   if (cartItems.length === 0) return (
     <div className="cart-page animate-fade-in">
       <div className="cart-header"><div className="container">
-        <h1 className="cart-title">Your Cart</h1>
-        <p className="cart-subtitle">Your cart is waiting to be filled</p>
+        <h1 className="cart-title">{t('cart_title')}</h1>
+        <p className="cart-subtitle">{t('cart_empty_subtitle')}</p>
       </div></div>
       <div className="container">
         <div className="empty-cart glass-panel">
           <div className="empty-cart-icon">🛒</div>
-          <h2>Your Cart is Empty</h2>
-          <p>Explore our shop and discover authentic Ayurvedic products.</p>
-          <Link to="/shop" className="btn btn-primary"><ShoppingBag size={18} /> Browse Products <ArrowRight size={18} /></Link>
+          <h2>{t('cart_empty_title')}</h2>
+          <p>{t('cart_empty_body')}</p>
+          <Link to="/shop" className="btn btn-primary"><ShoppingBag size={18} /> {t('cart_browse_products')} <ArrowRight size={18} /></Link>
         </div>
       </div>
     </div>
@@ -265,8 +290,12 @@ const Cart = () => {
     <div className="cart-page animate-fade-in">
       <div className="cart-header">
         <div className="container">
-          <h1 className="cart-title">Your Cart</h1>
-          <p className="cart-subtitle">{cartCount} item{cartCount !== 1 ? 's' : ''} in your cart</p>
+          <h1 className="cart-title">{t('cart_title')}</h1>
+          <p className="cart-subtitle">
+            {cartCount === 1
+              ? t('cart_items_count_one')
+              : formatText('cart_items_count_many', { count: cartCount })}
+          </p>
         </div>
       </div>
 
@@ -283,15 +312,15 @@ const Cart = () => {
                 />
                 <div className="cart-item-details">
                   <span className="cart-item-name">{item.name}</span>
-                  {item.vendorName && <span className="cart-item-vendor">by {item.vendorName}</span>}
+                  {item.vendorName && <span className="cart-item-vendor">{t('cart_sold_by')} {item.vendorName}</span>}
                   {item.category   && <span className="cart-item-category">{item.category}</span>}
                   <div className="cart-item-price-row">
                     <span className="cart-item-price">Rs. {Number(item.price).toLocaleString()}</span>
-                    <span className="cart-item-subtotal">Subtotal: Rs. {(item.price * (item.quantity || 1)).toLocaleString()}</span>
+                    <span className="cart-item-subtotal">{t('cart_subtotal')}: Rs. {(item.price * (item.quantity || 1)).toLocaleString()}</span>
                   </div>
                 </div>
                 <div className="cart-item-actions">
-                  <button className="remove-btn" onClick={() => removeFromCart(item.productId)} title="Remove">
+                  <button className="remove-btn" onClick={() => removeFromCart(item.productId)} title={t('cart_remove')}>
                     <Trash2 size={18} />
                   </button>
                   <div className="quantity-controls">
@@ -306,15 +335,15 @@ const Cart = () => {
 
           {/* Checkout Panel */}
           <div className="checkout-panel glass-panel">
-            <h2>Order Summary</h2>
-            <div className="order-summary-line"><span>Items ({cartCount})</span><span>Rs. {itemsTotal.toLocaleString()}</span></div>
+            <h2>{t('cart_order_summary')}</h2>
+            <div className="order-summary-line"><span>{formatText('cart_items_summary', { count: cartCount })}</span><span>Rs. {itemsTotal.toLocaleString()}</span></div>
             <div className="order-summary-line">
-              <span>Delivery{selectedZone ? ` (${selectedZone.name})` : ''}</span>
+              <span>{t('cart_delivery')}{selectedZone ? ` (${selectedZone.name})` : ''}</span>
               <span style={{ color: 'var(--primary-color)', fontWeight: 600 }}>
-                {shippingFee > 0 ? `Rs. ${shippingFee.toLocaleString()}` : 'Free'}
+                {shippingFee > 0 ? `Rs. ${shippingFee.toLocaleString()}` : t('cart_free')}
               </span>
             </div>
-            <div className="order-total-line"><span>Total</span><span>Rs. {grandTotal.toLocaleString()}</span></div>
+            <div className="order-total-line"><span>{t('cart_total')}</span><span>Rs. {grandTotal.toLocaleString()}</span></div>
 
             {errMsg && <div className="cart-error" style={{ marginTop: '0.75rem' }}>{errMsg}</div>}
 
@@ -322,7 +351,7 @@ const Cart = () => {
 
               {shippingZones.length > 0 && (
                 <div className="form-group" style={{ marginTop: '1.25rem' }}>
-                  <label>Shipping Zone *</label>
+                  <label>{t('cart_shipping_zone')} *</label>
                   <select
                     value={shippingZoneId}
                     onChange={(e) => setShippingZoneId(e.target.value)}
@@ -345,7 +374,7 @@ const Cart = () => {
               {/* Payment Method */}
               <div className="form-group" style={{ marginTop: '1.25rem' }}>
                 <label style={{ fontWeight: 700, display: 'block', marginBottom: '0.75rem', fontSize: '0.95rem' }}>
-                  Select Payment Method
+                  {t('cart_payment_method')}
                 </label>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                   {paymentOptions.map(opt => (
@@ -366,8 +395,8 @@ const Cart = () => {
                         style={{ accentColor: '#d4af37', width: 16, height: 16 }} />
                       <span style={{ fontSize: '1.3rem' }}>{opt.icon}</span>
                       <div>
-                        <div style={{ fontWeight: 600, fontSize: '0.88rem' }}>{opt.label}</div>
-                        <div style={{ fontSize: '0.73rem', color: 'var(--text-secondary)' }}>{opt.desc}</div>
+                        <div style={{ fontWeight: 600, fontSize: '0.88rem' }}>{t(opt.labelKey)}</div>
+                        <div style={{ fontSize: '0.73rem', color: 'var(--text-secondary)' }}>{t(opt.descKey)}</div>
                       </div>
                     </label>
                   ))}
@@ -375,41 +404,43 @@ const Cart = () => {
 
                 {paymentMethod === 'qr_pay' && (
                   <div style={{ background: 'rgba(212,175,55,0.05)', border: '1px solid rgba(212,175,55,0.2)', borderRadius: 8, padding: '0.85rem', marginTop: '0.5rem', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
-                    📱 QR code will be displayed after placing your order. Supports all Sri Lankan banking apps.
+                    📱 {t('cart_qr_after_order')}
                   </div>
                 )}
                 {paymentMethod === 'bank_transfer' && (
                   <div style={{ background: 'rgba(212,175,55,0.05)', border: '1px solid rgba(212,175,55,0.2)', borderRadius: 8, padding: '0.85rem', marginTop: '0.5rem', fontSize: '0.8rem' }}>
-                    <div style={{ color: 'var(--text-secondary)', marginBottom: 4 }}>Bank details will be shown after placing the order.</div>
+                    <div style={{ color: 'var(--text-secondary)', marginBottom: 4 }}>{t('cart_bank_after_order')}</div>
                     <div style={{ color: 'rgba(212,175,55,0.85)' }}>🏦 {bankDetails.bank} · <strong>{bankDetails.accountName}</strong></div>
                   </div>
                 )}
                 {paymentMethod === 'payhere' && (
                   <div style={{ background: 'rgba(212,175,55,0.05)', border: '1px solid rgba(212,175,55,0.2)', borderRadius: 8, padding: '0.85rem', marginTop: '0.5rem', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
-                    💳 You will be redirected to PayHere to complete card payment after placing the order.
+                    💳 {t('cart_payhere_after_order')}
                   </div>
                 )}
               </div>
 
               <div className="form-group" style={{ marginTop: '1rem' }}>
-                <label>Delivery Address *</label>
+                <label>{t('cart_delivery_address')} *</label>
                 <textarea value={deliveryAddress} onChange={e => setDeliveryAddress(e.target.value)}
-                  placeholder="No., Street, City, District (e.g. 15/A, Galle Rd, Moratuwa, Colombo)" rows={3} required />
+                  placeholder={t('cart_delivery_address_ph')} rows={3} required />
               </div>
 
               <div className="form-group">
-                <label>Phone Number *</label>
-                <input type="tel" value={phone} onChange={e => setPhone(e.target.value)} placeholder="e.g. 077 123 4567" required />
+                <label>{t('cart_phone')} *</label>
+                <input type="tel" value={phone} onChange={e => setPhone(e.target.value)} placeholder={t('cart_phone_ph')} required />
               </div>
 
               <div className="form-group">
-                <label>Notes <span style={{ color: 'var(--text-secondary)', fontWeight: 400 }}>(optional)</span></label>
-                <textarea value={notes} onChange={e => setNotes(e.target.value)} placeholder="Any special instructions or delivery notes..." rows={2} />
+                <label>{t('cart_notes')} <span style={{ color: 'var(--text-secondary)', fontWeight: 400 }}>({t('common_optional')})</span></label>
+                <textarea value={notes} onChange={e => setNotes(e.target.value)} placeholder={t('cart_notes_ph')} rows={2} />
               </div>
 
               <button type="submit" className="btn btn-primary checkout-btn" disabled={checkingOut}
                 style={{ width: '100%', padding: '1rem', fontSize: '1rem', fontWeight: 700, marginTop: '0.25rem' }}>
-                {checkingOut ? '⏳ Placing Order...' : `Place Order — Rs. ${grandTotal.toLocaleString()}`}
+                {checkingOut
+                  ? `⏳ ${t('cart_placing_order')}`
+                  : formatText('cart_place_order_amount', { amount: grandTotal.toLocaleString() })}
               </button>
             </form>
           </div>

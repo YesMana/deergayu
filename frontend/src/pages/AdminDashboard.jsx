@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { auth } from '../firebase';
 import { API_URL } from '../config/api';
+import { useLanguage } from '../context/LanguageContext';
 
 // Components
 import OverviewDashboard from '../components/Admin/OverviewDashboard';
@@ -39,6 +40,7 @@ import PartnerSupportCard from '../components/PartnerSupportCard';
 import './AdminDashboard.css';
 
 const AdminDashboard = () => {
+  const { t } = useLanguage();
   const [activeTab, setActiveTab] = useState('dashboard');
 
   // Lightweight badge counts
@@ -70,14 +72,14 @@ const AdminDashboard = () => {
   }, [activeTab, fetchBadgeCounts]);
 
   const navItems = [
-    { id: 'dashboard', label: 'Overview', Icon: LayoutDashboard },
-    { id: 'providers', label: 'Manage Experts', Icon: Users, badge: pendingExperts },
+    { id: 'dashboard', labelKey: 'vd_overview', Icon: LayoutDashboard },
+    { id: 'providers', labelKey: 'admin_experts', Icon: Users, badge: pendingExperts },
     { id: 'users', label: 'All Users', Icon: ShieldAlert },
     { id: 'products', label: 'Product Approvals', Icon: Package, badge: pendingProducts },
     { id: 'orders', label: 'All Orders', Icon: ShoppingBag, badge: pendingOrders },
     { id: 'appointments', label: 'Appointments', Icon: Calendar },
-    { id: 'facilities', label: 'Facilities', Icon: Building2 },
-    { id: 'commercial', label: 'Commercial Terms', Icon: Wallet },
+    { id: 'facilities', labelKey: 'admin_facilities', Icon: Building2 },
+    { id: 'commercial', labelKey: 'admin_commercial_terms', Icon: Wallet },
     { id: 'reviews', label: 'Reviews', Icon: Star },
     { id: 'contact', label: 'Inquiries', Icon: Mail, badge: newInquiries },
     { id: 'social', label: 'Social Links', Icon: Share2 },
@@ -93,45 +95,45 @@ const AdminDashboard = () => {
           <div className="admin-brand-icon">🌿</div>
           <div className="admin-brand-text">
             <h2>Deergayu</h2>
-            <span>Admin Console</span>
+            <span>{t('admin_console')}</span>
           </div>
         </div>
 
         <ul className="admin-nav">
           <li className="admin-nav-section-title">Main</li>
-          {navItems.slice(0, 1).map(({ id, label, Icon, badge }) => (
+          {navItems.slice(0, 1).map(({ id, label, labelKey, Icon, badge }) => (
             <li key={id} className={activeTab === id ? 'active' : ''} onClick={() => setActiveTab(id)}>
-              <Icon size={17} /> {label}
+              <Icon size={17} /> {labelKey ? t(labelKey) : label}
               {badge > 0 && <span className="nav-badge">{badge}</span>}
             </li>
           ))}
 
           <li className="admin-nav-section-title">Users & Operations</li>
-          {navItems.slice(1, 3).map(({ id, label, Icon, badge }) => (
+          {navItems.slice(1, 3).map(({ id, label, labelKey, Icon, badge }) => (
             <li key={id} className={activeTab === id ? 'active' : ''} onClick={() => setActiveTab(id)}>
-              <Icon size={17} /> {label}
+              <Icon size={17} /> {labelKey ? t(labelKey) : label}
               {badge > 0 && <span className="nav-badge">{badge}</span>}
             </li>
           ))}
 
           <li className="admin-nav-section-title">Commerce</li>
-          {navItems.slice(3, 5).map(({ id, label, Icon, badge }) => (
+          {navItems.slice(3, 5).map(({ id, label, labelKey, Icon, badge }) => (
             <li key={id} className={activeTab === id ? 'active' : ''} onClick={() => setActiveTab(id)}>
-              <Icon size={17} /> {label}
+              <Icon size={17} /> {labelKey ? t(labelKey) : label}
               {badge > 0 && <span className="nav-badge">{badge}</span>}
             </li>
           ))}
 
           <li className="admin-nav-section-title">Services</li>
-          {navItems.slice(5, 10).map(({ id, label, Icon, badge }) => (
+          {navItems.slice(5, 10).map(({ id, label, labelKey, Icon, badge }) => (
             <li key={id} className={activeTab === id ? 'active' : ''} onClick={() => setActiveTab(id)}>
-              <Icon size={17} /> {label}
+              <Icon size={17} /> {labelKey ? t(labelKey) : label}
               {badge > 0 && <span className="nav-badge">{badge}</span>}
             </li>
           ))}
 
           <li className="admin-nav-section-title">System</li>
-          {navItems.slice(10).map(({ id, label, Icon, badge }) => (
+          {navItems.slice(10).map(({ id, label, labelKey, Icon, badge }) => (
             <li
               key={id}
               className={activeTab === id ? 'active' : ''}
@@ -142,7 +144,7 @@ const AdminDashboard = () => {
                   : undefined
               }
             >
-              <Icon size={17} /> {label}
+              <Icon size={17} /> {labelKey ? t(labelKey) : label}
               {badge > 0 && <span className="nav-badge">{badge}</span>}
             </li>
           ))}

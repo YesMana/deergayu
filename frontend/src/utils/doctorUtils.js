@@ -1,4 +1,5 @@
 /** Helpers for public doctor directory — no payout/finance fields. */
+import { localizeConsultationType } from '../i18n/catalogLabels';
 
 export function specialtyToSlug(name = '') {
   return String(name)
@@ -127,7 +128,10 @@ export function getConsultationTypes(provider) {
   return ['in_person'];
 }
 
-export function consultationTypeLabel(type) {
+export function consultationTypeLabel(type, t) {
+  if (typeof t === 'function') {
+    return localizeConsultationType(type, t);
+  }
   const map = {
     in_person: 'In person',
     video: 'Video',
@@ -186,10 +190,11 @@ export function providerPublicPath(provider) {
   return key ? `/doctors/${encodeURIComponent(key)}` : '/doctors';
 }
 
-export function formatAvailabilitySummary(summary) {
+export function formatAvailabilitySummary(summary, t) {
   if (!summary?.nextDate) return '';
-  const time = summary.nextTime ? ` at ${summary.nextTime}` : '';
-  return `Next available ${summary.nextDate}${time}`;
+  const time = summary.nextTime ? ` ${summary.nextTime}` : '';
+  const label = typeof t === 'function' ? t('doc_next_available') : 'Next available';
+  return `${label} ${summary.nextDate}${time}`;
 }
 
 export async function fetchPublicProvider(apiUrl, idOrSlug) {
