@@ -21,6 +21,9 @@ const PRIVILEGED_USER_FIELDS = [
   'approvedBy',
   'rejectedBy',
   'adminEmails',
+  // P1-B: server-managed SEO slug — clients must never set
+  'publicSlug',
+  'slugHistory',
 ];
 
 /** Top-level user fields a user may update about themselves. */
@@ -31,6 +34,11 @@ const SAFE_PROFILE_DETAIL_FIELDS = [
   'telephone',
   'phone',
   'address',
+  // P1-B additive structured location (keep free-text address)
+  'country',
+  'province',
+  'district',
+  'city',
   'profileImageUrl',
   'specialty',
   'experience',
@@ -42,6 +50,11 @@ const SAFE_PROFILE_DETAIL_FIELDS = [
   'title',
   'qualifications',
   'registrationNumber',
+  'offersInPerson',
+  'offersVideo',
+  'offersAudio',
+  'videoConsultation',
+  'consultationModes',
 ];
 
 /** Settings safe for anonymous / storefront clients. */

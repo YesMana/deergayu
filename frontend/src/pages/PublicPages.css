@@ -250,6 +250,27 @@
   margin-bottom: 1.5rem;
 }
 
+.doctor-filters.doctor-filters-4 {
+  grid-template-columns: 2fr 1fr 1fr 1fr;
+}
+
+.doctor-avail {
+  color: var(--primary-light, var(--primary-color));
+  font-weight: 600;
+}
+
+@media (max-width: 900px) {
+  .doctor-filters.doctor-filters-4 {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-width: 480px) {
+  .doctor-filters.doctor-filters-4 {
+    grid-template-columns: 1fr;
+  }
+}
+
 .doctor-filters input,
 .doctor-filters select {
   width: 100%;

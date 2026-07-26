@@ -7,10 +7,13 @@ import {
   collectSpecialtiesFromProviders,
   consultationTypeLabel,
   fetchPublicConsultationPrice,
+  fetchPublicProviders,
+  formatAvailabilitySummary,
   getConsultationTypes,
   getProviderSpecialties,
   getProviderTitle,
   isApprovedProvider,
+  providerPublicPath,
 } from '../utils/doctorUtils';
 import './PublicPages.css';
 
@@ -19,50 +22,49 @@ const Doctors = () => {
   const [nameQ, setNameQ] = useState(searchParams.get('q') || '');
   const [specialty, setSpecialty] = useState(searchParams.get('specialty') || 'all');
   const [consultType, setConsultType] = useState(searchParams.get('type') || 'all');
+  const [dateFilter, setDateFilter] = useState(searchParams.get('date') || '');
   const [prices, setPrices] = useState({});
 
+  const queryKey = ['public_doctors', nameQ, specialty, consultType, dateFilter];
+
   const { data: providers = [], isLoading, isError, refetch } = useQuery({
-    queryKey: ['public_doctors'],
-    queryFn: async () => {
-      const res = await fetch(`${API_URL}/api/providers`);
-      if (!res.ok) throw new Error('Failed to load doctors');
-      const list = await res.json();
-      return Array.isArray(list) ? list : [];
-    },
+    queryKey,
+    queryFn: () =>
+      fetchPublicProviders(API_URL, {
+        q: nameQ.trim() || undefined,
+        specialty: specialty !== 'all' ? specialty : undefined,
+        type: consultType !== 'all' ? consultType : undefined,
+        date: dateFilter || undefined,
+      }),
+    staleTime: 60 * 1000,
+  });
+
+  // Specialty options: when date-filtered list is small, still show known specialties from unfiltered fetch
+  const { data: allForSpecs = [] } = useQuery({
+    queryKey: ['public_doctors_specs'],
+    queryFn: () => fetchPublicProviders(API_URL, { includeNext: '0' }),
     staleTime: 5 * 60 * 1000,
   });
 
-  const specialties = useMemo(() => collectSpecialtiesFromProviders(providers), [providers]);
+  const specialties = useMemo(
+    () => collectSpecialtiesFromProviders(allForSpecs.length ? allForSpecs : providers),
+    [allForSpecs, providers]
+  );
 
   useEffect(() => {
     const next = new URLSearchParams();
     if (nameQ.trim()) next.set('q', nameQ.trim());
     if (specialty !== 'all') next.set('specialty', specialty);
     if (consultType !== 'all') next.set('type', consultType);
+    if (dateFilter) next.set('date', dateFilter);
     setSearchParams(next, { replace: true });
-  }, [nameQ, specialty, consultType, setSearchParams]);
-
-  const filtered = useMemo(() => {
-    return providers.filter((p) => {
-      const specs = getProviderSpecialties(p);
-      const types = getConsultationTypes(p);
-      const matchName =
-        !nameQ.trim() ||
-        String(p.name || '').toLowerCase().includes(nameQ.trim().toLowerCase()) ||
-        specs.some((s) => s.toLowerCase().includes(nameQ.trim().toLowerCase()));
-      const matchSpec =
-        specialty === 'all' ||
-        specs.some((s) => s.toLowerCase() === specialty.toLowerCase() || s.includes(specialty));
-      const matchType = consultType === 'all' || types.includes(consultType);
-      return matchName && matchSpec && matchType;
-    });
-  }, [providers, nameQ, specialty, consultType]);
+  }, [nameQ, specialty, consultType, dateFilter, setSearchParams]);
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
       const entries = await Promise.all(
-        filtered.slice(0, 40).map(async (p) => {
+        providers.slice(0, 40).map(async (p) => {
           const price = await fetchPublicConsultationPrice(API_URL, p.id, 'in_person');
           return [p.id, price];
         })
@@ -77,13 +79,13 @@ const Doctors = () => {
     return () => {
       cancelled = true;
     };
-  }, [filtered]);
+  }, [providers]);
 
   return (
     <div className="pub-page animate-fade-in">
       <SEO
         title="Find a Doctor | Deergayu"
-        description="Find approved doctors and healthcare providers on Deergayu. Filter by name, specialty, and consultation type."
+        description="Find approved doctors and healthcare providers on Deergayu. Filter by name, specialty, consultation type, and real availability date."
         url="https://deergayu.com/doctors"
         canonical="https://deergayu.com/doctors"
       />
@@ -92,8 +94,8 @@ const Doctors = () => {
           <h1>Find a Doctor</h1>
           <p className="pub-si">ඔබේ වෛද්‍යවරයා සොයා ගන්න</p>
           <p className="pub-lead">
-            Browse approved providers on Deergayu. Book an appointment when you are ready — no fake
-            availability or inflated counts.
+            Browse approved providers on Deergayu. Date filter uses real schedule data only — no fake
+            availability.
           </p>
           <div className="pub-actions">
             <Link to="/channeling" className="btn btn-outline">
@@ -108,7 +110,7 @@ const Doctors = () => {
 
       <section className="pub-section">
         <div className="container">
-          <div className="doctor-filters" role="search" aria-label="Filter doctors">
+          <div className="doctor-filters doctor-filters-4" role="search" aria-label="Filter doctors">
             <label className="sr-only" htmlFor="doc-name">
               Doctor name
             </label>
@@ -147,7 +149,26 @@ const Doctors = () => {
               <option value="video">Video</option>
               <option value="audio">Audio</option>
             </select>
+            <label className="sr-only" htmlFor="doc-date">
+              Available on date
+            </label>
+            <input
+              id="doc-date"
+              type="date"
+              value={dateFilter}
+              min={new Date().toISOString().split('T')[0]}
+              onChange={(e) => setDateFilter(e.target.value)}
+              title="Show providers with real open slots on this date (Asia/Colombo)"
+            />
           </div>
+          {dateFilter && (
+            <p className="pub-note" style={{ marginTop: '-0.5rem', marginBottom: '1rem' }}>
+              Showing providers with open slots on <strong>{dateFilter}</strong> (Asia/Colombo).{' '}
+              <button type="button" className="btn btn-outline btn-sm" onClick={() => setDateFilter('')}>
+                Clear date
+              </button>
+            </p>
+          )}
 
           {isLoading && <div className="pub-loading">Loading doctors…</div>}
           {isError && (
@@ -158,20 +179,25 @@ const Doctors = () => {
               </button>
             </div>
           )}
-          {!isLoading && !isError && filtered.length === 0 && (
+          {!isLoading && !isError && providers.length === 0 && (
             <div className="pub-empty">
-              No doctors match your filters. Try another specialty or{' '}
-              <Link to="/contact">contact support</Link>.
+              {dateFilter
+                ? 'No providers have open slots on that date. Try another day or clear the date filter.'
+                : 'No doctors match your filters. Try another specialty or '}
+              {!dateFilter && <Link to="/contact">contact support</Link>}
+              {!dateFilter && '.'}
             </div>
           )}
 
           <div className="doctor-card-grid">
-            {filtered.map((p) => {
+            {providers.map((p) => {
               const specs = getProviderSpecialties(p);
-              const types = getConsultationTypes(p);
+              const types = p.consultationTypes?.length ? p.consultationTypes : getConsultationTypes(p);
               const pic = p.profileDetails?.profileImageUrl;
               const price = prices[p.id];
               const initial = (p.name || 'D')[0].toUpperCase();
+              const avail = formatAvailabilitySummary(p.availabilitySummary);
+              const path = providerPublicPath(p);
               return (
                 <article key={p.id} className="doctor-card">
                   <div className="doctor-card-top">
@@ -200,25 +226,26 @@ const Doctors = () => {
                       </div>
                     </div>
                   </div>
-                  {p.profileDetails?.languages && (
-                    <div className="doctor-meta">
-                      Languages: {Array.isArray(p.profileDetails.languages)
-                        ? p.profileDetails.languages.join(', ')
-                        : p.profileDetails.languages}
-                    </div>
+                  {p.locationSummary && (
+                    <div className="doctor-meta">{p.locationSummary}</div>
                   )}
+                  {avail && <div className="doctor-meta doctor-avail">{avail}</div>}
                   {price ? (
                     <div className="doctor-meta">
-                      Consultation from {price.currency} {Number(price.consultationPrice).toLocaleString()}
+                      Consultation from {price.currency}{' '}
+                      {Number(price.consultationPrice).toLocaleString()}
                     </div>
                   ) : (
                     <div className="doctor-meta">Consultation fee: see booking / profile</div>
                   )}
                   <div className="doctor-card-actions">
-                    <Link to={`/doctors/${p.id}`} className="btn btn-outline btn-sm">
+                    <Link to={path} className="btn btn-outline btn-sm">
                       View profile
                     </Link>
-                    <Link to={`/channeling?book=${encodeURIComponent(p.id)}`} className="btn btn-primary btn-sm">
+                    <Link
+                      to={`/channeling?book=${encodeURIComponent(p.id)}`}
+                      className="btn btn-primary btn-sm"
+                    >
                       Book
                     </Link>
                   </div>

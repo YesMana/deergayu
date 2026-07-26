@@ -13,6 +13,7 @@ import {
   Mail,
   Share2,
   Wallet,
+  Building2,
 } from 'lucide-react';
 import { auth } from '../firebase';
 import { API_URL } from '../config/api';
@@ -31,6 +32,7 @@ import ManageReviews from '../components/Admin/ManageReviews';
 import ManageContact from '../components/Admin/ManageContact';
 import ManageSocial from '../components/Admin/ManageSocial';
 import ManageCommercialTerms from '../components/Admin/ManageCommercialTerms';
+import ManageFacilities from '../components/Admin/ManageFacilities';
 import ErrorBoundary from '../components/Common/ErrorBoundary';
 import PartnerSupportCard from '../components/PartnerSupportCard';
 
@@ -74,6 +76,7 @@ const AdminDashboard = () => {
     { id: 'products', label: 'Product Approvals', Icon: Package, badge: pendingProducts },
     { id: 'orders', label: 'All Orders', Icon: ShoppingBag, badge: pendingOrders },
     { id: 'appointments', label: 'Appointments', Icon: Calendar },
+    { id: 'facilities', label: 'Facilities', Icon: Building2 },
     { id: 'commercial', label: 'Commercial Terms', Icon: Wallet },
     { id: 'reviews', label: 'Reviews', Icon: Star },
     { id: 'contact', label: 'Inquiries', Icon: Mail, badge: newInquiries },
@@ -120,7 +123,7 @@ const AdminDashboard = () => {
           ))}
 
           <li className="admin-nav-section-title">Services</li>
-          {navItems.slice(5, 9).map(({ id, label, Icon, badge }) => (
+          {navItems.slice(5, 10).map(({ id, label, Icon, badge }) => (
             <li key={id} className={activeTab === id ? 'active' : ''} onClick={() => setActiveTab(id)}>
               <Icon size={17} /> {label}
               {badge > 0 && <span className="nav-badge">{badge}</span>}
@@ -128,7 +131,7 @@ const AdminDashboard = () => {
           ))}
 
           <li className="admin-nav-section-title">System</li>
-          {navItems.slice(9).map(({ id, label, Icon, badge }) => (
+          {navItems.slice(10).map(({ id, label, Icon, badge }) => (
             <li
               key={id}
               className={activeTab === id ? 'active' : ''}
@@ -154,6 +157,7 @@ const AdminDashboard = () => {
         {activeTab === 'products' && <ManageProducts />}
         {activeTab === 'orders' && <ManageOrders />}
         {activeTab === 'appointments' && <ManageAppointments />}
+        {activeTab === 'facilities' && <ManageFacilities />}
         {activeTab === 'commercial' && <ManageCommercialTerms />}
         {activeTab === 'reviews' && <ManageReviews />}
         {activeTab === 'contact' && <ManageContact />}

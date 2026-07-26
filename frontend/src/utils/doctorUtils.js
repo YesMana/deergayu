@@ -164,3 +164,50 @@ export async function fetchPublicConsultationPrice(apiUrl, providerId, consultat
     return null;
   }
 }
+
+/** Prefer SEO slug when present; Firebase UID remains valid. */
+export function providerPublicPath(provider) {
+  const slug = cleanDisplayText(provider?.publicSlug || provider?.canonicalSlug);
+  const id = cleanDisplayText(provider?.id);
+  const key = slug || id;
+  return key ? `/doctors/${encodeURIComponent(key)}` : '/doctors';
+}
+
+export function formatAvailabilitySummary(summary) {
+  if (!summary?.nextDate) return '';
+  const time = summary.nextTime ? ` at ${summary.nextTime}` : '';
+  return `Next available ${summary.nextDate}${time}`;
+}
+
+export async function fetchPublicProvider(apiUrl, idOrSlug) {
+  const key = String(idOrSlug || '').trim();
+  // Prefer single-provider endpoint (slug or id)
+  try {
+    const res = await fetch(`${apiUrl}/api/providers/${encodeURIComponent(key)}`);
+    if (res.ok) return res.json();
+    if (res.status !== 404) throw new Error('Failed to load');
+  } catch (e) {
+    if (e.message === 'Failed to load') throw e;
+  }
+  // Compatibility: older APIs only expose the list (pre-P1-B deploy)
+  const listRes = await fetch(`${apiUrl}/api/providers`);
+  if (!listRes.ok) throw new Error('Failed to load');
+  const list = await listRes.json();
+  const found = (Array.isArray(list) ? list : []).find(
+    (p) => p.id === key || p.publicSlug === key || p.publicSlug === key.toLowerCase()
+  );
+  if (!found) throw new Error('NOT_FOUND');
+  return found;
+}
+
+export async function fetchPublicProviders(apiUrl, params = {}) {
+  const qs = new URLSearchParams();
+  Object.entries(params).forEach(([k, v]) => {
+    if (v != null && v !== '' && v !== 'all') qs.set(k, v);
+  });
+  const url = `${apiUrl}/api/providers${qs.toString() ? `?${qs}` : ''}`;
+  const res = await fetch(url);
+  if (!res.ok) throw new Error('Failed to load doctors');
+  const list = await res.json();
+  return Array.isArray(list) ? list : [];
+}

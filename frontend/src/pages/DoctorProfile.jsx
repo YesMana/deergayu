@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, Navigate, useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import SEO from '../components/SEO';
 import { API_URL } from '../config/api';
@@ -7,11 +7,14 @@ import {
   cleanDisplayText,
   consultationTypeLabel,
   fetchPublicConsultationPrice,
+  fetchPublicProvider,
+  formatAvailabilitySummary,
   getConsultationTypes,
   getProviderSpecialties,
   getProviderTitle,
   isApprovedProvider,
   isDisplayableText,
+  providerPublicPath,
 } from '../utils/doctorUtils';
 import './PublicPages.css';
 
@@ -25,37 +28,16 @@ function formatLanguages(languages) {
 const DoctorProfile = () => {
   const { id } = useParams();
   const [price, setPrice] = useState(null);
-  const [slotsPreview, setSlotsPreview] = useState(null);
 
   const { data: provider, isLoading, isError, refetch } = useQuery({
     queryKey: ['doctor_profile', id],
-    queryFn: async () => {
-      const res = await fetch(`${API_URL}/api/providers`);
-      if (!res.ok) throw new Error('Failed to load');
-      const list = await res.json();
-      const found = (Array.isArray(list) ? list : []).find((p) => p.id === id);
-      if (!found) throw new Error('NOT_FOUND');
-      return found;
-    },
+    queryFn: () => fetchPublicProvider(API_URL, id),
     enabled: Boolean(id),
   });
 
   useEffect(() => {
     if (!provider?.id) return;
     fetchPublicConsultationPrice(API_URL, provider.id, 'in_person').then(setPrice);
-    const today = new Date();
-    const yyyy = today.getFullYear();
-    const mm = String(today.getMonth() + 1).padStart(2, '0');
-    const dd = String(today.getDate()).padStart(2, '0');
-    const date = `${yyyy}-${mm}-${dd}`;
-    fetch(`${API_URL}/api/appointments/available/${provider.id}?date=${date}`)
-      .then((r) => (r.ok ? r.json() : null))
-      .then((data) => {
-        if (!data) return;
-        const free = (data.allSlots || []).filter((s) => !(data.bookedSlots || []).includes(s));
-        setSlotsPreview({ date, freeCount: free.length, sample: free.slice(0, 4) });
-      })
-      .catch(() => setSlotsPreview(null));
   }, [provider?.id]);
 
   if (isLoading) {
@@ -81,9 +63,17 @@ const DoctorProfile = () => {
     );
   }
 
+  // Legacy UID URL → redirect to slug when available (keep ID links working via API)
+  const canonicalPath = providerPublicPath(provider);
+  if (provider.publicSlug && id === provider.id && id !== provider.publicSlug) {
+    return <Navigate to={canonicalPath} replace />;
+  }
+
   const pd = provider.profileDetails || {};
-  const specs = getProviderSpecialties(provider);
-  const types = getConsultationTypes(provider);
+  const specs = provider.specialties?.length ? provider.specialties : getProviderSpecialties(provider);
+  const types = provider.consultationTypes?.length
+    ? provider.consultationTypes
+    : getConsultationTypes(provider);
   const pic = cleanDisplayText(pd.profileImageUrl);
   const name = cleanDisplayText(provider.name) || 'Provider';
   const initial = name[0].toUpperCase();
@@ -92,25 +82,30 @@ const DoctorProfile = () => {
   const qualifications = cleanDisplayText(pd.qualifications);
   const registration = cleanDisplayText(pd.registrationNumber);
   const languages = formatLanguages(pd.languages);
-  const locationLine = [cleanDisplayText(pd.address), cleanDisplayText(pd.province)]
-    .filter(Boolean)
-    .join(', ');
+  const locationLine =
+    cleanDisplayText(provider.locationSummary) ||
+    [cleanDisplayText(pd.address), cleanDisplayText(pd.city), cleanDisplayText(pd.district), cleanDisplayText(pd.province)]
+      .filter(Boolean)
+      .join(', ');
+  const availText = formatAvailabilitySummary(provider.availabilitySummary);
+  const affiliations = Array.isArray(provider.affiliations) ? provider.affiliations : [];
   const pageTitle = `${name} | Deergayu`;
   const desc = `${name} — ${professionalTitle}${specs[0] ? `, ${specs[0]}` : ''}. Book on Deergayu.`;
+  const canonicalUrl = `https://deergayu.com${canonicalPath}`;
 
   return (
     <div className="pub-page doctor-profile-page animate-fade-in">
       <SEO
         title={pageTitle}
         description={desc}
-        url={`https://deergayu.com/doctors/${provider.id}`}
-        canonical={`https://deergayu.com/doctors/${provider.id}`}
+        url={canonicalUrl}
+        canonical={canonicalUrl}
         jsonLd={{
           '@context': 'https://schema.org',
           '@type': 'Physician',
           name,
           ...(specs.length ? { medicalSpecialty: specs } : {}),
-          url: `https://deergayu.com/doctors/${provider.id}`,
+          url: canonicalUrl,
         }}
       />
 
@@ -200,6 +195,27 @@ const DoctorProfile = () => {
               </section>
             )}
 
+            {affiliations.length > 0 && (
+              <section className="profile-block">
+                <h2>Clinics & facilities</h2>
+                <ul className="profile-chip-list">
+                  {affiliations.map((a) => {
+                    const f = a.facility;
+                    if (!f) return null;
+                    const href =
+                      f.type === 'hospital'
+                        ? `/hospitals/${encodeURIComponent(f.slug)}`
+                        : `/clinics/${encodeURIComponent(f.slug)}`;
+                    return (
+                      <li key={a.id}>
+                        <Link to={href}>{f.name}</Link>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </section>
+            )}
+
             <section className="profile-block">
               <h2>Consultation</h2>
               <ul className="profile-chip-list">
@@ -209,16 +225,17 @@ const DoctorProfile = () => {
               </ul>
             </section>
 
-            {slotsPreview && (
+            {availText && (
               <section className="profile-block">
                 <h2>Availability</h2>
-                <p className="profile-block-body">
-                  Today ({slotsPreview.date}): {slotsPreview.freeCount} open slot
-                  {slotsPreview.freeCount === 1 ? '' : 's'}
-                  {slotsPreview.sample?.length ? ` · e.g. ${slotsPreview.sample.join(', ')}` : ''}
-                </p>
+                <p className="profile-block-body">{availText}</p>
+                {provider.availabilitySummary?.sample?.length ? (
+                  <p className="profile-block-meta">
+                    Sample times: {provider.availabilitySummary.sample.join(', ')}
+                  </p>
+                ) : null}
                 <p className="profile-block-meta">
-                  Choose a date in booking to see full schedule for that day.
+                  Choose a date in booking to see the full schedule for that day (Asia/Colombo).
                 </p>
               </section>
             )}
@@ -249,11 +266,8 @@ const DoctorProfile = () => {
 
               <div className="booking-side-row">
                 <span className="booking-side-label">Availability</span>
-                {slotsPreview ? (
-                  <p className="booking-side-body">
-                    {slotsPreview.freeCount} open slot{slotsPreview.freeCount === 1 ? '' : 's'} today
-                    {slotsPreview.sample?.length ? ` (${slotsPreview.sample.join(', ')})` : ''}
-                  </p>
+                {availText ? (
+                  <p className="booking-side-body">{availText}</p>
                 ) : (
                   <p className="booking-side-muted">Open booking to check available times.</p>
                 )}

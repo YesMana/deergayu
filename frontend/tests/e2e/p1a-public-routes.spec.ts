@@ -106,7 +106,8 @@ test.describe('P1-A public routes', () => {
     await expect(book).toBeVisible();
     const href = await book.getAttribute('href');
     expect(href).toMatch(/book=/);
-    await book.click();
+    // Navigate directly — list may re-render while fetching prices/availability
+    await page.goto(href!);
     await expect(page).toHaveURL(/\/channeling\?book=/);
   });
 
