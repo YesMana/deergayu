@@ -4,6 +4,8 @@ import { useQuery } from '@tanstack/react-query';
 import SEO from '../components/SEO';
 import { API_URL } from '../config/api';
 import { getProviderTitle, providerPublicPath } from '../utils/doctorUtils';
+import { useLanguage } from '../context/LanguageContext';
+import { localizeFacilityType } from '../i18n/catalogLabels';
 import './PublicPages.css';
 
 async function fetchFacilities(group) {
@@ -21,12 +23,15 @@ async function fetchFacility(slugOrId) {
 }
 
 /** Shared directory for /clinics and /hospitals — empty state, never fake listings. */
-export function FacilityDirectory({ group, title, siTitle, lead, basePath }) {
+export function FacilityDirectory({ group, titleKey, leadKey, basePath }) {
+  const { t } = useLanguage();
   const { data: facilities = [], isLoading, isError, refetch } = useQuery({
     queryKey: ['facilities', group],
     queryFn: () => fetchFacilities(group),
     staleTime: 60 * 1000,
   });
+  const title = t(titleKey);
+  const lead = t(leadKey);
 
   return (
     <div className="pub-page animate-fade-in">
@@ -39,38 +44,33 @@ export function FacilityDirectory({ group, title, siTitle, lead, basePath }) {
       <section className="pub-hero">
         <div className="container">
           <h1>{title}</h1>
-          {siTitle && <p className="pub-si">{siTitle}</p>}
           <p className="pub-lead">{lead}</p>
           <div className="pub-actions">
             <Link to="/doctors" className="btn btn-primary">
-              Find a Doctor
+              {t('fac_find_doctor')}
             </Link>
             <Link to="/join-as-clinic" className="btn btn-outline">
-              Join as a clinic
+              {t('fac_join_clinic')}
             </Link>
           </div>
         </div>
       </section>
       <section className="pub-section">
         <div className="container">
-          {isLoading && <div className="pub-loading">Loading…</div>}
+          {isLoading && <div className="pub-loading">{t('fac_loading')}</div>}
           {isError && (
             <div className="pub-error">
-              Could not load directory.{' '}
+              {t('fac_error')}{' '}
               <button type="button" className="btn btn-outline btn-sm" onClick={() => refetch()}>
-                Retry
+                {t('common_retry')}
               </button>
             </div>
           )}
           {!isLoading && !isError && facilities.length === 0 && (
             <div className="pub-empty">
+              <p>{t('fac_empty')}</p>
               <p>
-                No {title.toLowerCase()} are listed yet. Deergayu does not show placeholder facilities.
-              </p>
-              <p>
-                Clinics and hospitals are added by our team when verified. Meanwhile,{' '}
-                <Link to="/doctors">browse doctors</Link> or{' '}
-                <Link to="/contact">contact support</Link>.
+                <Link to="/doctors">{t('fac_find_doctor')}</Link>
               </p>
             </div>
           )}
@@ -78,7 +78,7 @@ export function FacilityDirectory({ group, title, siTitle, lead, basePath }) {
             {facilities.map((f) => (
               <article key={f.id} className="doctor-card">
                 <h3>{f.name}</h3>
-                <div className="doctor-meta">{f.type?.replace(/_/g, ' ')}</div>
+                <div className="doctor-meta">{localizeFacilityType(f.type, t)}</div>
                 {(f.city || f.district || f.address) && (
                   <div className="doctor-meta">
                     {[f.address, f.city, f.district].filter(Boolean).join(', ')}
@@ -92,7 +92,7 @@ export function FacilityDirectory({ group, title, siTitle, lead, basePath }) {
                     to={`${basePath}/${encodeURIComponent(f.slug)}`}
                     className="btn btn-outline btn-sm"
                   >
-                    View
+                    {t('fac_view_doctors')}
                   </Link>
                 </div>
               </article>
@@ -104,7 +104,8 @@ export function FacilityDirectory({ group, title, siTitle, lead, basePath }) {
   );
 }
 
-export function FacilityProfile({ basePath, kindLabel }) {
+export function FacilityProfile({ basePath, kindLabelKey }) {
+  const { t } = useLanguage();
   const { slug } = useParams();
   const { data, isLoading, isError } = useQuery({
     queryKey: ['facility', slug],
@@ -125,13 +126,14 @@ export function FacilityProfile({ basePath, kindLabel }) {
     return (
       <div className="pub-page">
         <div className="container pub-error">
-          {kindLabel} not found. <Link to={basePath}>Back</Link>
+          {t('fac_not_found')} <Link to={basePath}>{t('common_back')}</Link>
         </div>
       </div>
     );
   }
 
   const canonical = `https://deergayu.com${basePath}/${data.slug}`;
+  const kindLabel = t(kindLabelKey);
 
   return (
     <div className="pub-page doctor-profile-page animate-fade-in">
@@ -155,7 +157,7 @@ export function FacilityProfile({ basePath, kindLabel }) {
           <header className="profile-header-card" style={{ marginBottom: '1rem' }}>
             <div className="profile-header-text">
               <h1>{data.name}</h1>
-              <p className="profile-title">{String(data.type || '').replace(/_/g, ' ')}</p>
+              <p className="profile-title">{localizeFacilityType(data.type, t)}</p>
               {(data.address || data.city) && (
                 <p className="doctor-meta">
                   {[data.address, data.city, data.district, data.province].filter(Boolean).join(', ')}
@@ -194,9 +196,8 @@ export function FacilityProfile({ basePath, kindLabel }) {
 export const Clinics = () => (
   <FacilityDirectory
     group="clinics"
-    title="Clinics"
-    siTitle="සායන"
-    lead="Verified clinics and Ayurveda centres on Deergayu. Empty until real facilities are published."
+    titleKey="fac_clinics_title"
+    leadKey="fac_clinics_sub"
     basePath="/clinics"
   />
 );
@@ -204,16 +205,15 @@ export const Clinics = () => (
 export const Hospitals = () => (
   <FacilityDirectory
     group="hospitals"
-    title="Hospitals"
-    siTitle="රෝහල්"
-    lead="Verified hospitals on Deergayu. Empty until real facilities are published."
+    titleKey="fac_hospitals_title"
+    leadKey="fac_hospitals_sub"
     basePath="/hospitals"
   />
 );
 
-export const ClinicProfile = () => <FacilityProfile basePath="/clinics" kindLabel="Clinics" />;
+export const ClinicProfile = () => <FacilityProfile basePath="/clinics" kindLabelKey="fac_clinics_title" />;
 export const HospitalProfile = () => (
-  <FacilityProfile basePath="/hospitals" kindLabel="Hospitals" />
+  <FacilityProfile basePath="/hospitals" kindLabelKey="fac_hospitals_title" />
 );
 
 export default Clinics;

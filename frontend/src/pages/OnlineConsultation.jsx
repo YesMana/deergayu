@@ -1,35 +1,34 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import SEO from '../components/SEO';
+import { useLanguage } from '../context/LanguageContext';
 import './PublicPages.css';
 
-const OnlineConsultation = () => (
-  <div className="pub-page animate-fade-in">
-    <SEO
-      title="Online Consultation | Deergayu"
-      description="Learn how online and remote consultation options work on Deergayu."
-      url="https://deergayu.com/online-consultation"
-      canonical="https://deergayu.com/online-consultation"
-    />
-    <section className="pub-hero">
-      <div className="container">
-        <h1>Online consultation</h1>
-        <p className="pub-lead">
-          Deergayu lets you request consultations with approved providers. You can choose
-          consultation types such as in person or video when booking. Built-in live video calling
-          inside the Deergayu app is not claimed as a completed product feature — providers and
-          patients arrange the consultation according to the confirmed booking details.
-        </p>
-        <div className="pub-actions">
-          <Link to="/doctors?type=video" className="btn btn-primary">
-            Find doctors
-          </Link>
-          <Link to="/faq" className="btn btn-outline">
-            Read FAQ
-          </Link>
+const OnlineConsultation = () => {
+  const { t } = useLanguage();
+
+  return (
+    <div className="pub-page animate-fade-in">
+      <SEO
+        title={`${t('oc_title')} | Deergayu`}
+        description={t('oc_subtitle')}
+        url="https://deergayu.com/online-consultation"
+        canonical="https://deergayu.com/online-consultation"
+      />
+      <section className="pub-hero">
+        <div className="container">
+          <h1>{t('oc_title')}</h1>
+          <p className="pub-lead">{t('oc_subtitle')}</p>
+          <div className="pub-actions">
+            <Link to="/doctors?type=video" className="btn btn-primary">
+              {t('oc_cta')}
+            </Link>
+            <Link to="/faq" className="btn btn-outline">
+              {t('oc_cta_secondary')}
+            </Link>
+          </div>
         </div>
-      </div>
-    </section>
+      </section>
 
     <section className="pub-section">
       <div className="container">
@@ -83,6 +82,7 @@ const OnlineConsultation = () => (
       </div>
     </section>
   </div>
-);
+  );
+};
 
 export default OnlineConsultation;

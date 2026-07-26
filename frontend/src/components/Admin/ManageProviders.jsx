@@ -3,6 +3,7 @@ import { Users, RefreshCw, Search, Pencil, Trash2, X } from 'lucide-react';
 import { useProvidersQuery } from '../../hooks/queries/useProviders';
 import { auth } from '../../firebase';
 import { useToast } from '../../context/ToastContext';
+import { useLanguage } from '../../context/LanguageContext';
 import { userInitials, StatusPill } from './AdminUtils';
 import AdminUserProfileModal from './AdminUserProfileModal';
 import { uploadImageDurable } from '../../utils/uploadImage';
@@ -37,6 +38,7 @@ const emptyEdit = {
 };
 
 export default function ManageProviders() {
+  const { t } = useLanguage();
   const { success, error } = useToast();
   const { data: providers = [], isLoading, refetch } = useProvidersQuery();
   const [providerSearch, setProviderSearch] = useState('');
@@ -218,7 +220,7 @@ export default function ManageProviders() {
           <div style={{ overflowX: 'auto' }}>
             <table className="admin-table">
               <thead><tr>
-                <th>Expert</th><th>Role</th><th>Specialty</th><th>Profile</th><th>Status</th><th>Actions</th>
+                <th>Expert</th><th>Role</th><th>Specialty</th><th>{t('admin_profile')}</th><th>Status</th><th>Actions</th>
               </tr></thead>
               <tbody>
                 {filtered.map((p) => {
@@ -245,7 +247,7 @@ export default function ManageProviders() {
                         ? p.profileDetails.specialty.join(', ')
                         : p.profileDetails?.specialty || p.profileDetails?.doctorType || '—'}
                       {suspicious.length > 0 && (
-                        <div style={{ color: '#ef9a9a', fontSize: '0.75rem' }}>Needs cleanup</div>
+                        <div style={{ color: '#ef9a9a', fontSize: '0.75rem' }}>{t('admin_needs_cleanup')}</div>
                       )}
                     </td>
                     <td>
@@ -275,14 +277,14 @@ export default function ManageProviders() {
                             }}
                             style={{ background: 'rgba(239,83,80,0.15)', color: '#ef5350' }}
                           >
-                            Reject / correct
+                            {t('admin_reject_correct')}
                           </button>
                         )}
                         <button className="btn-xs" onClick={() => openEdit(p)} style={{ background: 'rgba(61,139,85,0.2)', color: 'var(--primary-light)' }}>
                           <Pencil size={12} style={{ marginRight: 4 }} /> Edit
                         </button>
                         <button className="btn-xs edit-btn" onClick={() => setProfileUserId(p.id)} style={{ background: 'var(--primary-color)', color: 'white' }}>
-                          Full Profile
+                          {t('admin_full_profile')}
                         </button>
                         <button className="btn-xs" onClick={() => handleDelete(p)} style={{ background: 'rgba(239,83,80,0.15)', color: '#ef5350' }}>
                           <Trash2 size={12} style={{ marginRight: 4 }} /> Delete

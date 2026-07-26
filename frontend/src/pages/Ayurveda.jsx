@@ -1,35 +1,34 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import SEO from '../components/SEO';
+import { useLanguage } from '../context/LanguageContext';
 import './PublicPages.css';
 
-const Ayurveda = () => (
-  <div className="pub-page animate-fade-in">
-    <SEO
-      title="Ayurveda | Deergayu"
-      description="Find Ayurveda doctors and educational content on Deergayu — Sri Lanka's digital healthcare and Ayurveda platform."
-      url="https://deergayu.com/ayurveda"
-      canonical="https://deergayu.com/ayurveda"
-    />
-    <section className="pub-hero">
-      <div className="container">
-        <h1>Ayurveda on Deergayu</h1>
-        <p className="pub-si">ආයුර්වේද සත්කාරයට ඩිජිටල් මාර්ගයක්</p>
-        <p className="pub-lead">
-          Connect with approved Ayurveda practitioners, explore educational guide content, and book
-          consultations through Deergayu. We do not guarantee cures for serious diseases — care
-          decisions belong to you and your qualified provider.
-        </p>
-        <div className="pub-actions">
-          <Link to="/doctors" className="btn btn-primary">
-            Find an Ayurveda doctor
-          </Link>
-          <Link to="/online-consultation" className="btn btn-outline">
-            Online consultation info
-          </Link>
+const Ayurveda = () => {
+  const { t } = useLanguage();
+
+  return (
+    <div className="pub-page animate-fade-in">
+      <SEO
+        title={`${t('ay_title')} | Deergayu`}
+        description={t('ay_subtitle')}
+        url="https://deergayu.com/ayurveda"
+        canonical="https://deergayu.com/ayurveda"
+      />
+      <section className="pub-hero">
+        <div className="container">
+          <h1>{t('ay_title')}</h1>
+          <p className="pub-lead">{t('ay_subtitle')}</p>
+          <div className="pub-actions">
+            <Link to="/doctors" className="btn btn-primary">
+              {t('ay_cta_doctor')}
+            </Link>
+            <Link to="/online-consultation" className="btn btn-outline">
+              {t('ay_cta_online')}
+            </Link>
+          </div>
         </div>
-      </div>
-    </section>
+      </section>
 
     <section className="pub-section">
       <div className="container">
@@ -91,6 +90,7 @@ const Ayurveda = () => (
       </div>
     </section>
   </div>
-);
+  );
+};
 
 export default Ayurveda;

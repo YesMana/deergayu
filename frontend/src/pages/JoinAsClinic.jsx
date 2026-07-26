@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import SEO from '../components/SEO';
 import { useToast } from '../context/ToastContext';
+import { useLanguage } from '../context/LanguageContext';
 import { API_URL } from '../config/api';
 import './PublicPages.css';
 
@@ -10,6 +11,7 @@ import './PublicPages.css';
  * This page offers signup (clinic role) + an enquiry form via /api/contact.
  */
 const JoinAsClinic = () => {
+  const { t } = useLanguage();
   const { success, error } = useToast();
   const [form, setForm] = useState({
     name: '',
@@ -52,25 +54,21 @@ const JoinAsClinic = () => {
   return (
     <div className="pub-page animate-fade-in">
       <SEO
-        title="Join as a Clinic | Deergayu"
-        description="Register clinic interest with Deergayu. Full multi-location clinic management is expanding — start with clinic role signup or an enquiry."
+        title={`${t('jac_title')} | Deergayu`}
+        description={t('jac_subtitle')}
         url="https://deergayu.com/join-as-clinic"
         canonical="https://deergayu.com/join-as-clinic"
       />
       <section className="pub-hero">
         <div className="container">
-          <h1>Clinic &amp; partnership interest</h1>
-          <p className="pub-lead">
-            Deergayu supports clinic-role accounts for providers. A full public hospital/clinic
-            directory and multi-doctor facility management are not complete yet — we do not list
-            fake clinics. You can create a clinic account for review, or send an interest enquiry.
-          </p>
+          <h1>{t('jac_title')}</h1>
+          <p className="pub-lead">{t('jac_subtitle')}</p>
           <div className="pub-actions">
             <Link to="/login?mode=signup&role=clinic" className="btn btn-primary">
-              Register clinic account
+              {t('jac_cta_register')}
             </Link>
             <Link to="/join-as-doctor" className="btn btn-outline">
-              Join as a doctor
+              {t('jac_cta_doctor')}
             </Link>
           </div>
         </div>
@@ -127,7 +125,7 @@ const JoinAsClinic = () => {
               />
             </div>
             <button type="submit" className="btn btn-primary" disabled={submitting}>
-              {submitting ? 'Sending…' : 'Submit interest'}
+              {submitting ? `${t('common_submit')}...` : t('jac_submit_interest')}
             </button>
           </form>
         </div>
