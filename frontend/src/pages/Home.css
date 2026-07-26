@@ -747,3 +747,162 @@
 
 .hero-doctor-first .hero-particles { display: none; }
 .hero-doctor-first { min-height: auto; }
+
+/* ── Astrology discovery (secondary to Find a Doctor) ── */
+.home-astrology-section {
+  position: relative;
+  overflow: hidden;
+  background:
+    radial-gradient(ellipse 70% 55% at 88% 12%, rgba(196, 163, 90, 0.1), transparent 55%),
+    radial-gradient(ellipse 55% 45% at 8% 88%, rgba(61, 139, 85, 0.12), transparent 50%),
+    var(--surface-alt);
+}
+
+.home-astrology-motif {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.45;
+  background-image:
+    radial-gradient(1.5px 1.5px at 12% 22%, var(--secondary-light), transparent),
+    radial-gradient(1.5px 1.5px at 28% 68%, var(--secondary-color), transparent),
+    radial-gradient(1px 1px at 48% 18%, var(--secondary-light), transparent),
+    radial-gradient(1.5px 1.5px at 72% 42%, var(--secondary-color), transparent),
+    radial-gradient(1px 1px at 86% 76%, var(--secondary-light), transparent),
+    radial-gradient(1px 1px at 62% 88%, var(--secondary-color), transparent),
+    linear-gradient(
+      125deg,
+      transparent 0%,
+      transparent 38%,
+      rgba(196, 163, 90, 0.07) 39%,
+      transparent 40%,
+      transparent 58%,
+      rgba(196, 163, 90, 0.05) 59%,
+      transparent 60%
+    );
+}
+
+.home-astrology-inner {
+  position: relative;
+  z-index: 1;
+}
+
+.home-astrology-eyebrow {
+  letter-spacing: 0.14em;
+  color: var(--secondary-color);
+  background: rgba(196, 163, 90, 0.1);
+  border: 1px solid rgba(196, 163, 90, 0.28);
+  display: inline-flex;
+  padding: 0.3rem 0.75rem;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.home-astrology-cards {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1.25rem;
+}
+
+.home-astrology-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  padding: 1.35rem 1.25rem;
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-md, 12px);
+  background: var(--glass-bg);
+  min-width: 0;
+}
+
+.home-astrology-card-icon {
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--secondary-color);
+  background: rgba(196, 163, 90, 0.12);
+  border: 1px solid rgba(196, 163, 90, 0.22);
+  flex-shrink: 0;
+}
+
+.home-astrology-card h3 {
+  margin: 0;
+  font-family: var(--font-heading);
+  font-size: 1.15rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.home-astrology-card p {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 0.92rem;
+  line-height: 1.55;
+}
+
+.home-astrology-cta {
+  display: flex;
+  justify-content: center;
+  margin-top: 1.75rem;
+}
+
+.home-astrology-cta-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  border-color: rgba(196, 163, 90, 0.45);
+  color: var(--secondary-color);
+}
+
+.home-astrology-cta-btn:hover {
+  border-color: var(--secondary-color);
+  color: var(--secondary-light);
+  background: rgba(196, 163, 90, 0.08);
+}
+
+:root[data-theme='light'] .home-astrology-section {
+  background:
+    radial-gradient(ellipse 70% 55% at 88% 12%, rgba(184, 134, 11, 0.08), transparent 55%),
+    radial-gradient(ellipse 55% 45% at 8% 88%, rgba(46, 125, 50, 0.08), transparent 50%),
+    #f7f3ea;
+}
+
+:root[data-theme='light'] .home-astrology-card {
+  background: rgba(255, 255, 255, 0.92);
+  border-color: rgba(46, 125, 50, 0.16);
+}
+
+:root[data-theme='light'] .home-astrology-eyebrow {
+  background: rgba(184, 134, 11, 0.1);
+  border-color: rgba(184, 134, 11, 0.28);
+}
+
+:root[data-theme='light'] .home-astrology-cta-btn:hover {
+  color: var(--secondary-color);
+  background: rgba(184, 134, 11, 0.08);
+}
+
+@media (max-width: 900px) {
+  .home-astrology-cards {
+    grid-template-columns: 1fr;
+  }
+
+  .home-astrology-cta-btn {
+    width: 100%;
+    justify-content: center;
+  }
+}
+
+@media (max-width: 480px) {
+  .home-astrology-card {
+    padding: 1.15rem 1rem;
+  }
+}
