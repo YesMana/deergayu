@@ -1,1 +1,0 @@
-import{n as e,t}from"./useBaseQuery-Cvdp7JMD.js";function n(n,r){return t(n,e,r)}export{n as t};
