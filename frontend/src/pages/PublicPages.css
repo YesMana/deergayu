@@ -31,9 +31,11 @@
 
 .pub-hero .pub-lead {
   max-width: 40rem;
-  color: var(--text-muted, #555);
+  /* Secondary (not muted): keep hierarchy but stay readable in dark + SI/TA */
+  color: var(--text-secondary, #3d5346);
   margin: 0 0 1.25rem;
   line-height: 1.55;
+  opacity: 1;
 }
 
 .pub-actions {
@@ -282,12 +284,24 @@
   font-size: 1rem;
 }
 
+/* FAQ accordion — theme-aware surfaces (do NOT use undefined --surface → #fff fallback) */
 .faq-list details {
-  border: 1px solid rgba(0, 0, 0, 0.08);
+  border: 1px solid var(--glass-border, rgba(0, 0, 0, 0.08));
   border-radius: 10px;
   padding: 0.85rem 1rem;
   margin-bottom: 0.65rem;
-  background: var(--surface, #fff);
+  background: var(--surface-color, var(--card-bg, #ffffff));
+  color: var(--text-primary, #142019);
+  transition: border-color 0.2s ease, background-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.faq-list details:hover {
+  border-color: rgba(46, 125, 50, 0.4);
+  box-shadow: 0 4px 14px rgba(46, 125, 50, 0.08);
+}
+
+.faq-list details[open] {
+  border-color: rgba(46, 125, 50, 0.45);
 }
 
 .faq-list summary {
@@ -296,12 +310,57 @@
   min-height: 44px;
   display: flex;
   align-items: center;
+  gap: 0.5rem;
+  color: var(--text-primary, #142019);
+  opacity: 1;
+  line-height: 1.45;
+  list-style: none;
+}
+
+.faq-list summary::-webkit-details-marker {
+  display: none;
+}
+
+.faq-list summary::marker {
+  content: '';
+}
+
+.faq-list summary::after {
+  content: '';
+  margin-left: auto;
+  flex-shrink: 0;
+  width: 0.45rem;
+  height: 0.45rem;
+  border-right: 2px solid var(--primary-color, #2e7d32);
+  border-bottom: 2px solid var(--primary-color, #2e7d32);
+  transform: rotate(45deg);
+  transition: transform 0.2s ease;
+}
+
+.faq-list details[open] summary::after {
+  transform: rotate(-135deg);
+  margin-top: 0.2rem;
+}
+
+.faq-list summary:focus-visible {
+  outline: 2px solid var(--primary-color, #2e7d32);
+  outline-offset: 3px;
+  border-radius: 6px;
 }
 
 .faq-list details p {
   margin: 0.65rem 0 0;
-  color: var(--text-muted, #555);
-  line-height: 1.55;
+  color: var(--text-secondary, var(--text-muted, #3d5346));
+  line-height: 1.6;
+  opacity: 1;
+}
+
+body.lang-si .faq-list summary,
+body.lang-ta .faq-list summary,
+body.lang-si .faq-list details p,
+body.lang-ta .faq-list details p {
+  opacity: 1;
+  -webkit-font-smoothing: antialiased;
 }
 
 .profile-layout {
