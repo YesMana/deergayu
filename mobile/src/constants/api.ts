@@ -9,6 +9,7 @@ export function mediaUrl(url?: string | null): string | null {
   if (!url || typeof url !== 'string') return null;
   const trimmed = url.trim();
   if (!trimmed) return null;
+  if (/^data:image\//i.test(trimmed)) return trimmed;
   if (/^https?:\/\//i.test(trimmed)) return trimmed;
   const path = trimmed.startsWith('/') ? trimmed : `/${trimmed}`;
   if (path.startsWith('/uploads/')) return `${API_URL}/api${path}`;
